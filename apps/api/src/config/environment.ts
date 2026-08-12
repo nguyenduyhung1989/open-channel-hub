@@ -3,6 +3,11 @@ import { z } from 'zod';
 import { DEFAULT_SOURCE_OFFER_URL } from '../source/source-offer.js';
 
 const environmentSchema = z.object({
+  DATABASE_HOST: z.string().optional(),
+  DATABASE_NAME: z.string().optional(),
+  DATABASE_PASSWORD_FILE: z.string().optional(),
+  DATABASE_PORT: z.string().optional(),
+  DATABASE_USER: z.string().optional(),
   HOST: z.string().min(1).default('127.0.0.1'),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   OPERATOR_API_TOKEN: z.string().optional(),
@@ -36,10 +41,19 @@ export interface EnabledTelegramBotEnvironment {
 
 export type TelegramBotEnvironment = DisabledTelegramBotEnvironment | EnabledTelegramBotEnvironment;
 
+export interface PostgresEnvironment {
+  readonly database: 'open_channel_hub';
+  readonly host: string;
+  readonly passwordFile: string;
+  readonly port: number;
+  readonly user: 'open_channel_hub';
+}
+
 export interface AppEnvironment {
   readonly HOST: string;
   readonly NODE_ENV: 'development' | 'test' | 'production';
   readonly PORT: number;
+  readonly postgres?: PostgresEnvironment;
   readonly sourceOfferUrl: string;
   readonly telegramBot: TelegramBotEnvironment;
 }
@@ -60,12 +74,14 @@ export const parseEnvironment = (environment: NodeJS.ProcessEnv): AppEnvironment
 
   const configuration = result.data;
   const sourceOfferUrl = sourceOfferUrlFor(configuration.SOURCE_OFFER_URL);
+  const postgres = postgresEnvironmentFor(configuration);
 
   if (
     (configuration.SOURCE_OFFER_URL !== undefined &&
       configuration.SOURCE_OFFER_URL.trim().length > 0 &&
       sourceOfferUrl === undefined) ||
-    (configuration.NODE_ENV === 'production' && sourceOfferUrl === undefined)
+    (configuration.NODE_ENV === 'production' && sourceOfferUrl === undefined) ||
+    (configuration.NODE_ENV === 'production' && postgres === undefined)
   ) {
     throw new EnvironmentConfigurationError();
   }
@@ -77,6 +93,7 @@ export const parseEnvironment = (environment: NodeJS.ProcessEnv): AppEnvironment
       HOST: configuration.HOST,
       NODE_ENV: configuration.NODE_ENV,
       PORT: configuration.PORT,
+      ...(postgres === undefined ? {} : { postgres }),
       sourceOfferUrl: resolvedSourceOfferUrl,
       telegramBot: Object.freeze({ enabled: false })
     });
@@ -91,7 +108,8 @@ export const parseEnvironment = (environment: NodeJS.ProcessEnv): AppEnvironment
     botToken === undefined ||
     operatorApiToken === undefined ||
     webhookSecret === undefined ||
-    operatorApiToken === webhookSecret
+    operatorApiToken === webhookSecret ||
+    postgres === undefined
   ) {
     throw new EnvironmentConfigurationError();
   }
@@ -108,6 +126,7 @@ export const parseEnvironment = (environment: NodeJS.ProcessEnv): AppEnvironment
     HOST: configuration.HOST,
     NODE_ENV: configuration.NODE_ENV,
     PORT: configuration.PORT,
+    ...(postgres === undefined ? {} : { postgres }),
     sourceOfferUrl: resolvedSourceOfferUrl,
     telegramBot: Object.freeze({
       botToken,
@@ -133,6 +152,63 @@ const requireWebhookSecret = (value: string | undefined): string | undefined => 
   const secret = requireNonBlank(value);
 
   return secret === undefined || !/^[A-Za-z0-9_-]{32,256}$/.test(secret) ? undefined : secret;
+};
+
+const postgresEnvironmentFor = (
+  configuration: Readonly<{
+    DATABASE_HOST?: string | undefined;
+    DATABASE_NAME?: string | undefined;
+    DATABASE_PASSWORD_FILE?: string | undefined;
+    DATABASE_PORT?: string | undefined;
+    DATABASE_USER?: string | undefined;
+  }>
+): PostgresEnvironment | undefined => {
+  const host = optionalNonBlank(configuration.DATABASE_HOST);
+  const database = optionalNonBlank(configuration.DATABASE_NAME);
+  const passwordFile = optionalNonBlank(configuration.DATABASE_PASSWORD_FILE);
+  const port = optionalNonBlank(configuration.DATABASE_PORT);
+  const user = optionalNonBlank(configuration.DATABASE_USER);
+
+  if (
+    host === undefined &&
+    database === undefined &&
+    passwordFile === undefined &&
+    port === undefined &&
+    user === undefined
+  ) {
+    return undefined;
+  }
+
+  const parsedPort = port === undefined ? undefined : Number(port);
+
+  if (
+    host === undefined ||
+    database !== 'open_channel_hub' ||
+    passwordFile === undefined ||
+    !passwordFile.startsWith('/') ||
+    passwordFile.length > 1_024 ||
+    parsedPort === undefined ||
+    !Number.isSafeInteger(parsedPort) ||
+    parsedPort < 1 ||
+    parsedPort > 65_535 ||
+    user !== 'open_channel_hub'
+  ) {
+    throw new EnvironmentConfigurationError();
+  }
+
+  return Object.freeze({
+    database,
+    host,
+    passwordFile,
+    port: parsedPort,
+    user
+  });
+};
+
+const optionalNonBlank = (value: string | undefined): string | undefined => {
+  const normalized = value?.trim();
+
+  return normalized === undefined || normalized.length === 0 ? undefined : normalized;
 };
 
 const optionalHttpsUrl = (value: string | undefined): string | undefined => {

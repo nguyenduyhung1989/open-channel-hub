@@ -64,7 +64,8 @@ describe('createTelegramBotFeature', () => {
       );
     const feature = await createTelegramBotFeature(ENVIRONMENT, {
       fetchImpl,
-      now: () => new Date('2026-08-12T00:00:00.000Z')
+      now: () => new Date('2026-08-12T00:00:00.000Z'),
+      receiveEvents: async (): Promise<void> => undefined
     });
     const app = await buildApp({ telegramBot: feature });
 

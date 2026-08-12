@@ -27,6 +27,6 @@ This policy applies to issues, pull requests, reviews, discussions, documentatio
 
 ## Reporting and enforcement
 
-Do not put sensitive details in a public issue. To report conduct privately, use the [repository Security tab](https://github.com/nguyenduyhung1989/open-channel-hub/security/advisories/new), prefix the title with `[conduct]`, and provide only the necessary information. During Phase 0–1a / alpha, this is the temporary private reporting channel for maintainers; it does not replace the vulnerability-reporting process in [SECURITY.md](SECURITY.md).
+Do not put sensitive details in a public issue. To report conduct privately, use the [repository Security tab](https://github.com/nguyenduyhung1989/open-channel-hub/security/advisories/new), prefix the title with `[conduct]`, and provide only the necessary information. During Phase 2a / alpha, this is the temporary private reporting channel for maintainers; it does not replace the vulnerability-reporting process in [SECURITY.md](SECURITY.md).
 
 A maintainer will acknowledge the report, assess it privately, and may warn, request a correction, remove content, lock a discussion, or ban participation according to severity. Good-faith reporters will not face retaliation.

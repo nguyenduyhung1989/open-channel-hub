@@ -3,6 +3,7 @@ import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 
 import { apiFailure } from './http/api-response.js';
 import { registerHealthRoute } from './health/health-route.js';
+import { registerReadinessRoute, type ReadinessCheck } from './health/readiness-route.js';
 import {
   DEFAULT_SOURCE_OFFER_URL,
   registerSourceOfferRoute,
@@ -13,6 +14,7 @@ import { registerTelegramBotMessageRoute } from './telegram-bot/telegram-bot-mes
 import { registerTelegramBotWebhookRoute } from './telegram-bot/telegram-bot-webhook-route.js';
 
 export interface BuildAppOptions {
+  readonly readiness?: ReadinessCheck;
   readonly sourceOfferUrl?: string;
   readonly telegramBot?: TelegramBotFeature;
 }
@@ -65,6 +67,7 @@ export const buildApp = async (options: BuildAppOptions = {}): Promise<FastifyIn
   });
 
   await registerHealthRoute(app);
+  await registerReadinessRoute(app, options.readiness);
   await registerSourceOfferRoute(app, sourceOfferUrl);
 
   if (options.telegramBot !== undefined) {

@@ -2,6 +2,14 @@ import { describe, expect, it } from 'vitest';
 
 import { EnvironmentConfigurationError, parseEnvironment } from './environment.js';
 
+const POSTGRES_ENVIRONMENT = Object.freeze({
+  DATABASE_HOST: 'postgres',
+  DATABASE_NAME: 'open_channel_hub',
+  DATABASE_PASSWORD_FILE: '/run/secrets/database_password',
+  DATABASE_PORT: '5432',
+  DATABASE_USER: 'open_channel_hub'
+});
+
 describe('parseEnvironment', () => {
   it('returns only the documented runtime settings with safe defaults', () => {
     expect(parseEnvironment({})).toEqual({
@@ -43,6 +51,7 @@ describe('parseEnvironment', () => {
   it('returns an enabled Telegram configuration only after validating secrets and HTTPS webhook URL', () => {
     expect(
       parseEnvironment({
+        ...POSTGRES_ENVIRONMENT,
         OPERATOR_API_TOKEN: 'operator-token-with-at-least-thirty-two-characters',
         TELEGRAM_BOT_ENABLED: 'true',
         TELEGRAM_BOT_TOKEN: 'synthetic-bot-token',
@@ -54,6 +63,13 @@ describe('parseEnvironment', () => {
       HOST: '127.0.0.1',
       NODE_ENV: 'development',
       PORT: 3000,
+      postgres: {
+        database: 'open_channel_hub',
+        host: 'postgres',
+        passwordFile: '/run/secrets/database_password',
+        port: 5432,
+        user: 'open_channel_hub'
+      },
       sourceOfferUrl: 'https://github.com/nguyenduyhung1989/open-channel-hub',
       telegramBot: {
         botToken: 'synthetic-bot-token',
@@ -72,6 +88,7 @@ describe('parseEnvironment', () => {
     );
     expect(
       parseEnvironment({
+        ...POSTGRES_ENVIRONMENT,
         NODE_ENV: 'production',
         SOURCE_OFFER_URL: 'https://example.test/open-channel-hub/source/phase-1a'
       }).sourceOfferUrl
@@ -83,8 +100,50 @@ describe('parseEnvironment', () => {
     ).toThrow(EnvironmentConfigurationError);
   });
 
+  it('requires an isolated PostgreSQL configuration in production and when Telegram is enabled', () => {
+    expect(() =>
+      parseEnvironment({
+        NODE_ENV: 'production',
+        SOURCE_OFFER_URL: 'https://example.test/open-channel-hub/source/phase-2a'
+      })
+    ).toThrow(EnvironmentConfigurationError);
+    expect(() =>
+      parseEnvironment({
+        TELEGRAM_BOT_ENABLED: 'true',
+        OPERATOR_API_TOKEN: 'operator-token-with-at-least-thirty-two-characters',
+        TELEGRAM_BOT_TOKEN: 'synthetic-bot-token',
+        TELEGRAM_WEBHOOK_SECRET: 'synthetic_webhook_secret_0123456789'
+      })
+    ).toThrow(EnvironmentConfigurationError);
+  });
+
+  it('rejects partial, unsafe, or differently named PostgreSQL configuration', () => {
+    expect(() => parseEnvironment({ DATABASE_HOST: 'postgres' })).toThrow(
+      EnvironmentConfigurationError
+    );
+    expect(() =>
+      parseEnvironment({
+        DATABASE_HOST: 'postgres',
+        DATABASE_NAME: 'another_database',
+        DATABASE_PASSWORD_FILE: '/run/secrets/database_password',
+        DATABASE_PORT: '5432',
+        DATABASE_USER: 'open_channel_hub'
+      })
+    ).toThrow(EnvironmentConfigurationError);
+    expect(() =>
+      parseEnvironment({
+        DATABASE_HOST: 'postgres',
+        DATABASE_NAME: 'open_channel_hub',
+        DATABASE_PASSWORD_FILE: 'relative-password-file',
+        DATABASE_PORT: '5432',
+        DATABASE_USER: 'open_channel_hub'
+      })
+    ).toThrow(EnvironmentConfigurationError);
+  });
+
   it('allows an omitted or blank optional Telegram webhook URL', () => {
     const configuration = {
+      ...POSTGRES_ENVIRONMENT,
       OPERATOR_API_TOKEN: 'operator-token-with-at-least-thirty-two-characters',
       TELEGRAM_BOT_ENABLED: 'true',
       TELEGRAM_BOT_TOKEN: 'synthetic-bot-token',
@@ -105,6 +164,7 @@ describe('parseEnvironment', () => {
 
     expect(() =>
       parseEnvironment({
+        ...POSTGRES_ENVIRONMENT,
         OPERATOR_API_TOKEN: sharedSecret,
         TELEGRAM_BOT_ENABLED: 'true',
         TELEGRAM_BOT_TOKEN: 'synthetic-bot-token',
@@ -115,6 +175,7 @@ describe('parseEnvironment', () => {
 
   it('rejects a short or malformed Telegram webhook secret and unsafe webhook URL', () => {
     const configuration = {
+      ...POSTGRES_ENVIRONMENT,
       OPERATOR_API_TOKEN: 'operator-token-with-at-least-thirty-two-characters',
       TELEGRAM_BOT_ENABLED: 'true',
       TELEGRAM_BOT_TOKEN: 'synthetic-bot-token',

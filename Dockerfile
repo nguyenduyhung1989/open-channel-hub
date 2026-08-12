@@ -35,6 +35,6 @@ USER app
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD node --input-type=module --eval "const response = await fetch('http://127.0.0.1:3000/health'); if (!response.ok) process.exit(1);"
+  CMD node --input-type=module --eval "const response = await fetch('http://127.0.0.1:3000/ready'); if (!response.ok) process.exit(1);"
 
 CMD ["node", "apps/api/dist/server.js"]

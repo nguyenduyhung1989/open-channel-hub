@@ -1,6 +1,6 @@
 # Support
 
-Open Channel Hub is a Phase 0–1a / alpha project maintained on a limited-time basis. It has no response-time commitment or production support. The `Telegram Bot` HTTP transport, startup wiring, and synthetic offline tests exist, but no live credential, network, webhook, or production verification has occurred.
+Open Channel Hub is a Phase 2a / alpha project maintained on a limited-time basis. It has no response-time commitment or production support. The `Telegram Bot` HTTP transport, startup wiring, durable PostgreSQL inbound-event ledger, and synthetic offline tests exist. An unauthenticated HTTPS reachability probe succeeded, but no live credential, authenticated Bot API request, webhook, or production verification has occurred.
 
 ## Where to ask
 
@@ -18,7 +18,7 @@ State the version or commit, operating system, Node.js version, commands run, ex
 
 - Maintainer-provided production deployment or hosting.
 - Maintainer-operated live Telegram use, webhook registration, or public TLS/production verification.
-- Platforms outside the Phase 1a `Telegram Bot` scope.
+- Platforms outside the narrow Phase 1a `Telegram Bot` and Phase 2a storage scope.
 - Connectors that depend on unsupported provider login sessions or APIs.
 
-Read the [Phase 1a Telegram Bot operating boundary](docs/operations/telegram-bot-1a.md) and [Phase 0–1a threat model](docs/security/threat-model.md) before asking about configuration or security.
+Read the [Phase 1a Telegram Bot operating boundary](docs/operations/telegram-bot-1a.md), [Phase 2a PostgreSQL operations guide](docs/operations/postgresql-phase-2a.md), and [Phase 0–2a threat model](docs/security/threat-model.md) before asking about configuration or security.

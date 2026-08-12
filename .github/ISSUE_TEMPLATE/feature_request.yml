@@ -5,9 +5,9 @@ body:
   - type: markdown
     attributes:
       value: |
-        Phase 0–1a has an official Telegram Bot transport, startup wiring, and synthetic offline tests,
-        but no live Telegram or production verification. Read ROADMAP.md first and describe the problem,
-        not only the platform you want to add.
+        Phase 2a has an official Telegram Bot transport, startup wiring, a durable PostgreSQL inbound-event
+        ledger, and synthetic offline tests, but no live Telegram or production verification. Read ROADMAP.md
+        first and describe the problem, not only the platform you want to add.
   - type: textarea
     id: problem
     attributes:

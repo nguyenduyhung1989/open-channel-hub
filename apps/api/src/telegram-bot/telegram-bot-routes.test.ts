@@ -198,6 +198,30 @@ describe('Telegram Bot routes', () => {
     expect(normalize).toHaveBeenCalledWith({ update_id: 9001 });
     expect(receiveEvents).toHaveBeenCalledWith([EVENT]);
   });
+
+  it('does not acknowledge a webhook when durable event recording fails', async () => {
+    const receiveEvents = vi.fn(async (): Promise<void> => {
+      throw new Error('Synthetic PostgreSQL failure detail must never reach Telegram.');
+    });
+    const { feature } = createFeature({ receiveEvents });
+    const app = await buildApp({ telegramBot: feature });
+    applications.push(app);
+
+    const response = await app.inject({
+      headers: { 'x-telegram-bot-api-secret-token': WEBHOOK_SECRET },
+      method: 'POST',
+      payload: { update_id: 9001 },
+      url: '/v1/webhooks/telegram-bot'
+    });
+
+    expect(response.statusCode).toBe(500);
+    expect(response.json()).toEqual({
+      success: false,
+      error: { code: 'internal_error', message: 'An unexpected error occurred.' }
+    });
+    expect(receiveEvents).toHaveBeenCalledWith([EVENT]);
+    expect(response.body).not.toContain('Synthetic PostgreSQL failure detail');
+  });
 });
 
 function createFeature(overrides: Partial<TelegramBotFeature> = {}) {

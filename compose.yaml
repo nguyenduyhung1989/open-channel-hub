@@ -1,17 +1,87 @@
 name: open-channel-hub
 
-# Local operator-only alpha runner: one API process with a loopback-only host port.
-# Phase 1a values come from the Git-ignored `.env` file; do not place secrets in this file.
+# Local operator-only alpha runner. PostgreSQL remains on an internal Docker network; only the API
+# publishes a loopback-only host port. Values come from Git-ignored environment sources; never place secrets here.
 # SOURCE_OFFER_URL is required because this service uses NODE_ENV=production. It must point to the exact
 # public, unauthenticated corresponding source for this running version; a modified fork must not use upstream as a placeholder.
 # TELEGRAM_WEBHOOK_URL may be blank. When set, it must be a public absolute HTTPS URL with no userinfo, query, fragment, or secret.
-# Starting this service does not create PostgreSQL, Redis, a queue, TLS, a public proxy, or a production deployment.
+# PostgreSQL is initialized for this hub only: database `open_channel_hub`, schema `open_channel_hub`, and a non-superuser
+# application role. The migration service applies idempotent schema changes before the API starts. This stack still does not provide
+# Redis, a queue, TLS, a public proxy, backups, or a production deployment.
 services:
+  postgres:
+    image: postgres:18.4-alpine3.24
+    environment:
+      POSTGRES_DB: open_channel_hub
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      POSTGRES_USER: postgres
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready --username=postgres --dbname=open_channel_hub']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    networks:
+      - hub-data
+    secrets:
+      - source: postgres_password
+        target: postgres_password
+        uid: '70'
+        gid: '70'
+        mode: 0400
+      - source: database_password
+        target: database_password
+        uid: '0'
+        gid: '70'
+        mode: 0440
+    shm_size: 128mb
+    volumes:
+      - postgres-data:/var/lib/postgresql
+      - ./docker/postgres/init/010-create-application-role.sh:/docker-entrypoint-initdb.d/010-create-application-role.sh:ro
+
+  migrate:
+    build:
+      context: .
+      target: runtime
+    command: ['node', 'apps/api/dist/db/migrate.js']
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_HOST: postgres
+      DATABASE_NAME: open_channel_hub
+      DATABASE_PASSWORD_FILE: /run/secrets/database_password
+      DATABASE_PORT: '5432'
+      DATABASE_USER: open_channel_hub
+      NODE_ENV: production
+      SOURCE_OFFER_URL: '${SOURCE_OFFER_URL:-}'
+      TELEGRAM_BOT_ENABLED: 'false'
+    networks:
+      - hub-data
+    restart: 'no'
+    secrets:
+      - source: database_password
+        target: database_password
+        uid: '10001'
+        gid: '10001'
+        mode: 0400
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
   api:
     build:
       context: .
       target: runtime
     environment:
+      DATABASE_HOST: postgres
+      DATABASE_NAME: open_channel_hub
+      DATABASE_PASSWORD_FILE: /run/secrets/database_password
+      DATABASE_PORT: '5432'
+      DATABASE_USER: open_channel_hub
       NODE_ENV: production
       # The process must listen on every container interface; the ports mapping below limits the host to loopback.
       HOST: 0.0.0.0
@@ -23,12 +93,37 @@ services:
       TELEGRAM_CONNECTION_ID: '${TELEGRAM_CONNECTION_ID:-telegram-bot-default}'
       TELEGRAM_WEBHOOK_SECRET: '${TELEGRAM_WEBHOOK_SECRET:-}'
       TELEGRAM_WEBHOOK_URL: '${TELEGRAM_WEBHOOK_URL:-}'
-    ports:
-      - '127.0.0.1:3000:3000'
-    read_only: true
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - hub-edge
+      - hub-data
+    secrets:
+      - source: database_password
+        target: database_password
+        uid: '10001'
+        gid: '10001'
+        mode: 0400
     tmpfs:
       - /tmp
+    ports:
+      - '127.0.0.1:${API_HOST_PORT:-3000}:3000'
     cap_drop:
       - ALL
     security_opt:
       - no-new-privileges:true
+
+networks:
+  hub-data:
+    internal: true
+  hub-edge: {}
+
+secrets:
+  database_password:
+    environment: DATABASE_PASSWORD
+  postgres_password:
+    environment: POSTGRES_PASSWORD
+
+volumes:
+  postgres-data: {}

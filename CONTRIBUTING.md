@@ -1,10 +1,10 @@
 # Contributing to Open Channel Hub
 
-Thank you for helping improve the project. It is in Phase 0–1a / alpha: the official `Telegram Bot` HTTP transport, startup wiring, and synthetic offline tests exist, but no real credential, network, webhook, or production verification has occurred. The most useful contribution is therefore a small, well-reasoned change with matching checks.
+Thank you for helping improve the project. It is in Phase 2a / alpha: the official `Telegram Bot` HTTP transport, startup wiring, durable PostgreSQL inbound-event storage, and synthetic offline tests exist. An unauthenticated HTTPS reachability probe succeeded, but no real credential, authenticated Bot API request, webhook, or production verification has occurred. The most useful contribution is therefore a small, well-reasoned change with matching checks.
 
 ## Before you begin
 
-1. Read [README.md](README.md), [ROADMAP.md](ROADMAP.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), the [Phase 0–1a threat model](docs/security/threat-model.md), the [Phase 1a Telegram Bot operating boundary](docs/operations/telegram-bot-1a.md), and any relevant [ADRs](docs/adr/README.md).
+1. Read [README.md](README.md), [ROADMAP.md](ROADMAP.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), the [Phase 0–2a threat model](docs/security/threat-model.md), the [Phase 1a Telegram Bot operating boundary](docs/operations/telegram-bot-1a.md), the [Phase 2a PostgreSQL operations guide](docs/operations/postgresql-phase-2a.md), and any relevant [ADRs](docs/adr/README.md).
 2. Search existing issues and pull requests to avoid duplicate work.
 3. Open a discussion issue first for significant architecture, connector, or privacy changes. Do not drop an unbounded design into a pull request.
 
@@ -20,7 +20,7 @@ cp .env.example .env
 npm run check
 ```
 
-No token or provider account is required for offline tests. If a Phase 0–1a workflow requires a contributor to possess a real secret, report it as a design defect. A live Telegram test is a separate operational step and requires owner authorization.
+No token or provider account is required for offline tests. If an offline workflow requires a contributor to possess a real secret, report it as a design defect. A live Telegram test is a separate operational step and requires owner authorization.
 
 ## Make a change
 
@@ -29,7 +29,7 @@ No token or provider account is required for offline tests. If a Phase 0–1a wo
 - Treat data from HTTP, webhooks, and providers as untrusted. Validate it at the boundary before use.
 - A send action must be blocked before a provider call when the connector does not advertise that capability.
 - Write behavioral tests for success, invalid input, and unavailable capability. Tests must not make real network calls.
-- Do not add PostgreSQL, Redis, a queue, or a UI merely because it may be useful later. Add it only when the current vertical slice needs it.
+- Do not add another database, Redis, a queue, or a UI merely because it may be useful later. PostgreSQL exists for the current inbound ledger; further operational services require a demonstrated need.
 
 Before opening a pull request, run:
 

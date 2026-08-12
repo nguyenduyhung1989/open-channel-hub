@@ -1,27 +1,60 @@
 # Changelog
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows [Semantic Versioning](https://semver.org/).
+The format is based on
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
+follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
 ### Added
 
 - The public Phase 0 foundation for Open Channel Hub.
-- The original mocked `Telegram Bot` vertical slice, connector contracts, and health-check API.
-- CI, CodeQL, Dependabot, community-policy files, ADRs, and an initial threat model.
-- Phase 1a: Telegram Bot HTTP transport, startup wiring, local operator API, separately authenticated webhook, and credential-safe configuration and operations documentation.
-- An unauthenticated `GET /source` endpoint and `Link: <SOURCE_OFFER_URL>; rel="source"` response header to surface the configured corresponding-source offer.
+- The original mocked Telegram Bot vertical slice, connector contracts, and
+  health-check API.
+- CI, CodeQL, Dependabot, community-policy files, ADRs, and an initial threat
+  model.
+- Phase 1a: Telegram Bot HTTP transport, startup wiring, local operator API,
+  separately authenticated webhook, and credential-safe configuration and
+  operations documentation.
+- An unauthenticated <code>GET /source</code> endpoint and
+  <code>Link: &lt;SOURCE_OFFER_URL&gt;; rel="source"</code> response header to
+  surface the configured corresponding-source offer.
+- Phase 2a: a PostgreSQL 18.4 Compose service, dedicated
+  <code>open_channel_hub</code> database/schema, non-superuser application
+  role, migration ledger, and readiness check.
+- Phase 2a: a domain-owned PostgreSQL inbound-event adapter that stores
+  canonical text events with parameterized SQL and conflict-safe uniqueness on
+  <code>(connection_id, provider_event_id)</code>, without raw provider
+  payloads.
+- A local synthetic Docker proof that an idempotent migration can run twice and
+  duplicate fake webhook delivery produces one durable ledger row.
 
 ### Changed
 
-- GitHub CI and CodeQL succeeded for the Phase 1a candidate at `7141949`; creating a `0.1.0` release tag remains a separate owner decision.
-- Phase 1a status now records passing final local candidate evidence: `npm run check` (seven test files, fifty tests, and build), `npm audit --audit-level=low` with zero vulnerabilities, `docker compose config --quiet`, non-root/read-only runtime checks, and independent audit.
-- Real Telegram verification remains outstanding.
+- The current documentation now distinguishes historical Phase 1a verification
+  at <code>7141949</code> from completed local verification and still-pending
+  GitHub evidence for the Phase 2a candidate.
+- An accepted inbound Telegram text event now becomes durable when the
+  PostgreSQL configuration is present; this does not add an inbox, read API,
+  live Telegram proof, backup, or retention policy.
+- The runtime has <code>/ready</code> for dependency readiness in addition to
+  process liveness at <code>/health</code>.
 
 ### Security
 
-- Real secrets and data are prohibited in the repository, issues, pull requests, and tests.
-- Telegram is disabled by default; Compose publishes only a loopback host port, documentation never puts tokens in commands or logs, and a configured `TELEGRAM_WEBHOOK_URL` cannot contain userinfo, a query string, a fragment, or a secret.
-- Production requires an explicit HTTPS `SOURCE_OFFER_URL` with no userinfo, query string, fragment, or secret; it must provide the exact corresponding source for the version running.
+- PostgreSQL remains on an internal Compose network and has no host port.
+- Compose injects distinct bootstrap and application database passwords as
+  Docker secrets; the application database password is read from a secret file,
+  not placed in the API environment.
+- The API and migration services remain non-root, drop Linux capabilities, use
+  <code>no-new-privileges</code>, and have no host source/data bind mount.
+  Their root filesystems are not currently read-only because the available
+  Compose environment-secret injection cannot support that configuration; this
+  is a known limitation, not a hardening claim.
+- Real secrets and data are prohibited in the repository, issues, pull
+  requests, and tests. A database volume can contain canonical message text, so
+  <code>docker compose down --volumes</code> is destructive and must not be
+  used as a routine shutdown.
 
-There has been no official release. A version is dated here only when its release tag is created after final checks.
+There has been no official release. A version is dated here only when its
+release tag is created after final checks.

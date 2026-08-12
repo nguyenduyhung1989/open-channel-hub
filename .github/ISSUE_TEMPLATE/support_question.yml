@@ -5,8 +5,9 @@ body:
   - type: markdown
     attributes:
       value: |
-        Read SUPPORT.md and README.md first. Phase 0–1a has no live Telegram, PostgreSQL, Redis,
-        dashboard, or platform support outside the deliberately narrow Telegram Bot scope.
+        Read SUPPORT.md and README.md first. Phase 2a has a local PostgreSQL inbound-event ledger,
+        but no live Telegram, Redis, dashboard, or platform support outside the deliberately narrow
+        Telegram Bot and storage scope.
   - type: textarea
     id: question
     attributes:

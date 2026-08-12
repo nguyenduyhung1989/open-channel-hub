@@ -15,17 +15,17 @@ import type { TelegramBotFeature } from './telegram-bot-feature.js';
 export interface CreateTelegramBotFeatureOptions {
   readonly fetchImpl?: typeof fetch;
   readonly now?: () => Date;
-  readonly receiveEvents?: (events: readonly CanonicalEvent[]) => Promise<void>;
+  readonly receiveEvents: (events: readonly CanonicalEvent[]) => Promise<void>;
 }
 
 /**
  * Wires one explicitly configured official Telegram Bot into the application.
- * It deliberately has no persistence yet: accepted inbound events are normalized
- * and handed to a sink that is a no-op until the Phase 2 event store exists.
+ * Accepted inbound events are normalized and handed to the required durable
+ * sink supplied by the composition root.
  */
 export const createTelegramBotFeature = async (
   environment: EnabledTelegramBotEnvironment,
-  options: CreateTelegramBotFeatureOptions = {}
+  options: CreateTelegramBotFeatureOptions
 ): Promise<TelegramBotFeature> => {
   const gateway = new TelegramHttpBotGateway({
     botToken: environment.botToken,
@@ -47,10 +47,8 @@ export const createTelegramBotFeature = async (
     connectionId: environment.connectionId,
     normalize: (rawEvent: unknown): readonly CanonicalEvent[] => connector.normalize(rawEvent),
     operatorApiToken: environment.operatorApiToken,
-    receiveEvents: options.receiveEvents ?? discardInboundEvents,
+    receiveEvents: options.receiveEvents,
     sendMessage: async (input: unknown): Promise<SendMessageResult> => sendMessage.execute(input),
     webhookSecret: environment.webhookSecret
   });
 };
-
-const discardInboundEvents = async (): Promise<void> => undefined;

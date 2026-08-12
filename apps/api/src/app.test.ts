@@ -26,6 +26,46 @@ describe('Open Channel Hub API', () => {
     });
   });
 
+  it('reports readiness only after its injected dependencies are ready', async () => {
+    const app = await buildApp({
+      readiness: Object.freeze({
+        check: async (): Promise<void> => undefined
+      })
+    });
+    applications.push(app);
+
+    const response = await app.inject({ method: 'GET', url: '/ready' });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      success: true,
+      data: { service: 'open-channel-hub', status: 'ready' }
+    });
+  });
+
+  it('returns a safe readiness failure without leaking database details', async () => {
+    const app = await buildApp({
+      readiness: Object.freeze({
+        check: async (): Promise<void> => {
+          throw new Error('Synthetic database host and password detail must never reach callers.');
+        }
+      })
+    });
+    applications.push(app);
+
+    const response = await app.inject({ method: 'GET', url: '/ready' });
+
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toEqual({
+      success: false,
+      error: {
+        code: 'not_ready',
+        message: 'The service is not ready to receive requests.'
+      }
+    });
+    expect(response.body).not.toContain('Synthetic database host');
+  });
+
   it('offers the configured corresponding source without authentication', async () => {
     const app = await buildApp({
       sourceOfferUrl: 'https://example.test/open-channel-hub/source/phase-1a'

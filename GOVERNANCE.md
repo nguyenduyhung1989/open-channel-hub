@@ -2,7 +2,7 @@
 
 ## Current phase
 
-Open Channel Hub is in Phase 0–1a / alpha and is currently coordinated by one maintainer. The official `Telegram Bot` HTTP transport, startup wiring, and offline tests exist; no live credential, network, webhook, or production verification has occurred. That does not make decisions private: material changes need an issue or pull request, technical reasoning, and a public ADR when appropriate. See the [Phase 0–1a threat model](docs/security/threat-model.md) and [Phase 1a Telegram Bot operating boundary](docs/operations/telegram-bot-1a.md).
+Open Channel Hub is in Phase 2a / alpha and is currently coordinated by one maintainer. The official `Telegram Bot` HTTP transport, startup wiring, durable PostgreSQL inbound-event ledger, and offline tests exist; an unauthenticated HTTPS reachability probe succeeded, but no live credential, authenticated Bot API request, webhook, or production verification has occurred. That does not make decisions private: material changes need an issue or pull request, technical reasoning, and a public ADR when appropriate. See the [Phase 0–2a threat model](docs/security/threat-model.md), [Phase 1a Telegram Bot operating boundary](docs/operations/telegram-bot-1a.md), and [Phase 2a PostgreSQL operations guide](docs/operations/postgresql-phase-2a.md).
 
 ## Roles
 
