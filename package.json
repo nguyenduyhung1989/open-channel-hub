@@ -1,0 +1,47 @@
+{
+  "name": "open-channel-hub",
+  "version": "0.1.0",
+  "description": "Open-source, self-hostable omnichannel messaging hub with official-first connectors.",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.0 <25"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "tsup --config tsup.config.ts",
+    "dev": "tsx apps/api/src/server.ts",
+    "start": "node apps/api/dist/server.js",
+    "typecheck": "tsc --noEmit --project tsconfig.json",
+    "lint": "eslint . --max-warnings=0",
+    "format:check": "prettier --check .",
+    "test": "vitest run --coverage",
+    "test:watch": "vitest",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build"
+  },
+  "dependencies": {
+    "@fastify/helmet": "13.1.0",
+    "fastify": "5.11.3",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "24.13.3",
+    "@vitest/coverage-v8": "4.1.10",
+    "eslint": "10.8.1",
+    "globals": "17.10.0",
+    "prettier": "3.9.6",
+    "tsup": "8.5.1",
+    "tsx": "4.23.12",
+    "typescript": "6.0.2",
+    "typescript-eslint": "8.67.0",
+    "vitest": "4.1.10"
+  },
+  "overrides": {
+    "esbuild": "0.28.2"
+  }
+}

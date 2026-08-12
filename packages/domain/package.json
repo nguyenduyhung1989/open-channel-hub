@@ -1,0 +1,14 @@
+{
+  "name": "@open-channel-hub/domain",
+  "version": "0.1.0",
+  "description": "Framework-free domain use cases for Open Channel Hub.",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "@open-channel-hub/contracts": "file:../contracts"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

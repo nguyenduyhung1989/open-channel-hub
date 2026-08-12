@@ -1,0 +1,36 @@
+name: Đề xuất tính năng
+description: Đề xuất một khả năng mới, có vấn đề cụ thể và phạm vi nhỏ.
+title: '[Feature]: '
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Chặng 0 chưa có connector chạy thật, cơ sở dữ liệu hay giao diện. Hãy đọc ROADMAP.md trước và mô tả vấn đề, không chỉ tên nền tảng muốn thêm.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Vấn đề cần giải quyết
+      description: Ai gặp vấn đề gì, trong tình huống nào?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Đề xuất nhỏ nhất
+      description: Nêu hành vi mong muốn, giới hạn và dữ liệu/permission liên quan.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Phương án đã cân nhắc
+      description: Kể cả “chưa có”.
+  - type: checkboxes
+    id: policy
+    attributes:
+      label: Ranh giới connector
+      options:
+        - label: Tôi hiểu dự án ưu tiên API chính thức và không nhận tính năng né CAPTCHA, giả dấu vết, lấy cắp phiên hay gửi thư rác.
+          required: true
+        - label: Tôi không đưa token, số điện thoại hay dữ liệu hội thoại thật vào đề xuất.
+          required: true

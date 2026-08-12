@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Báo lỗ hổng bảo mật riêng tư
+    url: https://github.com/nguyenduyhung1989/open-channel-hub/security/advisories/new
+    about: Không tạo issue công khai cho token, dữ liệu thật hoặc lỗ hổng.
+  - name: Hướng dẫn nhận hỗ trợ
+    url: https://github.com/nguyenduyhung1989/open-channel-hub/blob/main/SUPPORT.md
+    about: Đọc tài liệu trước, sau đó dùng biểu mẫu Câu hỏi hỗ trợ nếu cần.

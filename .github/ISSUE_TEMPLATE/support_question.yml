@@ -1,0 +1,39 @@
+name: Câu hỏi hỗ trợ
+description: Hỏi cách cài đặt/chạy một phần đã được tài liệu hoá.
+title: '[Support]: '
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Đọc SUPPORT.md và README.md trước. Chặng 0 không hỗ trợ Telegram thật, PostgreSQL, Redis, bảng điều khiển hoặc các nền tảng ngoài cổng mock.
+  - type: textarea
+    id: question
+    attributes:
+      label: Câu hỏi
+    validations:
+      required: true
+  - type: textarea
+    id: attempted
+    attributes:
+      label: Bạn đã thử gì?
+      description: Kèm lệnh/kết quả đã làm sạch bí mật.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Môi trường
+      value: |
+        - Hệ điều hành:
+        - Node.js:
+        - npm:
+        - Commit/phiên bản:
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: An toàn dữ liệu
+      options:
+        - label: Tôi không đưa token, cookie, số điện thoại, dữ liệu hội thoại hay `.env` vào issue.
+          required: true

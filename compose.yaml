@@ -1,0 +1,22 @@
+name: open-channel-hub
+
+# Local alpha runner only: one API process. The Telegram gateway is mocked only in tests.
+# This file deliberately does not create PostgreSQL, Redis, a queue, TLS, or a production deployment.
+services:
+  api:
+    build:
+      context: .
+      target: runtime
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: '3000'
+    ports:
+      - '127.0.0.1:3000:3000'
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true

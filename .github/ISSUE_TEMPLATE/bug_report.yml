@@ -1,0 +1,61 @@
+name: Báo lỗi
+description: Báo một lỗi có thể tái hiện trong mã nguồn hiện có.
+title: '[Bug]: '
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Cảm ơn mày đã giúp tìm lỗi. Không dán token, cookie, số điện thoại, nội dung hội thoại, payload thật hay tệp `.env`.
+        Nếu đây là lỗ hổng, dừng lại và làm theo SECURITY.md — đừng mở issue này.
+  - type: input
+    id: version
+    attributes:
+      label: Phiên bản hoặc commit
+      description: Tag phát hành, SHA commit hoặc nhánh đang dùng.
+      placeholder: main @ abc1234
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Bước tái hiện tối thiểu
+      description: Dùng dữ liệu giả tổng hợp, đủ để người khác chạy lại.
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Kết quả mong đợi
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Kết quả thực tế
+      description: Đính kèm log đã làm sạch bí mật nếu cần.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Môi trường
+      value: |
+        - Hệ điều hành:
+        - Node.js:
+        - npm:
+        - Cách chạy (npm/Docker):
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Kiểm tra trước khi gửi
+      options:
+        - label: Tôi đã tìm issue trùng và dùng dữ liệu giả, không có bí mật/dữ liệu thật.
+          required: true
+        - label: Đây không phải báo cáo lỗ hổng bảo mật.
+          required: true
