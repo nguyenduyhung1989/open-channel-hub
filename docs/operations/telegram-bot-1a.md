@@ -1,6 +1,6 @@
 # Phase 1a Telegram Bot: configuration and operating boundary
 
-**Status:** the HTTP gateway, startup wiring, and final local candidate verification are complete: `npm run check` passed with seven test files, fifty tests, and a build; `npm audit --audit-level=low` found zero vulnerabilities; `docker compose config --quiet` passed; the non-root, read-only runtime image was built and checked; and an independent audit passed. The bundled webhook CLI exits safely while Telegram is disabled and no real Telegram environment is present. Phase 1a is still not complete: no GitHub CI/CodeQL result exists for this candidate, and no real token, network request, webhook registration, or authorized test-bot check has occurred.
+**Status:** the HTTP gateway, startup wiring, and final candidate verification are complete: `npm run check` passed with seven test files, fifty tests, and a build; `npm audit --audit-level=low` found zero vulnerabilities; `docker compose config --quiet` passed; the non-root, read-only runtime image was built and checked; an independent audit passed; and GitHub CI and CodeQL succeeded at `7141949`. The bundled webhook CLI exits safely while Telegram is disabled and no real Telegram environment is present. Phase 1a is still not complete: no real token, network request, webhook registration, or authorized test-bot check has occurred.
 
 ## Deliberately narrow scope
 

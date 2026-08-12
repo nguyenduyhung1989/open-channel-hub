@@ -2,7 +2,7 @@
 
 > A self-hosted, official-first multichannel messaging hub.
 
-**Status: Phase 1a alpha; final local candidate verification has passed, but an owner-authorized live Telegram/TLS check is still required.** GitHub CI and CodeQL succeeded for Phase 0 at commit `8b80c3b`. That is evidence for that commit, not a release: creating a `0.1.0` tag remains a separate owner decision. No GitHub CI or CodeQL result exists yet for the current candidate.
+**Status: Phase 1a alpha; local and GitHub verification have passed, but an owner-authorized live Telegram/TLS check is still required.** GitHub CI and CodeQL succeeded for the Phase 1a candidate at commit `7141949`. That is evidence for that commit, not a release: creating a `0.1.0` tag remains a separate owner decision.
 
 The official `Telegram Bot` HTTP transport and startup wiring are implemented. A local operator uses `OPERATOR_API_TOKEN`; Telegram must supply a separate `X-Telegram-Bot-Api-Secret-Token` webhook header. `npm run check` passed with seven test files, fifty tests, and a build; `npm audit --audit-level=low` found zero vulnerabilities; `docker compose config --quiet` passed; and an independent audit passed. The runtime image was built and checked as a non-root, read-only container: a missing `SOURCE_OFFER_URL` fails fast, while a synthetic non-secret source URL produced healthy `/health` and correct `/source` responses. The bundled webhook CLI exits safely while Telegram is disabled and no real environment is present. The implementation only normalizes inbound text messages and does **not** persist conversations or provide a durable inbox before Phase 2. No real Telegram token, network request, webhook registration, send/receive confirmation, or production verification has occurred.
 
@@ -16,7 +16,7 @@ Open Channel Hub is intended to give small teams a shared multichannel core with
 - A narrow Telegram text-update normalizer covered by 41 API and connector tests using synthetic, offline data; other update types are ignored.
 - Formatting, linting, type checking, tests, and builds that can run locally and in CI.
 
-`Telegram Bot` is not presented as an Internet-proven integration. The code, startup wiring, focused offline tests, local runtime verification, and independent audit are complete. The remaining evidence is GitHub CI/CodeQL for the final candidate and then an owner-authorized real bot/TLS check. See [the Phase 1a Telegram Bot operations guide](docs/operations/telegram-bot-1a.md) for credential-safe setup instructions.
+`Telegram Bot` is not presented as an Internet-proven integration. The code, startup wiring, focused offline tests, local runtime verification, independent audit, GitHub CI, and CodeQL are complete for commit `7141949`. The remaining evidence is an owner-authorized real bot/TLS check. See [the Phase 1a Telegram Bot operations guide](docs/operations/telegram-bot-1a.md) for credential-safe setup instructions.
 
 ## What is not here yet?
 

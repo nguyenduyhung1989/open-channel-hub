@@ -9,7 +9,7 @@
 - Phase 0 GitHub CI and CodeQL succeeded at commit `8b80c3b`.
 - GitHub Private Vulnerability Reporting, secret scanning, Dependabot alerts, and automatic security fixes are enabled.
 - Final local candidate evidence passed: `npm run check` (seven test files, fifty tests, and build), `npm audit --audit-level=low` with zero vulnerabilities, `docker compose config --quiet`, non-root/read-only runtime checks, and independent audit.
-- No GitHub CI or CodeQL result exists yet for this candidate; the verified Phase 0 result remains commit `8b80c3b`.
+- GitHub CI and CodeQL succeeded for the Phase 1a candidate at commit `7141949`; the older Phase 0 result remains commit `8b80c3b`.
 - The `0.1.0` release tag has not been created; that is a separate owner decision.
 - Branch protection is intentionally open pending an owner decision. Do not describe it as an existing safeguard.
 
@@ -32,6 +32,5 @@
 
 ## Exact next verification
 
-1. When the final candidate is pushed, verify GitHub CI and CodeQL for that exact commit; the old `8b80c3b` result is not evidence for it.
-2. Only with owner authorization, place a test token in a safe secret source, use a public TLS URL, recreate the Compose `api` container if its environment changed, and run `docker compose exec api npm run telegram:webhook:set`. Then confirm one real Telegram flow without printing a token, header, or payload.
-3. Update this checkpoint, the threat model, and the roadmap from the new evidence before calling 1a complete or creating a release tag.
+1. Only with owner authorization, place a test token in a safe secret source, use a public TLS URL, recreate the Compose `api` container if its environment changed, and run `docker compose exec api npm run telegram:webhook:set`. Then confirm one real Telegram flow without printing a token, header, or payload.
+2. Update this checkpoint, the threat model, and the roadmap from the new evidence before calling 1a complete or creating a release tag.

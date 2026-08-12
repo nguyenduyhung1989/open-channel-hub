@@ -8,11 +8,12 @@ This is an honest operating checklist, not a claim that a program or organizatio
 - Contribution guidance, code of conduct, support, governance, security policy, roadmap, changelog, and ADRs.
 - CI files with a pinned runtime and formatting, lint, type, test, and build checks; CodeQL, Dependabot, and dependency review.
 - A small verifiable slice instead of a claim to support every platform.
-- The Phase 1a candidate has an HTTP gateway and startup wiring, and has passed final local evidence: `npm run check` (seven test files, fifty tests, and build), `npm audit --audit-level=low` with zero vulnerabilities, `docker compose config --quiet`, non-root/read-only runtime checks, and independent audit. Live Telegram verification and GitHub CI/CodeQL evidence for this candidate remain outstanding.
+- The Phase 1a candidate has an HTTP gateway and startup wiring, and has passed final local evidence: `npm run check` (seven test files, fifty tests, and build), `npm audit --audit-level=low` with zero vulnerabilities, `docker compose config --quiet`, non-root/read-only runtime checks, and independent audit. GitHub CI and CodeQL also succeeded for that candidate at `7141949`. Live Telegram verification remains outstanding.
 
 ## Verified GitHub evidence
 
 - GitHub CI and CodeQL succeeded at commit `8b80c3b`. This evidence applies only to that commit and does not replace verification of a later release commit or tag.
+- GitHub CI and CodeQL succeeded for the Phase 1a candidate at commit `7141949`. A later release tag still needs its own owner decision and verification.
 - GitHub Private Vulnerability Reporting, secret scanning, Dependabot alerts, and automatic security fixes are enabled.
 - Branch protection is intentionally open for an owner decision. Do not describe it as an existing safeguard or change it during documentation work.
 

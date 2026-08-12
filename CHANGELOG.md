@@ -14,9 +14,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
-- The roadmap now separates GitHub CI/CodeQL evidence at `8b80c3b` from the owner's decision to create a `0.1.0` release tag.
+- GitHub CI and CodeQL succeeded for the Phase 1a candidate at `7141949`; creating a `0.1.0` release tag remains a separate owner decision.
 - Phase 1a status now records passing final local candidate evidence: `npm run check` (seven test files, fifty tests, and build), `npm audit --audit-level=low` with zero vulnerabilities, `docker compose config --quiet`, non-root/read-only runtime checks, and independent audit.
-- Real Telegram verification and GitHub CI/CodeQL evidence for the current candidate remain outstanding.
+- Real Telegram verification remains outstanding.
 
 ### Security
 

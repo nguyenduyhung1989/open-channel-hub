@@ -19,7 +19,7 @@ Checked boxes describe code and configuration in the repository. They do not rep
 
 ## Phase 1 — official Telegram Bot, deliberately small
 
-**Status: Phase 1a implementation and final local candidate verification are complete; Phase 1a itself is not complete.** `npm run check` passed with seven test files, fifty tests, and a build; `npm audit --audit-level=low` found zero vulnerabilities; `docker compose config --quiet` passed; the non-root, read-only runtime image was built and checked; and an independent audit passed. No real token or network test has occurred, and GitHub CI/CodeQL has not yet run for this candidate.
+**Status: Phase 1a implementation and final local/GitHub candidate verification are complete; Phase 1a itself is not complete.** `npm run check` passed with seven test files, fifty tests, and a build; `npm audit --audit-level=low` found zero vulnerabilities; `docker compose config --quiet` passed; the non-root, read-only runtime image was built and checked; an independent audit passed; and GitHub CI and CodeQL succeeded at `7141949`. No real token or network test has occurred.
 
 ### 1a — HTTP boundary and local operation
 
@@ -28,7 +28,7 @@ Checked boxes describe code and configuration in the repository. They do not rep
 - [x] Webhook requires `X-Telegram-Bot-Api-Secret-Token`, normalizes only valid text updates, and does not persist conversations before Phase 2.
 - [x] Credential-safe configuration guidance; Compose keeps the host port on loopback and the webhook requires a public HTTPS URL. `TELEGRAM_WEBHOOK_URL` is optional and, when set, cannot contain userinfo, a query string, a fragment, or a secret.
 - [x] Final local candidate verification: full suite (`npm run check`, seven files and fifty tests, plus build), dependency audit with zero reported vulnerabilities, Compose configuration, non-root/read-only Docker runtime checks, and independent audit.
-- [ ] GitHub CI and CodeQL evidence for the final candidate; the last verified GitHub result remains `8b80c3b`.
+- [x] GitHub CI and CodeQL evidence for the Phase 1a candidate at `7141949`.
 - [ ] Authorized test-bot verification through a public TLS URL, without exposing a token, header, or payload in commands or logs.
 
 - The transport, configuration, webhook authentication, and focused offline tests are complete.

@@ -1,7 +1,7 @@
 # Phase 0–1a threat model
 
 **Review date:** 2026-08-12
-**Status:** Phase 0 has GitHub CI/CodeQL evidence at `8b80c3b`. The Phase 1a candidate passed its final local check, low-threshold dependency audit, Compose configuration check, non-root/read-only runtime check, and independent audit. No GitHub CI/CodeQL result exists for this candidate. This is not a security certification, a live Telegram test, or a production-ready confirmation.
+**Status:** Phase 0 has GitHub CI/CodeQL evidence at `8b80c3b`, and the Phase 1a candidate passed GitHub CI and CodeQL at `7141949`. The Phase 1a candidate also passed its final local check, low-threshold dependency audit, Compose configuration check, non-root/read-only runtime check, and independent audit. This is not a security certification, a live Telegram test, or a production-ready confirmation.
 
 ## Facts before plans
 
@@ -57,7 +57,7 @@ The principal boundaries are HTTP input into the API, environment configuration 
 - Green CI proves only the commands that ran; it does not prove an Internet-facing deployment is safe.
 - `OPERATOR_API_TOKEN` does not make the API a user or RBAC system. It is only the temporary local operator key for 1a.
 - No persistence means no durable history, but it also means no deduplication or recovery after the process dies.
-- `npm run check` passed with seven test files, fifty tests, and a build; `npm audit --audit-level=low` reported zero vulnerabilities; Compose configuration, non-root/read-only runtime behavior, and an independent audit also passed. These are local checks only, not GitHub CI/CodeQL evidence for this candidate.
+- `npm run check` passed with seven test files, fifty tests, and a build; `npm audit --audit-level=low` reported zero vulnerabilities; Compose configuration, non-root/read-only runtime behavior, an independent audit, GitHub CI, and CodeQL also passed for the Phase 1a candidate at `7141949`.
 - There has been no real token or network test. Do not infer Telegram compatibility from mocks or internal HTTP tests.
 
 ## Review trigger
