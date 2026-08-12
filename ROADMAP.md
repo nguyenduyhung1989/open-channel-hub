@@ -32,7 +32,7 @@ Checked boxes describe code and configuration in the repository. They do not rep
 - [ ] Authorized test-bot verification through a public TLS URL, without exposing a token, header, or payload in commands or logs.
 
 - The transport, configuration, webhook authentication, and focused offline tests are complete.
-- Phase 1a is complete only after fresh CI/CodeQL evidence for the final candidate and an authorized test-bot check through TLS. Neither has occurred.
+- Phase 1a is complete only after fresh CI/CodeQL evidence for the final candidate and an authorized test-bot check through TLS. CI/CodeQL succeeded for the candidate at `7141949`; the authorized test-bot check has not occurred.
 
 ## Phase 2 — durable data and minimal operation
 
