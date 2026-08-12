@@ -1,34 +1,34 @@
-# ADR-0003: Node.js 24.18.1 LTS và npm workspaces
+# ADR-0003: Node.js 24.18.1 LTS and npm workspaces
 
-**Ngày:** 2026-08-12
-**Trạng thái:** accepted
+**Date:** 2026-08-12
+**Status:** accepted
 
-## Bối cảnh
+## Context
 
-Dự án có API và các package nội bộ nhưng Chặng 0 chưa cần một hệ điều phối monorepo phức tạp. Cần một runtime thống nhất, còn được hỗ trợ dài hạn và một cách quản lý phụ thuộc tái lập cho máy lập trình, CI và container.
+The project has an API and internal packages, but the Phase 0–1a alpha does not need a complex monorepo orchestrator. It needs one long-term-supported runtime and reproducible dependency management for developer machines, CI, and containers.
 
-## Quyết định
+## Decision
 
-Ghim runtime kiểm tra/chạy container là **Node.js `24.18.1` LTS**, dùng npm đi kèm Node và npm workspaces ở gốc kho mã. CI dùng `npm ci`; Docker dùng `node:24.18.1-alpine`; các phụ thuộc trực tiếp được ghim phiên bản cụ thể và lockfile đóng băng cây phụ thuộc.
+Pin the CI and container runtime to **Node.js `24.18.1` LTS**, use the npm bundled with Node, and use npm workspaces at the repository root. CI uses `npm ci`; Docker uses `node:24.18.1-alpine`; direct dependencies use exact versions, and the lockfile freezes the dependency tree.
 
-Trường `engines` trong `package.json` cho biết dải tương thích tối thiểu của mã nguồn. Nó không thay thế việc CI/container ghim chính xác `24.18.1`.
+The `engines` field in `package.json` states the source code's minimum compatibility range. It does not replace the exact `24.18.1` pin in CI and containers.
 
-## Phương án đã cân nhắc
+## Options considered
 
-### Nhiều runtime hoặc để CI dùng `node` không ghim
+### Multiple runtimes or an unpinned `node` in CI
 
-- Ưu: ít cập nhật cấu hình khi phiên bản thay đổi.
-- Nhược: kết quả không tái lập, có thể lấy bản không tương thích hoặc khác với production.
-- Không chọn: độ ổn định quan trọng hơn sự tiện tay.
+- Benefit: fewer configuration updates when versions change.
+- Cost: non-reproducible results and the possibility of an incompatible version or one that differs from production.
+- Rejected: stability matters more than convenience.
 
-### pnpm/Turborepo/Nx ngay từ Chặng 0
+### pnpm/Turborepo/Nx from the start
 
-- Ưu: có thêm tối ưu/bộ công cụ monorepo.
-- Nhược: thêm công cụ và chính sách cache khi npm workspaces + một `package-lock.json` đã giải quyết nhu cầu hiện tại.
-- Không chọn: có thể xem lại khi số package/tốc độ CI chứng minh cần.
+- Benefit: additional monorepo tooling and optimizations.
+- Cost: adds tools and cache policies when npm workspaces plus one `package-lock.json` meet the current need.
+- Rejected: revisit when package count or CI speed demonstrates the need.
 
-## Hệ quả
+## Consequences
 
-- Người đóng góp cần cài đúng Node `24.18.1` để khớp CI.
-- Nâng runtime là thay đổi có chủ đích: kiểm tra lịch hỗ trợ Node, tương thích dependency, Docker image và CI, rồi ghi ADR/PR thích hợp.
-- Không dùng tag Docker `latest` hoặc cài dependency không qua lockfile trong CI.
+- Contributors need Node `24.18.1` to match CI.
+- A runtime upgrade is deliberate work: check the Node support schedule, dependency compatibility, Docker image, and CI, then record the appropriate ADR/PR.
+- Do not use the Docker `latest` tag or install dependencies outside the lockfile in CI.

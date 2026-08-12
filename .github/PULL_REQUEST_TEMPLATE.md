@@ -1,14 +1,14 @@
-## Mục tiêu
+## Objective
 
-<!-- Vấn đề gì được giải quyết, vì sao cần làm ngay? -->
+<!-- What problem does this solve, and why is it needed now? -->
 
-## Phạm vi
+## Scope
 
-<!-- Đã làm gì, và điều gì cố ý chưa làm? -->
+<!-- What was done, and what was intentionally not done? -->
 
-## Kiểm tra
+## Verification
 
-<!-- Liệt kê chính xác lệnh đã chạy và kết quả. -->
+<!-- List the exact commands run and their results. -->
 
 - [ ] `npm run format:check`
 - [ ] `npm run lint`
@@ -16,10 +16,10 @@
 - [ ] `npm run test`
 - [ ] `npm run build`
 
-## Rủi ro và tài liệu
+## Risks and documentation
 
-<!-- Có thay đổi giao thức, quyền, dữ liệu, bảo mật hay ADR/tài liệu nào không? -->
+<!-- Does this change a protocol, authorization, data, security boundary, ADR, or documentation? -->
 
-- [ ] Không có token, cookie, số điện thoại, payload thật, nội dung hội thoại hay `.env` trong thay đổi này.
-- [ ] Tôi đã cập nhật tài liệu/ADR khi trạng thái hay quyết định thay đổi.
-- [ ] Tôi đã dùng dữ liệu giả tổng hợp cho kiểm thử và ảnh chụp.
+- [ ] This change contains no token, cookie, phone number, real payload, conversation content, or `.env` file.
+- [ ] I updated documentation or ADRs when status or a decision changed.
+- [ ] I used synthetic data for tests and screenshots.

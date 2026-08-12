@@ -1,36 +1,38 @@
-name: Đề xuất tính năng
-description: Đề xuất một khả năng mới, có vấn đề cụ thể và phạm vi nhỏ.
+name: Feature request
+description: Propose a new capability with a concrete problem and a small scope.
 title: '[Feature]: '
 body:
   - type: markdown
     attributes:
       value: |
-        Chặng 0 chưa có connector chạy thật, cơ sở dữ liệu hay giao diện. Hãy đọc ROADMAP.md trước và mô tả vấn đề, không chỉ tên nền tảng muốn thêm.
+        Phase 0–1a has an official Telegram Bot transport, startup wiring, and synthetic offline tests,
+        but no live Telegram or production verification. Read ROADMAP.md first and describe the problem,
+        not only the platform you want to add.
   - type: textarea
     id: problem
     attributes:
-      label: Vấn đề cần giải quyết
-      description: Ai gặp vấn đề gì, trong tình huống nào?
+      label: Problem to solve
+      description: Who has what problem, in which situation?
     validations:
       required: true
   - type: textarea
     id: proposal
     attributes:
-      label: Đề xuất nhỏ nhất
-      description: Nêu hành vi mong muốn, giới hạn và dữ liệu/permission liên quan.
+      label: Smallest proposal
+      description: State the desired behavior, constraints, and relevant data or permissions.
     validations:
       required: true
   - type: textarea
     id: alternatives
     attributes:
-      label: Phương án đã cân nhắc
-      description: Kể cả “chưa có”.
+      label: Alternatives considered
+      description: Include "none" where appropriate.
   - type: checkboxes
     id: policy
     attributes:
-      label: Ranh giới connector
+      label: Connector boundary
       options:
-        - label: Tôi hiểu dự án ưu tiên API chính thức và không nhận tính năng né CAPTCHA, giả dấu vết, lấy cắp phiên hay gửi thư rác.
+        - label: I understand that the project prefers official APIs and does not accept CAPTCHA bypasses, fingerprint spoofing, session theft, or spam features.
           required: true
-        - label: Tôi không đưa token, số điện thoại hay dữ liệu hội thoại thật vào đề xuất.
+        - label: I have not included tokens, phone numbers, or real conversation data in this proposal.
           required: true

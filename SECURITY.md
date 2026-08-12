@@ -1,25 +1,25 @@
-# Chính sách bảo mật
+# Security Policy
 
-## Báo lỗ hổng riêng tư
+## Report vulnerabilities privately
 
-**Đừng mở issue, pull request hay discussion công khai cho lỗ hổng.** Dùng biểu mẫu báo cáo riêng tư của GitHub tại:
+**Do not open a public issue, pull request, or discussion for a vulnerability.** Use GitHub's private vulnerability-reporting form:
 
 <https://github.com/nguyenduyhung1989/open-channel-hub/security/advisories/new>
 
-Nếu nút “Report a vulnerability” chưa xuất hiện trên trang Security, maintainer phải bật GitHub Private Vulnerability Reporting trước khi quảng bá kho mã rộng rãi. Không được bù bằng việc mở issue công khai.
+If the Security page does not show **Report a vulnerability**, a maintainer must enable GitHub Private Vulnerability Reporting before broadly promoting the repository. Do not substitute a public issue.
 
-Trong báo cáo, nêu phiên bản/commit, điều kiện tái hiện tối thiểu, tác động dự kiến và cách liên lạc an toàn. **Không bao giờ dán** token Telegram, cookie, khoá API, tệp `.env`, số điện thoại, nội dung hội thoại, payload webhook thật hay dữ liệu khách hàng. Hãy thay bằng giá trị giả và mô tả cách tạo lại dữ liệu đó.
+Include the version or commit, minimal reproduction conditions, expected impact, and a safe way to contact you. **Never paste** a Telegram token, cookie, API key, `.env` file, phone number, conversation content, real webhook payload, or customer data. Replace them with synthetic values and explain how to reproduce the case.
 
-## Phạm vi hiện tại
+## Current scope
 
-Chặng 0 chỉ có API cục bộ nhỏ và lát cắt `Telegram Bot` dùng cổng mô phỏng. Dù vậy, các lỗi trong mã nguồn, quy trình CI, Dockerfile, xử lý cấu hình, xác thực dữ liệu đầu vào và ranh giới connector đều nằm trong phạm vi.
+Open Channel Hub is in **Phase 0–1a / alpha**. The official `Telegram Bot` HTTP transport, startup wiring, and synthetic offline tests exist. No real Telegram credential, network request, webhook registration or delivery, or production confirmation has occurred. Findings in source code, CI workflows, the Dockerfile, configuration handling, input validation, the HTTP transport, and connector boundaries are nevertheless in scope.
 
-Không kiểm tra phá hoại trên hạ tầng không thuộc quyền mày, không dùng tài khoản người khác và không cố gửi tin nhắn thật qua hệ thống hiện chưa cung cấp tích hợp production.
+Do not perform destructive testing against infrastructure you do not own, use another person's account, or introduce a real token or public webhook URL into the system. Any live Telegram test requires explicit owner authorization.
 
-## Cách xử lý
+## Handling
 
-Mục tiêu là xác nhận đã nhận báo cáo critical trong 24 giờ, high trong 72 giờ và các mức khác trong 7 ngày làm việc. Đây là mục tiêu vận hành thiện chí của dự án alpha, không phải cam kết SLA.
+The project aims to acknowledge critical reports within 24 hours, high-severity reports within 72 hours, and other reports within seven business days. These are good-faith operating targets for an alpha project, not an SLA.
 
-Khi một lỗi được xác nhận, maintainer sẽ đánh giá mức độ, vá, thêm kiểm thử hồi quy phù hợp, cập nhật ghi chú phát hành và phối hợp thời điểm công bố. Nếu bí mật có thể đã lộ, phải thu hồi/đổi bí mật đó ngay — sửa mã một mình không đủ.
+After confirming a report, a maintainer will assess severity, patch the issue, add an appropriate regression test, update release notes, and coordinate disclosure. If a secret may have leaked, revoke or rotate it immediately; a code change alone is not sufficient.
 
-Xem [mô hình đe doạ Chặng 0](docs/security/threat-model.md) để phân biệt các hàng rào đã có với các việc còn là kế hoạch.
+See the [Phase 0–1a threat model](docs/security/threat-model.md) and [Phase 1a Telegram Bot operating boundary](docs/operations/telegram-bot-1a.md) for the distinction between local evidence already obtained and work awaiting live or external verification.

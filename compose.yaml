@@ -1,7 +1,11 @@
 name: open-channel-hub
 
-# Local alpha runner only: one API process. The Telegram gateway is mocked only in tests.
-# This file deliberately does not create PostgreSQL, Redis, a queue, TLS, or a production deployment.
+# Local operator-only alpha runner: one API process with a loopback-only host port.
+# Phase 1a values come from the Git-ignored `.env` file; do not place secrets in this file.
+# SOURCE_OFFER_URL is required because this service uses NODE_ENV=production. It must point to the exact
+# public, unauthenticated corresponding source for this running version; a modified fork must not use upstream as a placeholder.
+# TELEGRAM_WEBHOOK_URL may be blank. When set, it must be a public absolute HTTPS URL with no userinfo, query, fragment, or secret.
+# Starting this service does not create PostgreSQL, Redis, a queue, TLS, a public proxy, or a production deployment.
 services:
   api:
     build:
@@ -9,8 +13,16 @@ services:
       target: runtime
     environment:
       NODE_ENV: production
+      # The process must listen on every container interface; the ports mapping below limits the host to loopback.
       HOST: 0.0.0.0
       PORT: '3000'
+      SOURCE_OFFER_URL: '${SOURCE_OFFER_URL:-}'
+      TELEGRAM_BOT_ENABLED: '${TELEGRAM_BOT_ENABLED:-false}'
+      TELEGRAM_BOT_TOKEN: '${TELEGRAM_BOT_TOKEN:-}'
+      OPERATOR_API_TOKEN: '${OPERATOR_API_TOKEN:-}'
+      TELEGRAM_CONNECTION_ID: '${TELEGRAM_CONNECTION_ID:-telegram-bot-default}'
+      TELEGRAM_WEBHOOK_SECRET: '${TELEGRAM_WEBHOOK_SECRET:-}'
+      TELEGRAM_WEBHOOK_URL: '${TELEGRAM_WEBHOOK_URL:-}'
     ports:
       - '127.0.0.1:3000:3000'
     read_only: true

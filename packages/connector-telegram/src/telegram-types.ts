@@ -2,7 +2,7 @@ import type { ProviderReceipt } from '@open-channel-hub/contracts';
 
 /**
  * The only provider port this first vertical slice needs. Implementations own
- * the HTTP client and credentials outside this connector package.
+ * the HTTP client and keep credentials private from connector callers.
  */
 export interface TelegramBotGateway {
   sendMessage(input: TelegramSendTextMessage): Promise<ProviderReceipt>;

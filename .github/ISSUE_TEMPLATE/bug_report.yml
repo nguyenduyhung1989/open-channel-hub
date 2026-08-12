@@ -1,25 +1,26 @@
-name: Báo lỗi
-description: Báo một lỗi có thể tái hiện trong mã nguồn hiện có.
+name: Bug report
+description: Report a reproducible defect in the current source code.
 title: '[Bug]: '
 body:
   - type: markdown
     attributes:
       value: |
-        Cảm ơn mày đã giúp tìm lỗi. Không dán token, cookie, số điện thoại, nội dung hội thoại, payload thật hay tệp `.env`.
-        Nếu đây là lỗ hổng, dừng lại và làm theo SECURITY.md — đừng mở issue này.
+        Thank you for helping find a defect. Do not paste tokens, cookies, phone numbers,
+        conversation content, real payloads, or a `.env` file.
+        If this is a vulnerability, stop and follow SECURITY.md instead of opening this issue.
   - type: input
     id: version
     attributes:
-      label: Phiên bản hoặc commit
-      description: Tag phát hành, SHA commit hoặc nhánh đang dùng.
+      label: Version or commit
+      description: The release tag, commit SHA, or branch in use.
       placeholder: main @ abc1234
     validations:
       required: true
   - type: textarea
     id: steps
     attributes:
-      label: Bước tái hiện tối thiểu
-      description: Dùng dữ liệu giả tổng hợp, đủ để người khác chạy lại.
+      label: Minimal reproduction steps
+      description: Use synthetic data sufficient for someone else to reproduce the problem.
       placeholder: |
         1. ...
         2. ...
@@ -29,33 +30,33 @@ body:
   - type: textarea
     id: expected
     attributes:
-      label: Kết quả mong đợi
+      label: Expected result
     validations:
       required: true
   - type: textarea
     id: actual
     attributes:
-      label: Kết quả thực tế
-      description: Đính kèm log đã làm sạch bí mật nếu cần.
+      label: Actual result
+      description: Include logs with secrets removed if useful.
     validations:
       required: true
   - type: textarea
     id: environment
     attributes:
-      label: Môi trường
+      label: Environment
       value: |
-        - Hệ điều hành:
+        - Operating system:
         - Node.js:
         - npm:
-        - Cách chạy (npm/Docker):
+        - How it was run (npm/Docker):
     validations:
       required: true
   - type: checkboxes
     id: checks
     attributes:
-      label: Kiểm tra trước khi gửi
+      label: Submission checks
       options:
-        - label: Tôi đã tìm issue trùng và dùng dữ liệu giả, không có bí mật/dữ liệu thật.
+        - label: I searched for duplicates and used synthetic data with no secret or real data.
           required: true
-        - label: Đây không phải báo cáo lỗ hổng bảo mật.
+        - label: This is not a security vulnerability report.
           required: true

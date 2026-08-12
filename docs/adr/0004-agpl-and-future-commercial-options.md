@@ -1,38 +1,40 @@
-# ADR-0004: AGPL-3.0-or-later và lựa chọn thương mại tương lai
+# ADR-0004: AGPL-3.0-or-later and future commercial options
 
-**Ngày:** 2026-08-12
-**Trạng thái:** accepted
+**Date:** 2026-08-12
+**Status:** accepted
 
-## Bối cảnh
+## Context
 
-Dự án là trung tâm nhắn tin tự triển khai. Một bên có thể sửa mã rồi vận hành thành dịch vụ mạng mà không phân phối binary, khiến giấy phép copyleft thông thường không kích hoạt nghĩa vụ cung cấp mã nguồn cho người dùng dịch vụ.
+The project is a self-hosted messaging hub. A party can modify the code and operate it as a network service without distributing a binary, which means a conventional copyleft license may not trigger a source-availability obligation for service users.
 
-Mục tiêu là giữ các cải tiến cho dịch vụ mạng có thể quay lại cộng đồng, đồng thời không tự lừa mình rằng giấy phép thay thế được chất lượng kỹ thuật, bảo mật hay mô hình kinh doanh.
+The goal is to keep network-service improvements available to return to the community, while not pretending that a license can replace technical quality, security, or a business model.
 
-## Quyết định
+## Decision
 
-Phát hành mã nguồn theo `AGPL-3.0-or-later`.
+Release the source code under `AGPL-3.0-or-later`.
 
-Theo Điều 13, khi một bên sửa chương trình và cho người khác tương tác với bản đã sửa qua mạng, bản đó phải cho các người dùng từ xa cơ hội nhận mã nguồn tương ứng của phiên bản đang chạy. Điều này áp dụng cho **bản đã sửa** và cần đọc toàn văn giấy phép để đánh giá các tình huống kết hợp/phân phối cụ thể.
+Under section 13, when a party modifies the program and lets others interact with that modified version over a network, the modified version must offer remote users an opportunity to receive the corresponding source for the version being run. This applies to the **modified version**; read the full license to assess particular combination and distribution situations.
 
-Dự án không hứa hẹn giấy phép thương mại, ngoại lệ SaaS hay giấy phép kép ở thời điểm này. Đóng góp theo chính sách đầu vào-bằng-đầu-ra: contributor giữ bản quyền nhưng cho phép phân phối phần đóng góp theo AGPL-3.0-or-later.
+The runtime exposes an unauthenticated `GET /source` endpoint and a `Link: <SOURCE_OFFER_URL>; rel="source"` header on every response. In production, `SOURCE_OFFER_URL` is required and must be an HTTPS URL without userinfo, query, or fragment. Operators of forks or modified SaaS deployments must point it to public, unauthenticated corresponding source for the exact version running; the upstream URL is not a placeholder for modified code. This is an implementation aid, not legal advice.
 
-## Phương án đã cân nhắc
+The project does not promise a commercial license, SaaS exception, or dual license at this time. Contributions follow an inbound-equals-outbound policy: contributors retain copyright while permitting their contributions to be distributed under `AGPL-3.0-or-later`.
+
+## Options considered
 
 ### Apache-2.0
 
-- Ưu: dễ dùng cho thư viện/hệ sinh thái, có điều khoản bằng sáng chế rõ.
-- Nhược: bên vận hành SaaS có thể sửa và giữ phần sửa kín.
-- Không chọn: không khớp mục tiêu chia sẻ cải tiến cho dịch vụ mạng.
+- Benefit: easy to use for libraries and ecosystems, with a clear patent clause.
+- Cost: a SaaS operator can modify the project and keep the changes private.
+- Rejected: does not match the goal of sharing network-service improvements.
 
-### Giấy phép kép ngay từ đầu
+### Dual licensing from the start
 
-- Ưu: có đường bán ngoại lệ thương mại rõ hơn.
-- Nhược: cần quyền cấp lại giấy phép đủ đối với mọi đóng góp; hiện không có CLA/thoả thuận chuyển nhượng bản quyền để bảo đảm điều đó.
-- Không chọn bây giờ: không hứa một quyền mà dự án chưa có.
+- Benefit: provides a clearer path for selling commercial exceptions.
+- Cost: requires sufficient relicensing rights for every contribution; there is currently no CLA or copyright-assignment agreement to ensure that.
+- Rejected for now: do not promise a right the project does not have.
 
-## Hệ quả
+## Consequences
 
-- README và các artifact phát hành phải nêu đúng AGPL, không dùng nhãn “open source” mơ hồ.
-- Trước bất kỳ đề nghị giấy phép thương mại/giấy phép kép nào, maintainer cần đánh giá mô hình quyền tác giả, chính sách đóng góp, tư vấn pháp lý phù hợp và một ADR mới.
-- Dịch vụ lưu trữ, hỗ trợ, tư vấn, tích hợp và thương mại hoá khác vẫn có thể tồn tại; quyết định kinh doanh đó không tự thay đổi nghĩa vụ của AGPL.
+- The README and release artifacts must name AGPL accurately rather than using an ambiguous “open source” label.
+- Before proposing a commercial or dual license, maintainers need to assess the copyright model, contribution policy, appropriate legal advice, and a new ADR.
+- Hosting, support, consulting, integration, and other commercialization can still exist; that business decision does not itself change AGPL obligations.

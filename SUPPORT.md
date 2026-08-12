@@ -1,21 +1,24 @@
-# Hỗ trợ
+# Support
 
-Open Channel Hub đang ở Chặng 0, do maintainer vận hành theo thời gian có hạn; không có cam kết thời gian phản hồi hay hỗ trợ production.
+Open Channel Hub is a Phase 0–1a / alpha project maintained on a limited-time basis. It has no response-time commitment or production support. The `Telegram Bot` HTTP transport, startup wiring, and synthetic offline tests exist, but no live credential, network, webhook, or production verification has occurred.
 
-## Nên hỏi ở đâu?
+## Where to ask
 
-- Đọc [README.md](README.md), [ROADMAP.md](ROADMAP.md), [CONTRIBUTING.md](CONTRIBUTING.md) và tài liệu trong `docs/` trước.
-- Nếu GitHub Discussions đã được bật, dùng Discussions cho câu hỏi cách dùng và ý tưởng.
-- Nếu Discussions chưa bật, mở biểu mẫu “Câu hỏi hỗ trợ” trên trang Issues với ví dụ tối thiểu đã làm sạch dữ liệu.
-- Lỗi tái hiện được: dùng biểu mẫu “Báo lỗi”.
-- Lỗ hổng: chỉ dùng [SECURITY.md](SECURITY.md), không dùng bất kỳ kênh công khai nào.
+- Read [README.md](README.md), [ROADMAP.md](ROADMAP.md), [CONTRIBUTING.md](CONTRIBUTING.md), and the documentation in `docs/` first.
+- If GitHub Discussions is enabled, use it for usage questions and ideas.
+- If Discussions is not enabled, open the **Support question** issue form with a minimal, sanitized example.
+- For a reproducible defect, use the **Bug report** form.
+- For a vulnerability, use [SECURITY.md](SECURITY.md) only; do not use any public channel.
 
-## Để nhận được câu trả lời hữu ích
+## Include enough context
 
-Nêu phiên bản/commit, hệ điều hành, Node.js, các lệnh đã chạy, kết quả mong đợi, kết quả thực tế và dữ liệu giả tối thiểu. Không dán token, số điện thoại, cookie, payload thật hoặc nhật ký có thông tin khách hàng.
+State the version or commit, operating system, Node.js version, commands run, expected result, actual result, and minimal synthetic data. Do not paste tokens, phone numbers, cookies, real payloads, or logs containing customer information.
 
-## Những việc hiện chưa hỗ trợ
+## Not currently supported
 
-- Triển khai production hay lưu trữ do maintainer cung cấp.
-- Tích hợp Telegram thật hoặc các nền tảng ngoài Telegram Bot mock.
-- Hỗ trợ cho các connector dựa vào phiên đăng nhập/API không được nhà cung cấp hỗ trợ.
+- Maintainer-provided production deployment or hosting.
+- Maintainer-operated live Telegram use, webhook registration, or public TLS/production verification.
+- Platforms outside the Phase 1a `Telegram Bot` scope.
+- Connectors that depend on unsupported provider login sessions or APIs.
+
+Read the [Phase 1a Telegram Bot operating boundary](docs/operations/telegram-bot-1a.md) and [Phase 0–1a threat model](docs/security/threat-model.md) before asking about configuration or security.

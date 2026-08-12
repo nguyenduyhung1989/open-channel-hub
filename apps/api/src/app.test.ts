@@ -16,10 +16,34 @@ describe('Open Channel Hub API', () => {
     const response = await app.inject({ method: 'GET', url: '/health' });
 
     expect(response.statusCode).toBe(200);
+    expect(response.headers.link).toBe(
+      '<https://github.com/nguyenduyhung1989/open-channel-hub>; rel="source"'
+    );
     expect(response.headers['x-content-type-options']).toBe('nosniff');
     expect(response.json()).toEqual({
       success: true,
       data: { service: 'open-channel-hub', status: 'ok' }
+    });
+  });
+
+  it('offers the configured corresponding source without authentication', async () => {
+    const app = await buildApp({
+      sourceOfferUrl: 'https://example.test/open-channel-hub/source/phase-1a'
+    });
+    applications.push(app);
+
+    const response = await app.inject({ method: 'GET', url: '/source' });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers.link).toBe(
+      '<https://example.test/open-channel-hub/source/phase-1a>; rel="source"'
+    );
+    expect(response.json()).toEqual({
+      success: true,
+      data: {
+        license: 'AGPL-3.0-or-later',
+        sourceOfferUrl: 'https://example.test/open-channel-hub/source/phase-1a'
+      }
     });
   });
 
@@ -30,6 +54,9 @@ describe('Open Channel Hub API', () => {
     const response = await app.inject({ method: 'GET', url: '/not-a-real-route' });
 
     expect(response.statusCode).toBe(404);
+    expect(response.headers.link).toBe(
+      '<https://github.com/nguyenduyhung1989/open-channel-hub>; rel="source"'
+    );
     expect(response.json()).toEqual({
       success: false,
       error: { code: 'not_found', message: 'The requested resource does not exist.' }

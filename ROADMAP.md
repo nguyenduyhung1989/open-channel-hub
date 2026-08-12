@@ -1,44 +1,57 @@
-# Lộ trình
+# Roadmap
 
-Lộ trình mô tả thứ tự ưu tiên, không phải lịch hứa phát hành. Chỉ một mục đủ tiêu chí mới được chuyển sang “đã làm”.
+This roadmap describes priority order, not release dates. An item moves to “done” only after its criteria are met.
 
-## Chặng 0 — nền móng có thể kiểm tra (đang làm)
+## Phase 0 — verifiable foundation (technical work complete)
 
-- [x] Kho mã công khai, AGPL-3.0-or-later, tài liệu cộng đồng và chính sách bảo mật.
-- [x] CI kiểm tra định dạng, lint, kiểu dữ liệu, kiểm thử, bản dựng và quét mã.
-- [x] API `GET /health`, cấu hình khởi động được xác thực.
-- [x] Hợp đồng connector, kiểm tra năng lực và lát cắt `Telegram Bot` dùng cổng mô phỏng.
-- [ ] Chốt kiểm thử hồi quy và phát hành `0.1.0` sau khi toàn bộ cổng kiểm tra xanh trên commit cuối.
+- [x] Public repository, AGPL-3.0-or-later, community documentation, and security policy.
+- [x] CI for formatting, linting, type checking, tests, builds, and code scanning.
+- [x] GitHub CI and CodeQL succeeded at commit `8b80c3b`; Private Vulnerability Reporting, secret scanning, Dependabot alerts, and automatic security fixes are enabled.
+- [x] `GET /health` and validated startup configuration.
+- [x] Connector contracts, capability checks, and the original mocked `Telegram Bot` vertical slice.
+- [ ] Owner decision on whether to create the `0.1.0` release tag. This is a release decision separate from the CI/CodeQL evidence for `8b80c3b`.
 
-Không có token Telegram thật, gọi Telegram thật, cơ sở dữ liệu, Redis hay giao diện web trong chặng này.
+Branch protection is intentionally open pending an owner decision; it must not be described as enabled merely because other security services are active.
 
-Các ô đã đánh dấu mô tả mã/tệp cấu hình hiện có trong kho mã; chúng không thay cho một lần CI xanh trên commit phát hành cuối hoặc xác nhận production.
+The Phase 0 evidence contains no real Telegram token or request, database, Redis, or web UI.
 
-## Chặng 1 — Telegram Bot chính thức, nhỏ nhưng thật
+Checked boxes describe code and configuration in the repository. They do not replace green CI on a final release commit or production verification.
 
-- Cấp quyền/cấu hình token theo cách không đưa bí mật vào log hay mã nguồn.
-- Gửi/nhận phạm vi Telegram Bot tối thiểu qua API chính thức.
-- Xác thực webhook, kiểm thử adapter và hướng dẫn vận hành cục bộ.
-- Chỉ gọi là hoàn thành khi có kiểm thử không gọi mạng thật, tài liệu cấu hình và kiểm tra hoạt động với một tài khoản thử nghiệm được uỷ quyền.
+## Phase 1 — official Telegram Bot, deliberately small
 
-## Chặng 2 — dữ liệu bền vững và vận hành tối thiểu
+**Status: Phase 1a implementation and final local candidate verification are complete; Phase 1a itself is not complete.** `npm run check` passed with seven test files, fifty tests, and a build; `npm audit --audit-level=low` found zero vulnerabilities; `docker compose config --quiet` passed; the non-root, read-only runtime image was built and checked; and an independent audit passed. No real token or network test has occurred, and GitHub CI/CodeQL has not yet run for this candidate.
 
-- PostgreSQL, migration an toàn và kho lưu trữ rõ ranh giới.
-- Redis/hàng đợi/hộp thư đi chỉ khi yêu cầu gửi lại hoặc tải thực tế chứng minh cần.
-- Nhật ký có cấu trúc, chỉ số, sao lưu và chính sách giữ/xoá dữ liệu.
+### 1a — HTTP boundary and local operation
 
-## Chặng 3 — trải nghiệm quản trị và kết nối chính thức tiếp theo
+- [x] Official Telegram Bot HTTP transport for a narrow text send/receive scope, wired at startup when `TELEGRAM_BOT_ENABLED=true`.
+- [x] Local operator API protected by `OPERATOR_API_TOKEN`; this is not user login or role-based access control.
+- [x] Webhook requires `X-Telegram-Bot-Api-Secret-Token`, normalizes only valid text updates, and does not persist conversations before Phase 2.
+- [x] Credential-safe configuration guidance; Compose keeps the host port on loopback and the webhook requires a public HTTPS URL. `TELEGRAM_WEBHOOK_URL` is optional and, when set, cannot contain userinfo, a query string, a fragment, or a secret.
+- [x] Final local candidate verification: full suite (`npm run check`, seven files and fifty tests, plus build), dependency audit with zero reported vulnerabilities, Compose configuration, non-root/read-only Docker runtime checks, and independent audit.
+- [ ] GitHub CI and CodeQL evidence for the final candidate; the last verified GitHub result remains `8b80c3b`.
+- [ ] Authorized test-bot verification through a public TLS URL, without exposing a token, header, or payload in commands or logs.
 
-- Bảng điều khiển, tài khoản/tổ chức và phân quyền được kiểm thử.
-- Đánh giá Facebook Page, Zalo OA và WhatsApp dựa trên tài liệu/chính sách chính thức tại thời điểm triển khai.
-- Mỗi connector có ma trận năng lực, trạng thái sức khoẻ và kiểm thử hợp đồng riêng.
+- The transport, configuration, webhook authentication, and focused offline tests are complete.
+- Phase 1a is complete only after fresh CI/CodeQL evidence for the final candidate and an authorized test-bot check through TLS. Neither has occurred.
 
-## Chặng 4 — connector thử nghiệm, chỉ khi có căn cứ
+## Phase 2 — durable data and minimal operation
 
-Facebook User và Zalo User không được coi là lời hứa tính năng. Nếu được nghiên cứu, chúng phải là gói tách biệt, tự nguyện bật, giới hạn năng lực, nêu rủi ro/pháp lý rõ ràng và không có tính năng né chống tự động hoá, giả dấu vết, vượt CAPTCHA hay gửi thư rác.
+- PostgreSQL, safe migrations, and a storage boundary with clear ownership.
+- Redis, a queue, and a durable outbox only when retry needs or real load justify them.
+- Structured logs, metrics, backups, and data retention/deletion policy.
 
-## Không nằm trong lộ trình
+## Phase 3 — administration experience and next official connectors
 
-- Bot tự động gửi hàng loạt, thu thập trái phép hay lách giới hạn nhà cung cấp.
-- Lưu/đăng dữ liệu hoặc bí mật thật trong kho mã.
-- Tuyên bố “tương tự Func đầy đủ” trước khi các lát cắt độc lập có kiểm thử và vận hành được.
+- A dashboard, accounts/organizations, and tested authorization.
+- Evaluation of Facebook Page, Zalo OA, and WhatsApp against current official documentation and policy at implementation time.
+- A capability matrix, health state, and separate contract tests for each connector.
+
+## Phase 4 — experimental connectors, only with evidence
+
+Facebook User and Zalo User are not feature promises. If researched, they must be separate, opt-in packages with constrained capabilities and clear policy/legal risk. They must not bypass automation controls, spoof fingerprints, evade CAPTCHA, or send bulk spam.
+
+## Explicitly out of scope
+
+- Bulk-sending bots, unlawful collection, or provider-limit evasion.
+- Storing or publishing real data or secrets in the repository.
+- Claiming “a complete Func equivalent” before independent slices are tested and operated.

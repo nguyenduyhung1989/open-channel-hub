@@ -1,42 +1,42 @@
-# ADR-0001: Modular monolith và hợp đồng hướng vào trong
+# ADR-0001: Modular monolith and inward-facing contracts
 
-**Ngày:** 2026-08-12
-**Trạng thái:** accepted
+**Date:** 2026-08-12
+**Status:** accepted
 
-## Bối cảnh
+## Context
 
-Open Channel Hub hướng tới nhiều connector và nhiều giao diện, nhưng Chặng 0 chỉ có một API nhỏ cùng lát cắt `Telegram Bot` mô phỏng. Tách microservice hay dựng hàng đợi ngay bây giờ sẽ tạo vận hành, triển khai và lỗi phân tán trước khi có một luồng thật chứng minh cần chúng.
+Open Channel Hub is intended to support multiple connectors and interfaces. Phase 0 began with a small API and a simulated `Telegram Bot` vertical slice. In the Phase 0–1a alpha, an official Telegram Bot HTTP transport, startup wiring, and synthetic offline tests exist, but there is no proof from real credentials, network traffic, webhooks, or a production deployment. Splitting into microservices or introducing a queue now would still add operational, deployment, and distributed-failure complexity before a live flow proves that either is needed.
 
-Đồng thời, mỗi connector không được kéo SDK hay chi tiết nhà cung cấp vào quy tắc nghiệp vụ chung.
+At the same time, a connector must not pull provider SDKs or provider-specific details into shared business rules.
 
-## Quyết định
+## Decision
 
-Dùng modular monolith trong một tiến trình triển khai, chia bằng npm workspaces:
+Use a modular monolith in one deployable process, separated by npm workspaces:
 
-- `packages/contracts`: kiểu và hợp đồng chuẩn.
-- `packages/domain`: quy tắc nghiệp vụ thuần, không phụ thuộc framework hay SDK.
-- `packages/connector-sdk`: cổng connector hướng vào lõi.
-- `packages/connector-*`: adapter dịch dữ liệu nhà cung cấp.
-- `apps/api`: adapter HTTP và điểm ghép phụ thuộc.
+- `packages/contracts`: canonical types and contracts.
+- `packages/domain`: pure business rules with no framework or SDK dependency.
+- `packages/connector-sdk`: connector ports facing inward to the core.
+- `packages/connector-*`: adapters that translate provider data.
+- `apps/api`: the HTTP adapter and dependency-composition point.
 
-Phụ thuộc đi vào trong: adapter → hợp đồng/lõi; lõi không nhập Fastify, ORM hay SDK nhà cung cấp. Chỉ tách tiến trình khi một lát cắt chạy thật cho thấy nhu cầu về cô lập tải, độ tin cậy hoặc quyền truy cập riêng.
+Dependencies point inward: adapters → contracts/core; the core does not import Fastify, an ORM, or a provider SDK. Split processes only when a live vertical slice demonstrates the need for separate load isolation, reliability, or access control.
 
-## Phương án đã cân nhắc
+## Options considered
 
-### Microservice từ đầu
+### Microservices from the start
 
-- Ưu: cô lập triển khai và mở rộng độc lập trên giấy.
-- Nhược: thêm mạng nội bộ, hàng đợi, quan sát, bí mật và phối hợp phát hành khi chưa có lưu lượng hay dữ liệu bền vững.
-- Không chọn: không phù hợp KISS/YAGNI ở Chặng 0.
+- Benefit: independent deployment isolation and scaling on paper.
+- Cost: adds internal networking, queues, observability, secrets, and release coordination before there is traffic or durable data.
+- Rejected: it does not fit KISS/YAGNI for the current Phase 0–1a alpha.
 
-### Một thư mục ứng dụng phẳng
+### One flat application directory
 
-- Ưu: bắt đầu nhanh hơn.
-- Nhược: logic chung và chi tiết connector sẽ lẫn, khó kiểm thử và khó tách connector sau này.
-- Không chọn: chi phí tách lại cao hơn phần hợp đồng nhỏ hiện tại.
+- Benefit: faster initial start.
+- Cost: shared logic and connector details become mixed, making tests and later connector separation harder.
+- Rejected: the future separation cost is higher than the current small contract layer.
 
-## Hệ quả
+## Consequences
 
-- Chúng ta có một artifact triển khai đơn giản, một lockfile và ranh giới kiểm thử rõ.
-- Mỗi connector phải khai báo năng lực; lệnh không được gọi nhà cung cấp khi năng lực vắng mặt.
-- Tách dịch vụ sau này đòi hỏi ADR mới, kế hoạch dữ liệu/quan sát/triển khai và bằng chứng rằng monolith là nút thắt thật.
+- We have one simple deployment artifact, one lockfile, and clear test boundaries.
+- Each connector must declare its capabilities; a command must not call a provider when the required capability is absent.
+- A future service split requires a new ADR, a data/observability/deployment plan, and evidence that the monolith is the actual bottleneck.

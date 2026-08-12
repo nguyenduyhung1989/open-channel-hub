@@ -1,39 +1,40 @@
-name: Câu hỏi hỗ trợ
-description: Hỏi cách cài đặt/chạy một phần đã được tài liệu hoá.
+name: Support question
+description: Ask how to install or run a documented part of the project.
 title: '[Support]: '
 body:
   - type: markdown
     attributes:
       value: |
-        Đọc SUPPORT.md và README.md trước. Chặng 0 không hỗ trợ Telegram thật, PostgreSQL, Redis, bảng điều khiển hoặc các nền tảng ngoài cổng mock.
+        Read SUPPORT.md and README.md first. Phase 0–1a has no live Telegram, PostgreSQL, Redis,
+        dashboard, or platform support outside the deliberately narrow Telegram Bot scope.
   - type: textarea
     id: question
     attributes:
-      label: Câu hỏi
+      label: Question
     validations:
       required: true
   - type: textarea
     id: attempted
     attributes:
-      label: Bạn đã thử gì?
-      description: Kèm lệnh/kết quả đã làm sạch bí mật.
+      label: What have you tried?
+      description: Include commands and results with secrets removed.
     validations:
       required: true
   - type: textarea
     id: environment
     attributes:
-      label: Môi trường
+      label: Environment
       value: |
-        - Hệ điều hành:
+        - Operating system:
         - Node.js:
         - npm:
-        - Commit/phiên bản:
+        - Commit/version:
     validations:
       required: true
   - type: checkboxes
     id: safety
     attributes:
-      label: An toàn dữ liệu
+      label: Data safety
       options:
-        - label: Tôi không đưa token, cookie, số điện thoại, dữ liệu hội thoại hay `.env` vào issue.
+        - label: I have not included tokens, cookies, phone numbers, conversation data, or a `.env` file in this issue.
           required: true

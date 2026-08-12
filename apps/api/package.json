@@ -2,5 +2,11 @@
   "name": "@open-channel-hub/api",
   "version": "0.1.0",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "@open-channel-hub/connector-sdk": "file:../../packages/connector-sdk",
+    "@open-channel-hub/connector-telegram": "file:../../packages/connector-telegram",
+    "@open-channel-hub/contracts": "file:../../packages/contracts",
+    "@open-channel-hub/domain": "file:../../packages/domain"
+  }
 }

@@ -14,8 +14,10 @@
   ],
   "scripts": {
     "build": "tsup --config tsup.config.ts",
-    "dev": "tsx apps/api/src/server.ts",
-    "start": "node apps/api/dist/server.js",
+    "dev": "node --env-file-if-exists=.env --import tsx apps/api/src/server.ts",
+    "start": "node --env-file-if-exists=.env apps/api/dist/server.js",
+    "telegram:webhook:set": "node --env-file-if-exists=.env apps/api/dist/telegram-bot/set-webhook.js",
+    "telegram:webhook:set:dev": "node --env-file-if-exists=.env --import tsx apps/api/src/telegram-bot/set-webhook.ts",
     "typecheck": "tsc --noEmit --project tsconfig.json",
     "lint": "eslint . --max-warnings=0",
     "format:check": "prettier --check .",

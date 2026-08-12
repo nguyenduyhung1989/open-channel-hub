@@ -1,5 +1,7 @@
-# Tài liệu kỹ thuật
+# Technical documentation
 
-- [Architecture Decision Records](adr/README.md): các quyết định cần giữ lý do lâu dài.
-- [Mô hình đe doạ Chặng 0](security/threat-model.md): tài sản, ranh giới tin cậy, biện pháp hiện có và việc còn kế hoạch.
-- [Sẵn sàng cho cộng đồng mã nguồn mở](maintainers/oss-readiness.md): checklist vận hành trung thực cho maintainer.
+- [Architecture Decision Records](adr/README.md): decisions whose rationale must remain available.
+- [Phase 1a Telegram Bot](operations/telegram-bot-1a.md): the HTTP boundary, token-safe configuration, and unresolved limits.
+- [Phase 0–1a threat model](security/threat-model.md): assets, trust boundaries, current controls, and planned work.
+- [Open-source readiness](maintainers/oss-readiness.md): an honest operating checklist for maintainers.
+- [Phase 1a checkpoint](maintainers/current-phase.md): verified milestones, code state, risks, and exact next verification.

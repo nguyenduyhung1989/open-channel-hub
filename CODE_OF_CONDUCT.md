@@ -1,32 +1,32 @@
-# Quy tắc ứng xử
+# Code of Conduct
 
-## Cam kết
+## Our pledge
 
-Chúng tao muốn cộng đồng Open Channel Hub là nơi người khác có thể đóng góp mà không bị quấy rối, hạ nhục hay loại trừ vì xuất thân, cơ thể, khuyết tật, dân tộc, đặc điểm giới, trình độ, quốc tịch, ngoại hình, chủng tộc, tôn giáo, giới tính, khuynh hướng tình dục hoặc bất kỳ đặc điểm cá nhân nào khác.
+We want the Open Channel Hub community to be a place where people can contribute without harassment, humiliation, or exclusion based on origin, body, disability, ethnicity, gender characteristics, level of experience, nationality, appearance, race, religion, sex, sexual orientation, or any other personal characteristic.
 
-Quy tắc này dựa trên [Contributor Covenant 2.1](https://www.contributor-covenant.org/version/2/1/code_of_conduct/), được diễn đạt lại cho kho mã này.
+This policy is based on [Contributor Covenant 2.1](https://www.contributor-covenant.org/version/2/1/code_of_conduct/) and adapted for this repository.
 
-## Hành vi được mong đợi
+## Expected behavior
 
-- Tranh luận vào ý tưởng và bằng chứng, không công kích người.
-- Tôn trọng góc nhìn, kinh nghiệm và ranh giới của người khác.
-- Nhận trách nhiệm khi gây ảnh hưởng xấu và sửa cho đúng.
-- Giữ thông tin riêng tư, dữ liệu thật và bí mật kỹ thuật ra khỏi không gian công khai.
+- Focus discussion on ideas and evidence, not personal attacks.
+- Respect other people's views, experience, and boundaries.
+- Take responsibility for harmful impact and correct it.
+- Keep private information, real data, and technical secrets out of public spaces.
 
-## Hành vi không chấp nhận
+## Unacceptable behavior
 
-- Ngôn từ hoặc hình ảnh mang tính tình dục không phù hợp, quấy rối hay đe doạ.
-- Công kích cá nhân, miệt thị, kích động thù ghét hoặc cố tình làm nhục.
-- Công bố thông tin riêng tư của người khác khi chưa được phép.
-- Spam, thao túng thảo luận hoặc dùng dự án để né chính sách nền tảng / gây hại cho người khác.
-- Hành vi không chuyên nghiệp lặp lại sau khi đã được nhắc rõ.
+- Inappropriate sexualized language or imagery, harassment, or threats.
+- Personal attacks, slurs, hate speech, or deliberate humiliation.
+- Publishing another person's private information without permission.
+- Spam, manipulating discussion, or using the project to evade platform policies or harm others.
+- Repeated unprofessional conduct after a clear warning.
 
-## Phạm vi
+## Scope
 
-Quy tắc áp dụng trong issue, pull request, review, thảo luận, tài liệu, kênh cộng đồng và các không gian đại diện chính thức cho dự án.
+This policy applies to issues, pull requests, reviews, discussions, documentation, community channels, and official project spaces.
 
-## Báo cáo và xử lý
+## Reporting and enforcement
 
-Không đưa chi tiết nhạy cảm vào issue công khai. Nếu cần báo cáo kín, dùng biểu mẫu báo cáo riêng tư tại [Security tab của kho mã](https://github.com/nguyenduyhung1989/open-channel-hub/security/advisories/new), mở tiêu đề bằng `[conduct]`, và chỉ cung cấp thông tin cần thiết. Kênh này được dùng tạm thời trong Chặng 0 để maintainer nhận báo cáo kín; nó không thay thế quy trình báo lỗ hổng trong [SECURITY.md](SECURITY.md).
+Do not put sensitive details in a public issue. To report conduct privately, use the [repository Security tab](https://github.com/nguyenduyhung1989/open-channel-hub/security/advisories/new), prefix the title with `[conduct]`, and provide only the necessary information. During Phase 0–1a / alpha, this is the temporary private reporting channel for maintainers; it does not replace the vulnerability-reporting process in [SECURITY.md](SECURITY.md).
 
-Maintainer sẽ xác nhận đã nhận, đánh giá riêng tư và có thể cảnh cáo, yêu cầu sửa, xoá nội dung, khoá thảo luận hoặc cấm tham gia tuỳ mức độ. Báo cáo thiện chí sẽ không bị trả đũa.
+A maintainer will acknowledge the report, assess it privately, and may warn, request a correction, remove content, lock a discussion, or ban participation according to severity. Good-faith reporters will not face retaliation.

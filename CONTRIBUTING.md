@@ -1,16 +1,16 @@
-# Đóng góp cho Open Channel Hub
+# Contributing to Open Channel Hub
 
-Cảm ơn mày đã muốn làm dự án tốt hơn. Chặng 0 còn nhỏ nên đóng góp tốt nhất là một thay đổi hẹp, có lý do rõ ràng và có kiểm tra đi kèm.
+Thank you for helping improve the project. It is in Phase 0–1a / alpha: the official `Telegram Bot` HTTP transport, startup wiring, and synthetic offline tests exist, but no real credential, network, webhook, or production verification has occurred. The most useful contribution is therefore a small, well-reasoned change with matching checks.
 
-## Trước khi bắt đầu
+## Before you begin
 
-1. Đọc [README.md](README.md), [ROADMAP.md](ROADMAP.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) và các [ADR](docs/adr/README.md) liên quan.
-2. Tìm issue/PR đang có để tránh làm trùng.
-3. Với thay đổi lớn về kiến trúc, bộ kết nối mới hay quyền riêng tư, mở issue thảo luận trước. Đừng đổ một bể thiết kế xuống PR rồi bắt mọi người bơi.
+1. Read [README.md](README.md), [ROADMAP.md](ROADMAP.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), the [Phase 0–1a threat model](docs/security/threat-model.md), the [Phase 1a Telegram Bot operating boundary](docs/operations/telegram-bot-1a.md), and any relevant [ADRs](docs/adr/README.md).
+2. Search existing issues and pull requests to avoid duplicate work.
+3. Open a discussion issue first for significant architecture, connector, or privacy changes. Do not drop an unbounded design into a pull request.
 
-## Chuẩn bị môi trường
+## Set up your environment
 
-Dùng Node.js `24.18.1`, phiên bản được CI và Docker ghim chính xác.
+Use Node.js `24.18.1`, the exact version pinned by CI and Docker.
 
 ```bash
 git clone https://github.com/nguyenduyhung1989/open-channel-hub.git
@@ -20,18 +20,18 @@ cp .env.example .env
 npm run check
 ```
 
-Không cần token hay tài khoản nhà cung cấp để chạy kiểm thử. Nếu mày phát hiện một quy trình buộc người đóng góp phải có bí mật thật ở Chặng 0, hãy báo đó là lỗi thiết kế.
+No token or provider account is required for offline tests. If a Phase 0–1a workflow requires a contributor to possess a real secret, report it as a design defect. A live Telegram test is a separate operational step and requires owner authorization.
 
-## Cách làm một thay đổi
+## Make a change
 
-- Tạo nhánh có tên rõ nghĩa, ví dụ `feature/telegram-normalizer` hoặc `fix/health-response`.
-- Giữ quy tắc nghiệp vụ trong `packages/domain`; bộ kết nối chỉ dịch dữ liệu nhà cung cấp qua các hợp đồng ở `packages/connector-sdk` và `packages/contracts`.
-- Dữ liệu từ HTTP, webhook và nhà cung cấp luôn là không đáng tin: xác thực ở ranh giới trước khi dùng.
-- Mọi tính năng gửi hành động phải bị chặn trước khi gọi nhà cung cấp nếu connector không công bố năng lực đó.
-- Viết kiểm thử hành vi cho trường hợp thành công, đầu vào sai và năng lực không có. Kiểm thử không được gọi mạng thật.
-- Không tự thêm PostgreSQL, Redis, hàng đợi hay giao diện chỉ vì “sau này chắc cần”; chỉ thêm khi lát cắt dọc hiện tại cần nó.
+- Create a descriptive branch, such as `feature/telegram-normalizer` or `fix/health-response`.
+- Keep business rules in `packages/domain`; connectors translate provider data through contracts in `packages/connector-sdk` and `packages/contracts`.
+- Treat data from HTTP, webhooks, and providers as untrusted. Validate it at the boundary before use.
+- A send action must be blocked before a provider call when the connector does not advertise that capability.
+- Write behavioral tests for success, invalid input, and unavailable capability. Tests must not make real network calls.
+- Do not add PostgreSQL, Redis, a queue, or a UI merely because it may be useful later. Add it only when the current vertical slice needs it.
 
-Trước khi mở PR, chạy:
+Before opening a pull request, run:
 
 ```bash
 npm run format:check
@@ -41,30 +41,30 @@ npm run test
 npm run build
 ```
 
-Hoặc chạy một lần:
+Or run all checks at once:
 
 ```bash
 npm run check
 ```
 
-## Pull request
+## Pull requests
 
-Một PR nên giải quyết một ý chính, mô tả rõ:
+A pull request should address one main idea and clearly state:
 
-- Vấn đề và lý do thay đổi.
-- Phạm vi thực hiện và điều cố ý không làm.
-- Lệnh kiểm tra đã chạy cùng kết quả.
-- Rủi ro về tương thích, bảo mật hoặc dữ liệu.
-- Tài liệu/ADR cần sửa, nếu có.
+- The problem and why the change is needed.
+- What is in scope and what is intentionally not included.
+- The verification commands that ran and their results.
+- Compatibility, security, or data risks.
+- Documentation or ADRs that require an update.
 
-Đừng đưa bí mật vào lịch sử Git: token bot, cookie, khoá API, payload webhook thật, số điện thoại và nội dung hội thoại đều bị cấm. Dùng dữ liệu giả tổng hợp trong mã, kiểm thử, issue và ảnh chụp màn hình.
+Do not put secrets in Git history. Bot tokens, cookies, API keys, real webhook payloads, phone numbers, and conversation content are prohibited. Use synthetic data in code, tests, issues, and screenshots.
 
-## Giấy phép cho phần đóng góp
+## Contribution license
 
-Bằng việc gửi phần đóng góp, mày xác nhận mình có quyền gửi nó và đồng ý để phần đó được phân phối theo [AGPL-3.0-or-later](LICENSE). Đây là chính sách “đầu vào bằng đầu ra”; dự án hiện không có CLA hay thoả thuận chuyển nhượng bản quyền riêng.
+By submitting a contribution, you confirm that you have the right to submit it and agree that it may be distributed under [AGPL-3.0-or-later](LICENSE). This is an inbound-equals-outbound policy; the project currently has no CLA or separate copyright assignment.
 
-Nếu một ngày dự án cân nhắc giấy phép kép hoặc ngoại lệ thương mại, việc đó phải được thảo luận công khai trước vì các phần đóng góp hiện tại không tự động trao cho maintainer toàn bộ quyền cấp lại giấy phép.
+If the project later considers dual licensing or a commercial exception, it must be discussed publicly first: current contributions do not automatically give maintainers all relicensing rights.
 
-## Hành vi và bảo mật
+## Conduct and security
 
-Tuân theo [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). Lỗ hổng bảo mật phải đi theo [SECURITY.md](SECURITY.md), không dùng issue/PR công khai.
+Follow [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). Report security vulnerabilities through [SECURITY.md](SECURITY.md), never through a public issue or pull request.
