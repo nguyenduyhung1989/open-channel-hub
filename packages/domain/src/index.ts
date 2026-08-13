@@ -1,3 +1,4 @@
+export type { ConnectionRegistry } from './ports/connection-registry.js';
 export type { InboundEventStore } from './ports/inbound-event-store.js';
 export type {
   InboundEventListInput,

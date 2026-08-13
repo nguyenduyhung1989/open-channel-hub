@@ -2,31 +2,44 @@
 
 > A self-hosted, official-first multichannel messaging hub.
 
-**Status: Phase 2b alpha.** The repository now contains a durable PostgreSQL
-inbound-event ledger and an operator-only API for reading canonical events from
-the configured Telegram connection. GitHub CI and CodeQL succeeded for the
-Phase 2a commit <code>f106bb8</code>. The current Phase 2b candidate still
-needs final local and GitHub verification for its own commit. Phase 1a remains
-incomplete until an owner-authorized Telegram test bot works through public
-TLS.
+**Status: Phase 2c alpha.** The repository contains a durable PostgreSQL
+inbound-event ledger, an operator-only canonical-event API, and the first
+runtime configuration foundation for more than one official Telegram Bot
+account. GitHub CI and CodeQL succeeded for the exact Phase 2b commit
+<code>4d5a9c9</code>. The current Phase 2c source passed its final local
+verification and synthetic Compose proof; its exact commit still needs fresh
+GitHub CI and CodeQL. Phase 1a remains incomplete until an
+owner-authorized Telegram test bot works through public TLS.
 
 The official Telegram Bot HTTP transport is wired for a deliberately narrow
-text send/receive slice. A local operator uses <code>OPERATOR_API_TOKEN</code>;
-Telegram must supply a separate
-<code>X-Telegram-Bot-Api-Secret-Token</code> webhook header. In Phase 2a, an
-accepted canonical inbound event is stored in PostgreSQL before the webhook
-returns. The storage scope is intentionally small: database
+text send/receive slice. Legacy mode uses <code>OPERATOR_API_TOKEN</code>;
+multi-connection mode uses one unique configured operator token per account.
+Telegram must supply a separate <code>X-Telegram-Bot-Api-Secret-Token</code>
+webhook header. In Phase 2a, an accepted canonical inbound event is stored in
+PostgreSQL before the webhook returns. The storage scope is intentionally small: database
 <code>open_channel_hub</code>, schema <code>open_channel_hub</code>, and the
 <code>inbound_events</code> ledger. It stores the canonical text fields needed
 for the event, not the raw provider payload. A primary key on
 <code>(connection_id, provider_event_id)</code> makes a repeated provider
 delivery a no-op for the same configured connection.
 
-Phase 2b adds <code>GET /v1/telegram-bot/inbound-events</code>. It requires the
-local <code>OPERATOR_API_TOKEN</code>, always scopes reads to the one Telegram
-connection configured by the process, and returns only canonical event fields.
-It uses an opaque cursor over a stable reverse-chronological snapshot, so newer
+Phase 2b adds <code>GET /v1/telegram-bot/inbound-events</code>. It returns only
+canonical event fields through a stable reverse-chronological cursor, so newer
 events do not shift or duplicate an operator's already-started page traversal.
+
+Phase 2c adds a secret-backed runtime configuration document and a durable
+connection registry. In multi-connection mode, each unique operator bearer
+token selects one configured Telegram Bot account inside the process; neither
+operator route accepts a caller-selected connection ID. Dynamic webhook ingress
+uses <code>POST /v1/webhooks/telegram-bot/:connectionId</code>, and the route
+checks the resolved account's separate Telegram webhook secret. The registry
+stores only opaque connection ID, connector ID, channel, and tier, never tokens,
+phone numbers, provider account names, or raw provider payloads.
+
+Multi-connection IDs are opaque safe route labels; <code>.</code> and
+<code>..</code> are rejected because webhook ingress places the ID in a dynamic
+path. This restriction does not rewrite a historical legacy one-Bot environment
+label.
 
 Compose runs a pinned PostgreSQL 18.4 image on an internal data network, starts
 an idempotent migration service before the API, and does not publish a database
@@ -50,9 +63,12 @@ CAPTCHA bypass, fingerprint spoofing, session theft, or bulk-spam capabilities.
   and a corresponding-source endpoint.
 - Data contracts, connector ports, and capability checks for the Telegram Bot
   slice.
-- When <code>TELEGRAM_BOT_ENABLED=true</code>, an official Telegram HTTP
-  transport: the local operator API sends text and a separately authenticated
-  webhook receives valid text updates.
+- A temporary legacy one-Bot environment mode and a mutually exclusive,
+  secret-backed multi-connection mode for official Telegram Bot accounts. The
+  latter maps each unique operator token to exactly one configured account.
+- Dynamic multi-connection webhook ingress that resolves the account server
+  side, uses a separate webhook secret, and gives unknown account IDs and wrong
+  secrets the same <code>401</code> response.
 - A PostgreSQL adapter behind a domain-owned inbound-event port. It writes
   canonical incoming text events with parameterized SQL and conflict-safe
   idempotency; raw Telegram payloads are deliberately not stored.
@@ -60,10 +76,10 @@ CAPTCHA bypass, fingerprint spoofing, session theft, or bulk-spam capabilities.
   bounded keyset pagination and opaque cursors. It returns canonical events,
   not database rows or raw Telegram payloads.
 - An isolated PostgreSQL database and schema, a non-superuser application role,
-  immutable migration ledger, and readiness that refuses traffic when the
-  expected migration is unavailable.
-- A local Docker proof of database migration and duplicate-event storage using
-  only synthetic data.
+  immutable migration ledger, a runtime connection registry, and readiness that
+  refuses traffic when the expected migration is unavailable.
+- A Phase 2b local Docker proof of database migration, duplicate-event storage,
+  and the operator event-read path using only synthetic data.
 - Formatting, linting, type checking, tests, and builds that can run locally
   and in CI.
 
@@ -76,7 +92,8 @@ The following remain plans or explicitly incomplete operational work:
   assurance.
 - Redis, a queue, durable outbound delivery, retries, and an outbox.
 - A web dashboard, user accounts, role-based access control, multiple
-  organizations, and webhook administration.
+  organizations, webhook administration, public connection management, or a
+  connection listing API.
 - A real Telegram Bot/TLS verification, Facebook Page, Facebook User, Zalo OA,
   Zalo User, and WhatsApp.
 
@@ -132,8 +149,10 @@ Before the first start, copy <code>.env.example</code> to
    <code>POSTGRES_PASSWORD</code> is only for PostgreSQL bootstrap;
    <code>DATABASE_PASSWORD</code> belongs to the non-superuser
    <code>open_channel_hub</code> application role.
-3. Keep Telegram disabled until an owner authorizes a real test and every
-   Telegram secret is configured safely.
+3. Either keep Telegram disabled, use the temporary legacy one-Bot variables,
+   or configure the multi-connection secret document. Do not mix the two
+   Telegram configuration modes. See the
+   [Phase 2c multi-connection guide](docs/operations/runtime-multi-connection-2c.md).
 
 ```bash
 docker compose up --build
@@ -146,9 +165,15 @@ use that port in the readiness request. The container port remains
 <code>3000</code>.
 
 Compose passes the two database passwords as Docker secrets. Neither password
-is set in the API process environment. The migration service applies
-schema-qualified forward migrations before the API starts; <code>/ready</code>
-returns <code>503</code> if the database or expected migration is unavailable.
+is set in the API process environment. When
+<code>CONNECTIONS_CONFIG_BASE64</code> is nonblank, Compose mounts its
+unpadded base64url value only as the <code>runtime_connections_base64</code>
+secret at <code>/run/secrets/runtime_connections_base64</code>; the API receives
+only that file path. Base64url prevents Compose from expanding a credential's
+<code>$</code>; it is not encryption and the encoded value remains secret. The
+migration service applies schema-qualified forward migrations before the API
+starts; <code>/ready</code> returns <code>503</code> if the database or expected
+migration is unavailable.
 
 The API and migration containers run as a non-root user, drop Linux
 capabilities, use <code>no-new-privileges</code>, have no host source/data bind
@@ -171,25 +196,27 @@ and restore drills are not implemented yet.
 
 Telegram can call a webhook only through a public HTTPS URL. Put a TLS reverse
 proxy in front of Compose, keep the operator API on loopback, and follow the
-[Phase 1a Telegram Bot operations guide](docs/operations/telegram-bot-1a.md)
-only after an authorized test is agreed. Starting Compose does not provide TLS
-or register a webhook automatically.
+[Phase 2c multi-connection guide](docs/operations/runtime-multi-connection-2c.md)
+or [Phase 1a legacy guide](docs/operations/telegram-bot-1a.md) only after an
+authorized test is agreed. Starting Compose does not provide TLS or register a
+webhook automatically.
 
 ## Read canonical inbound events
 
 When Telegram and PostgreSQL are enabled, a local operator can call
-<code>GET /v1/telegram-bot/inbound-events</code> with the same bearer token used
-for the outbound operator API. The route accepts an optional
-<code>limit</code> from 1 to 100 (default 50) and an optional opaque
-<code>cursor</code> returned by the preceding page. It does not accept a
-connection ID: the process always reads only its configured Telegram
-connection.
+<code>GET /v1/telegram-bot/inbound-events</code> with the bearer token assigned
+to one configured account. The route accepts an optional <code>limit</code>
+from 1 to 100 (default 50) and an optional opaque <code>cursor</code> returned
+by the preceding page. It does not accept a connection ID: in legacy mode it
+reads the one configured Bot, and in multi-connection mode the bearer token
+selects exactly one account server side.
 
 The response contains <code>events</code> and, when another page exists,
 <code>nextCursor</code>. Treat the cursor as opaque. It is a stable snapshot
-position, not an authorization mechanism; bearer authentication and the fixed
-connection scope remain mandatory. This API is not a dashboard, user login,
-role-based access control, search service, or a raw-provider-payload archive.
+position, not an authorization mechanism; bearer authentication and
+server-selected account scope remain mandatory. A cursor from one account is
+rejected for another. This API is not a dashboard, user login, role-based
+access control, search service, or a raw-provider-payload archive.
 
 ## Corresponding-source offer
 

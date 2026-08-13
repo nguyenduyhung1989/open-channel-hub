@@ -24,6 +24,18 @@ export const CONNECTOR_TIERS = Object.freeze([
 
 export type ConnectorTier = (typeof CONNECTOR_TIERS)[number];
 
+/**
+ * The non-secret metadata that binds one runtime connection identifier to the
+ * connector declaration it is allowed to use. It intentionally excludes
+ * account names, phone numbers, provider credentials, and provider payloads.
+ */
+export interface ConnectionRegistration {
+  readonly id: string;
+  readonly connectorId: string;
+  readonly channel: Channel;
+  readonly tier: ConnectorTier;
+}
+
 export const CONNECTOR_CAPABILITY_IDS = Object.freeze([
   'message.send.text',
   'message.receive.text'

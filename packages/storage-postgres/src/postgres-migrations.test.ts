@@ -24,13 +24,26 @@ describe('PostgreSQL migrations', () => {
     expect(sql).toContain('ALTER COLUMN ledger_id SET NOT NULL');
     expect(sql).toContain('CREATE UNIQUE INDEX inbound_events_ledger_id_unique');
     expect(sql).toContain('CREATE INDEX inbound_events_connection_ledger_id_desc');
+    expect(sql).toContain('CREATE TABLE open_channel_hub.connection_registry');
+    expect(sql).toContain("connection_id ~ '^[A-Za-z0-9._:-]{1,128}$'");
+    expect(sql).toContain("connector_id ~ '^[A-Za-z0-9._:-]{1,128}$'");
+    expect(sql).toContain("'telegram_bot'");
+    expect(sql).toContain("'EXPERIMENTAL'");
+    expect(sql).toContain('ADD CONSTRAINT inbound_events_connection_registry_fk');
+    expect(sql).toContain('REFERENCES open_channel_hub.connection_registry (connection_id)');
+    expect(sql).toContain('NOT VALID');
     expect(sql).toContain('INSERT INTO open_channel_hub.schema_migrations');
     expect(sql).not.toContain('public.');
     expect(
       pool.queries
         .filter((query) => query.sql.includes('INSERT INTO open_channel_hub.schema_migrations'))
         .map((query) => query.values[0])
-    ).toEqual(['0001_inbound_event_ledger', '0002_inbound_event_ledger_sequence']);
+    ).toEqual([
+      '0001_inbound_event_ledger',
+      '0002_inbound_event_ledger_sequence',
+      '0003_connection_registry',
+      '0004_inbound_events_connection_registry_fk'
+    ]);
     expect(pool.releaseCount).toBe(1);
   });
 
@@ -49,6 +62,8 @@ describe('PostgreSQL migrations', () => {
 
     expect(secondRunSql).not.toContain('CREATE TABLE open_channel_hub.inbound_events');
     expect(secondRunSql).not.toContain('ADD COLUMN ledger_id bigint GENERATED ALWAYS AS IDENTITY');
+    expect(secondRunSql).not.toContain('CREATE TABLE open_channel_hub.connection_registry');
+    expect(secondRunSql).not.toContain('ADD CONSTRAINT inbound_events_connection_registry_fk');
     expect(secondRunSql).not.toContain('INSERT INTO open_channel_hub.schema_migrations');
     expect(pool.releaseCount).toBe(2);
   });

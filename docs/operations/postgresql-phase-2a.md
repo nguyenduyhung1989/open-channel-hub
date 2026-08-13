@@ -1,8 +1,8 @@
 # Phase 2a PostgreSQL: operations and data boundary
 
-**Status:** the durable inbound-event ledger and a synthetic local Docker proof
-are implemented. This is not a production deployment, a backup/restore
-solution, or a real Telegram verification.
+**Status:** the durable inbound-event ledger, connection registry, and
+synthetic Docker proof source are implemented. This is not a production
+deployment, a backup/restore solution, or a real Telegram verification.
 
 ## What this stack creates
 
@@ -19,20 +19,29 @@ The supplied Compose stack creates three services:
 The database and schema are both named <code>open_channel_hub</code>. The
 application schema contains:
 
-| Object                         | Purpose                                                                                                  |
-| ------------------------------ | -------------------------------------------------------------------------------------------------------- |
-| <code>schema_migrations</code> | Immutable record of forward schema migrations applied by this binary.                                    |
-| <code>inbound_events</code>    | Canonical inbound text-event ledger. Its primary key is <code>(connection_id, provider_event_id)</code>. |
+| Object                           | Purpose                                                                                                  |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| <code>schema_migrations</code>   | Immutable record of forward schema migrations applied by this binary.                                    |
+| <code>connection_registry</code> | Opaque connection ID plus immutable connector ID, channel, tier, and registration timestamp.             |
+| <code>inbound_events</code>      | Canonical inbound text-event ledger. Its primary key is <code>(connection_id, provider_event_id)</code>. |
 
 The ledger stores a canonical event ID, channel/type/timestamps, conversation
 and sender/message identifiers, and message text. It intentionally does **not**
 store raw provider payloads. Canonical identifiers and text are still sensitive
 data; absence of raw payload is data minimization, not anonymity.
 
-The first migration is applied under a transaction-scoped PostgreSQL advisory
-lock. A second migrator waits instead of racing the ledger. A known migration
-is recorded only after its DDL succeeds. Future production changes must add a
-new forward migration; do not edit or delete an applied migration.
+Every migration is applied under a transaction-scoped PostgreSQL advisory lock.
+A second migrator waits instead of racing the ledger. A known migration is
+recorded only after its DDL succeeds. Future production changes must add a new
+forward migration; do not edit or delete an applied migration.
+
+The Phase 2c registry migration intentionally stores no Bot token, operator
+token, webhook secret, provider account name, phone number, or JSON
+configuration. The subsequent foreign key from
+<code>inbound_events.connection_id</code> to the registry is marked
+<code>NOT VALID</code>: PostgreSQL enforces new rows, while older Phase 2a
+history can be reconciled and explicitly validated later. Do not manually
+backfill, delete, or alter the registry in a deployed database.
 
 ## Configure without exposing passwords
 
@@ -53,6 +62,16 @@ non-whitespace. Compose sources them as Docker secrets. The PostgreSQL process
 gets its bootstrap secret from a secret file; the API and migration process get
 only the application secret file. Neither database password is an API
 environment variable.
+
+If multi-connection mode is enabled, <code>CONNECTIONS_CONFIG_BASE64</code> is
+a third Compose secret source. It is the unpadded base64url encoding of a JSON
+document that contains inline Telegram credentials. The encoded value is
+mounted only for the API as <code>runtime_connections_base64</code>; it is not
+sent to the API as an environment value and never belongs in PostgreSQL.
+Base64url prevents Compose from expanding credential <code>$</code> characters;
+it is not encryption. The precise configuration, compatibility, and route rules
+are in the
+[Phase 2c multi-connection guide](runtime-multi-connection-2c.md).
 
 Do **not** assume that editing <code>.env</code> rotates an existing database
 password. The role-creation script runs only while a new PostgreSQL volume is
@@ -86,10 +105,12 @@ docker compose exec postgres psql --username=postgres --dbname=open_channel_hub 
 docker compose exec postgres psql --username=postgres --dbname=open_channel_hub -c '\dt open_channel_hub.*'
 ```
 
-The local proof for this phase used only synthetic values. It ran the migration
-twice, delivered the same fake webhook twice, observed two <code>204</code>
-responses, and verified exactly one ledger row. It did not call Telegram or
-use any real credential or message.
+The verified Phase 2b local proof used only synthetic values. It ran the
+migration twice, delivered the same fake webhook twice, observed two
+<code>204</code> responses, and verified exactly one ledger row. The current
+Phase 2c smoke-test source extends that proof to two registered connections,
+but its final candidate verification is separate. Neither path calls Telegram
+or uses a real credential or message.
 
 ## Container and network boundary
 

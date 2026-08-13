@@ -5,10 +5,13 @@ set -euo pipefail
 # without contacting Telegram or using a real operator credential.
 readonly project_name='open-channel-hub-ci-smoke'
 readonly api_host_port='30127'
-readonly operator_api_token='synthetic_operator_api_token_01234567890123456789'
 readonly source_offer_url='https://github.com/nguyenduyhung1989/open-channel-hub/'
-readonly webhook_secret='synthetic_webhook_secret_0123456789'
+readonly support_operator_api_token='synthetic_operator_support_01234567890123456789'
+readonly support_webhook_secret='synthetic_support_webhook_secret_0123456789'
+readonly sales_operator_api_token='synthetic_operator_sales_0123456789012345678901'
+readonly sales_webhook_secret='synthetic_sales_webhook_secret_01234567890123456789'
 readonly webhook_payload='{"update_id":9001,"message":{"chat":{"id":-1001234567890,"type":"supergroup"},"date":1786492800,"from":{"first_name":"Synthetic","id":42,"is_bot":false},"message_id":301,"text":"Synthetic inbound message"}}'
+readonly runtime_connections_configuration='{"version":1,"connections":[{"id":"telegram-bot-support","type":"telegram_bot","botToken":"synthetic-bot-token-support","operatorApiToken":"synthetic_operator_support_01234567890123456789","webhookSecret":"synthetic_support_webhook_secret_0123456789","webhookUrl":"https://example.test/v1/webhooks/telegram-bot/telegram-bot-support"},{"id":"telegram-bot-sales","type":"telegram_bot","botToken":"synthetic-bot-token-sales","operatorApiToken":"synthetic_operator_sales_0123456789012345678901","webhookSecret":"synthetic_sales_webhook_secret_01234567890123456789","webhookUrl":"https://example.test/v1/webhooks/telegram-bot/telegram-bot-sales"}]}'
 
 compose=(docker compose --project-name "$project_name" --file compose.yaml)
 
@@ -69,6 +72,9 @@ wait_for_readiness() {
 }
 
 post_webhook() {
+  local connection_id=$1
+  local webhook_secret=$2
+
   curl --fail --silent --show-error --connect-timeout 3 --max-time 10 \
     --data "$webhook_payload" \
     --header 'content-type: application/json' \
@@ -76,13 +82,26 @@ post_webhook() {
     --output /dev/null \
     --request POST \
     --write-out '%{http_code}' \
-    "http://127.0.0.1:${api_host_port}/v1/webhooks/telegram-bot"
+    "http://127.0.0.1:${api_host_port}/v1/webhooks/telegram-bot/${connection_id}"
 }
 
 read_inbound_events() {
+  local operator_api_token=$1
+
   curl --fail --silent --show-error --connect-timeout 3 --max-time 10 \
     --header "authorization: Bearer ${operator_api_token}" \
     "http://127.0.0.1:${api_host_port}/v1/telegram-bot/inbound-events"
+}
+
+read_inbound_events_status() {
+  local operator_api_token=$1
+  local cursor=$2
+
+  curl --silent --show-error --connect-timeout 3 --max-time 10 \
+    --header "authorization: Bearer ${operator_api_token}" \
+    --output /dev/null \
+    --write-out '%{http_code}' \
+    "http://127.0.0.1:${api_host_port}/v1/telegram-bot/inbound-events?cursor=${cursor}"
 }
 
 query_postgres() {
@@ -90,18 +109,36 @@ query_postgres() {
     psql --username=postgres --dbname=open_channel_hub --tuples-only --no-align --command "$1"
 }
 
+assert_scoped_event_response() {
+  local response=$1
+  local expected_connection_id=$2
+  local forbidden_connection_id=$3
+
+  if [[ "$response" != *'"success":true'* ||
+    "$response" != *"\"connectionId\":\"${expected_connection_id}\""* ||
+    "$response" == *"${forbidden_connection_id}"* ||
+    "$response" == *'rawProviderPayload'* ]]; then
+    printf 'The operator inbound-event API did not remain scoped to the configured connection.\n' >&2
+    return 1
+  fi
+}
+
 trap cleanup EXIT
 trap 'on_error "$LINENO"' ERR
 
 export API_HOST_PORT="$api_host_port"
+export CONNECTIONS_CONFIG_BASE64="$(printf '%s' "$runtime_connections_configuration" | base64 | tr '+/' '-_' | tr -d '=\n')"
 export DATABASE_PASSWORD='synthetic_database_password_0123456789'
-export OPERATOR_API_TOKEN="$operator_api_token"
 export POSTGRES_PASSWORD='synthetic_postgres_password_0123456789'
 export SOURCE_OFFER_URL="$source_offer_url"
-export TELEGRAM_BOT_ENABLED='true'
-export TELEGRAM_BOT_TOKEN='synthetic-bot-token'
-export TELEGRAM_CONNECTION_ID='telegram-bot-ci'
-export TELEGRAM_WEBHOOK_SECRET="$webhook_secret"
+export TELEGRAM_BOT_ENABLED='false'
+unset CONNECTIONS_CONFIG_BASE64_FILE
+unset CONNECTIONS_CONFIG_FILE
+unset OPERATOR_API_TOKEN
+unset TELEGRAM_BOT_TOKEN
+unset TELEGRAM_CONNECTION_ID
+unset TELEGRAM_WEBHOOK_SECRET
+unset TELEGRAM_WEBHOOK_URL
 
 # A previous interrupted run can only be cleaned when it uses this exact test project name.
 "${compose[@]}" down --volumes --remove-orphans >&2 || true
@@ -112,31 +149,75 @@ wait_for_readiness
 "${compose[@]}" run --rm --no-deps migrate
 "${compose[@]}" run --rm --no-deps migrate
 
-assert_equal '204' "$(post_webhook)" 'first authenticated webhook status'
-assert_equal '204' "$(post_webhook)" 'duplicate authenticated webhook status'
+assert_equal \
+  '204' \
+  "$(post_webhook 'telegram-bot-support' "$support_webhook_secret")" \
+  'first support webhook status'
+assert_equal \
+  '204' \
+  "$(post_webhook 'telegram-bot-support' "$support_webhook_secret")" \
+  'duplicate support webhook status'
+assert_equal \
+  '204' \
+  "$(post_webhook 'telegram-bot-sales' "$sales_webhook_secret")" \
+  'sales webhook status with the same provider event id'
 
-event_record="$(
-  query_postgres "SELECT connection_id || ':' || provider_event_id || ':' || canonical_event_id || ':' || message_text FROM open_channel_hub.inbound_events;"
+event_records="$(
+  query_postgres "SELECT connection_id || ':' || provider_event_id || ':' || canonical_event_id || ':' || message_text FROM open_channel_hub.inbound_events ORDER BY connection_id;"
 )"
 assert_equal \
-  'telegram-bot-ci:9001:telegram:event:9001:Synthetic inbound message' \
-  "$event_record" \
-  'durably stored normalized event'
+  $'telegram-bot-sales:9001:telegram:event:9001:Synthetic inbound message\ntelegram-bot-support:9001:telegram:event:9001:Synthetic inbound message' \
+  "$event_records" \
+  'two connection-scoped normalized events with the same provider event id'
+
+per_connection_event_counts="$(
+  query_postgres "SELECT connection_id || ':' || COUNT(*) FROM open_channel_hub.inbound_events GROUP BY connection_id ORDER BY connection_id;"
+)"
+assert_equal \
+  $'telegram-bot-sales:1\ntelegram-bot-support:1' \
+  "$per_connection_event_counts" \
+  'duplicate event idempotency within each connection'
 
 migration_count="$(
   query_postgres "SELECT COUNT(*) FROM open_channel_hub.schema_migrations;"
 )"
-assert_equal '2' "$migration_count" 'immutable migration ledger entry count'
+assert_equal '4' "$migration_count" 'immutable migration ledger entry count'
 
-inbound_events_response="$(read_inbound_events)"
+connection_registry_records="$(
+  query_postgres "SELECT connection_id || ':' || connector_id || ':' || channel || ':' || tier FROM open_channel_hub.connection_registry ORDER BY connection_id;"
+)"
+assert_equal \
+  $'telegram-bot-sales:telegram-bot:telegram_bot:OFFICIAL\ntelegram-bot-support:telegram-bot:telegram_bot:OFFICIAL' \
+  "$connection_registry_records" \
+  'registered connection identity records'
 
-if [[ "$inbound_events_response" != *'"success":true'* ||
-  "$inbound_events_response" != *'"connectionId":"telegram-bot-ci"'* ||
-  "$inbound_events_response" != *'"text":"Synthetic inbound message"'* ||
-  "$inbound_events_response" == *'rawProviderPayload'* ]]; then
-  printf 'The operator inbound-event API did not return the expected canonical event.\n' >&2
-  exit 1
-fi
+support_inbound_events_response="$(read_inbound_events "$support_operator_api_token")"
+sales_inbound_events_response="$(read_inbound_events "$sales_operator_api_token")"
+
+assert_scoped_event_response \
+  "$support_inbound_events_response" \
+  'telegram-bot-support' \
+  'telegram-bot-sales'
+assert_scoped_event_response \
+  "$sales_inbound_events_response" \
+  'telegram-bot-sales' \
+  'telegram-bot-support'
+
+cross_connection_cursor="$(
+  printf '%s' '{"beforeSequence":"1","connectionId":"telegram-bot-support","snapshotMaxSequence":"1"}' \
+    | base64 \
+    | tr '+/' '-_' \
+    | tr -d '=\n'
+)"
+assert_equal \
+  '400' \
+  "$(read_inbound_events_status "$sales_operator_api_token" "$cross_connection_cursor")" \
+  'cross-connection cursor rejection'
+
+runtime_connection_secret_permissions="$(
+  "${compose[@]}" exec -T api stat -c '%u:%g:%a' /run/secrets/runtime_connections_base64
+)"
+assert_equal '10001:10001:400' "$runtime_connection_secret_permissions" 'runtime connection secret permissions'
 
 role_safety="$(
   query_postgres "SELECT CASE WHEN rolsuper OR rolcreatedb OR rolcreaterole OR rolinherit OR rolreplication OR rolbypassrls THEN 'unsafe' ELSE 'safe' END FROM pg_roles WHERE rolname = 'open_channel_hub';"

@@ -10,6 +10,7 @@ import {
   sourceOfferLinkHeader
 } from './source/source-offer.js';
 import type { TelegramBotFeature } from './telegram-bot/telegram-bot-feature.js';
+import { createTelegramBotFeatureCatalog } from './telegram-bot/telegram-bot-feature-catalog.js';
 import { registerTelegramBotInboundEventsRoute } from './telegram-bot/telegram-bot-inbound-events-route.js';
 import { registerTelegramBotMessageRoute } from './telegram-bot/telegram-bot-message-route.js';
 import { registerTelegramBotWebhookRoute } from './telegram-bot/telegram-bot-webhook-route.js';
@@ -18,6 +19,7 @@ export interface BuildAppOptions {
   readonly readiness?: ReadinessCheck;
   readonly sourceOfferUrl?: string;
   readonly telegramBot?: TelegramBotFeature;
+  readonly telegramBots?: readonly TelegramBotFeature[];
 }
 
 export const buildApp = async (options: BuildAppOptions = {}): Promise<FastifyInstance> => {
@@ -71,10 +73,30 @@ export const buildApp = async (options: BuildAppOptions = {}): Promise<FastifyIn
   await registerReadinessRoute(app, options.readiness);
   await registerSourceOfferRoute(app, sourceOfferUrl);
 
-  if (options.telegramBot !== undefined) {
-    await registerTelegramBotInboundEventsRoute(app, options.telegramBot);
-    await registerTelegramBotMessageRoute(app, options.telegramBot);
-    await registerTelegramBotWebhookRoute(app, options.telegramBot);
+  if (options.telegramBot !== undefined && options.telegramBots !== undefined) {
+    throw new Error('Telegram connection configuration is ambiguous.');
+  }
+
+  const telegramBots =
+    options.telegramBot === undefined
+      ? options.telegramBots
+      : Object.freeze([options.telegramBot] as const);
+
+  if (telegramBots !== undefined) {
+    const catalog = createTelegramBotFeatureCatalog(telegramBots, {
+      allowLegacyDotSegmentConnectionId: options.telegramBot !== undefined
+    });
+
+    await registerTelegramBotInboundEventsRoute(app, catalog, {
+      allowLegacyCursor: options.telegramBot !== undefined
+    });
+    await registerTelegramBotMessageRoute(app, catalog);
+    await registerTelegramBotWebhookRoute(app, catalog, {
+      dynamicRouteEnabled: options.telegramBot === undefined,
+      ...(options.telegramBot === undefined
+        ? {}
+        : { legacyConnectionId: options.telegramBot.connectionId })
+    });
   }
 
   return app;

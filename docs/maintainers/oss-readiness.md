@@ -9,8 +9,8 @@ organization has accepted the project.
   that run without secrets, and a clearly stated alpha status.
 - Contribution guidance, code of conduct, support, governance, security policy,
   roadmap, changelog, ADRs, and phase checkpoints.
-- CI files with a pinned runtime and formatting, lint, type, test, and build
-  checks; CodeQL, Dependabot, and dependency review.
+- CI files with a pinned runtime and formatting, lint, type, test, build,
+  Compose smoke, CodeQL, Dependabot, and dependency-review checks.
 - A small verifiable slice rather than a claim to support every platform.
 - Historical Phase 1a evidence: local candidate checks and GitHub CI/CodeQL at
   <code>7141949</code>. Live Telegram verification remains outstanding.
@@ -18,10 +18,13 @@ organization has accepted the project.
   non-superuser role, canonical inbound-event storage, and a synthetic Docker
   proof of migration/idempotency. GitHub CI and CodeQL succeeded at
   <code>f106bb8</code>.
-- The current Phase 2b candidate adds a fixed-connection, operator-authenticated
-  canonical event-read API, stable cursor pagination, and a Compose smoke test
-  in CI source. Its own final local and GitHub evidence, live Telegram proof,
-  and production operation remain unclaimed.
+- Phase 2b added a token-gated canonical event reader, stable pagination, and
+  its synthetic Compose proof. GitHub CI and CodeQL succeeded for exact commit
+  <code>4d5a9c9</code>.
+- The current Phase 2c source adds secret-backed multi-connection configuration,
+  token-bound account selection, dynamic webhook ingress, and a durable
+  connection registry. Its final local verification and synthetic Compose proof
+  passed; GitHub checks remain pending for its exact commit.
 
 ## Verified GitHub evidence
 
@@ -29,24 +32,28 @@ organization has accepted the project.
   applies only to that commit and does not replace verification of a later
   release commit or tag.
 - GitHub CI and CodeQL succeeded for the Phase 1a candidate at
-  <code>7141949</code>. A later release tag still needs its own owner decision
-  and verification.
-- GitHub CI and CodeQL succeeded for the Phase 2a storage candidate at
-  <code>f106bb8</code>. This does not verify the later Phase 2b candidate.
+  <code>7141949</code>, the Phase 2a candidate at <code>f106bb8</code>, and
+  the Phase 2b candidate at <code>4d5a9c9</code>.
 - GitHub Private Vulnerability Reporting, secret scanning, Dependabot alerts,
   and automatic security fixes are enabled.
-- Branch protection is intentionally open for an owner decision. Do not
-  describe it as an existing safeguard or change it during documentation work.
+- The <code>main</code> branch blocks force pushes and deletion, including by
+  administrators. Required status checks and pull-request review requirements
+  are deliberately absent to retain the current owner-controlled direct-push
+  workflow. A future collaboration model must revisit that choice before
+  treating it as comprehensive merge governance.
 
 ## Must be maintained through real work
 
 - Keep <code>main</code> green; address dependency and CodeQL alerts; update
   the runtime and Actions through verified stable releases.
-- Keep the final local evidence with the candidate and read fresh GitHub checks
-  for the actual Phase 2b commit before making release claims.
+- Keep final local evidence with the exact candidate and read fresh GitHub
+  checks for each actual release commit before making release claims.
 - Maintain migrations as immutable, forward-only repository artifacts. Never
   manually alter a deployed database and then describe it as a repository
   migration.
+- Treat the runtime multi-connection document as a secret. Never commit it,
+  publish it through a ticket/log/screenshot, store it in PostgreSQL, or mix it
+  with legacy Bot credentials in one process.
 - Treat canonical message text and identifiers as sensitive data. Build and
   test backup/restore, retention/deletion, secret rotation, access controls,
   and operational observability before operating real customer data.
@@ -54,9 +61,6 @@ organization has accepted the project.
   user data and secrets.
 - Respond to issues and pull requests, record material decisions, and create
   release tags and changelog entries only when an actual release occurs.
-- The owner decides the branch-protection scope before expanding write access
-  or collaboration scale. After that decision, document required checks and
-  any administrative exceptions.
 - Maintain Private Vulnerability Reporting, secret scanning, Dependabot
   alerts, and automatic security fixes; recheck them after permission or
   GitHub-configuration changes.

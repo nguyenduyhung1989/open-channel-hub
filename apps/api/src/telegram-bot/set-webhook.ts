@@ -1,28 +1,34 @@
 import { TelegramHttpBotGateway } from '@open-channel-hub/connector-telegram';
 
 import { parseEnvironment } from '../config/environment.js';
+import { loadTelegramBotConnectionConfigurations } from './telegram-bot-connection-configurations.js';
 
-const environment = parseEnvironment(process.env);
-
-if (!environment.telegramBot.enabled || environment.telegramBot.webhookUrl === undefined) {
-  process.stderr.write(
-    'Telegram webhook setup requires TELEGRAM_BOT_ENABLED=true and TELEGRAM_WEBHOOK_URL=https://... .\n'
+try {
+  const environment = parseEnvironment(process.env);
+  const connections = await loadTelegramBotConnectionConfigurations(environment.telegramBot);
+  const webhookConnections = connections.filter(
+    (connection): connection is typeof connection & Readonly<{ webhookUrl: string }> =>
+      connection.webhookUrl !== undefined
   );
-  process.exitCode = 1;
-} else {
-  try {
+
+  if (webhookConnections.length === 0) {
+    throw new Error('No Telegram webhook URL is configured.');
+  }
+
+  for (const connection of webhookConnections) {
     const gateway = new TelegramHttpBotGateway({
-      botToken: environment.telegramBot.botToken,
-      connectionId: environment.telegramBot.connectionId
+      botToken: connection.botToken,
+      connectionId: connection.connectionId
     });
 
     await gateway.setWebhook({
-      secretToken: environment.telegramBot.webhookSecret,
-      url: new URL(environment.telegramBot.webhookUrl)
+      secretToken: connection.webhookSecret,
+      url: new URL(connection.webhookUrl)
     });
-    process.stdout.write('Telegram webhook configuration was accepted.\n');
-  } catch {
-    process.stderr.write('Telegram webhook configuration failed. Check the documented setup.\n');
-    process.exitCode = 1;
   }
+
+  process.stdout.write('Telegram webhook configuration was accepted.\n');
+} catch {
+  process.stderr.write('Telegram webhook configuration failed. Check the documented setup.\n');
+  process.exitCode = 1;
 }

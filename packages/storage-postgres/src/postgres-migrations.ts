@@ -71,6 +71,64 @@ CREATE INDEX inbound_events_connection_ledger_id_desc
 `
 ]);
 
+/**
+ * Runtime connection metadata is deliberately distinct from event content and
+ * credentials. The static checks keep the durable registry aligned with the
+ * public connector vocabulary without storing any provider account data.
+ */
+const CONNECTION_REGISTRY_ID = '0003_connection_registry';
+
+const CONNECTION_REGISTRY_STATEMENTS = Object.freeze([
+  `
+CREATE TABLE ${POSTGRES_SCHEMA}.connection_registry (
+  connection_id text PRIMARY KEY,
+  connector_id text NOT NULL,
+  channel text NOT NULL,
+  tier text NOT NULL,
+  registered_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT connection_registry_connection_id_format CHECK (
+    connection_id ~ '^[A-Za-z0-9._:-]{1,128}$'
+  ),
+  CONSTRAINT connection_registry_connector_id_format CHECK (
+    connector_id ~ '^[A-Za-z0-9._:-]{1,128}$'
+  ),
+  CONSTRAINT connection_registry_channel_known CHECK (
+    channel IN (
+      'telegram_bot',
+      'zalo_oa',
+      'facebook_page',
+      'whatsapp_business',
+      'telegram_user',
+      'zalo_user',
+      'whatsapp_user',
+      'facebook_user'
+    )
+  ),
+  CONSTRAINT connection_registry_tier_known CHECK (
+    tier IN ('OFFICIAL', 'OFFICIAL_CLIENT', 'EXPERIMENTAL')
+  )
+)
+`
+]);
+
+/**
+ * Existing Phase 2a installations can contain events that predate the
+ * registry. PostgreSQL enforces this foreign key for all future writes while a
+ * later explicit validation migration can verify any historical backfill.
+ */
+const INBOUND_EVENTS_CONNECTION_REGISTRY_FOREIGN_KEY_ID =
+  '0004_inbound_events_connection_registry_fk';
+
+const INBOUND_EVENTS_CONNECTION_REGISTRY_FOREIGN_KEY_STATEMENTS = Object.freeze([
+  `
+ALTER TABLE ${POSTGRES_SCHEMA}.inbound_events
+  ADD CONSTRAINT inbound_events_connection_registry_fk
+  FOREIGN KEY (connection_id)
+  REFERENCES ${POSTGRES_SCHEMA}.connection_registry (connection_id)
+  NOT VALID
+`
+]);
+
 const MIGRATIONS = Object.freeze([
   Object.freeze({
     id: INBOUND_EVENT_LEDGER_ID,
@@ -84,6 +142,19 @@ const MIGRATIONS = Object.freeze([
       INBOUND_EVENT_LEDGER_SEQUENCE_STATEMENTS
     ),
     statements: INBOUND_EVENT_LEDGER_SEQUENCE_STATEMENTS
+  }),
+  Object.freeze({
+    id: CONNECTION_REGISTRY_ID,
+    checksum: checksumFor(CONNECTION_REGISTRY_ID, CONNECTION_REGISTRY_STATEMENTS),
+    statements: CONNECTION_REGISTRY_STATEMENTS
+  }),
+  Object.freeze({
+    id: INBOUND_EVENTS_CONNECTION_REGISTRY_FOREIGN_KEY_ID,
+    checksum: checksumFor(
+      INBOUND_EVENTS_CONNECTION_REGISTRY_FOREIGN_KEY_ID,
+      INBOUND_EVENTS_CONNECTION_REGISTRY_FOREIGN_KEY_STATEMENTS
+    ),
+    statements: INBOUND_EVENTS_CONNECTION_REGISTRY_FOREIGN_KEY_STATEMENTS
   })
 ]);
 

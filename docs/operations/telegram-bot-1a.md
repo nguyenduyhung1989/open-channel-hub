@@ -1,16 +1,20 @@
 # Phase 1a Telegram Bot: configuration and operating boundary
 
-**Status:** the HTTP gateway and startup wiring are implemented. Historical
-local and GitHub verification exists for the Phase 1a candidate at
-<code>7141949</code>, but no real Telegram Bot token, API method request,
-webhook registration, send/receive confirmation, or authorized test-bot check
-has occurred. Phase 2a now adds durable storage for accepted canonical inbound
-text events; its final local verification passed, while fresh GitHub evidence
-for its commit remains pending.
+**Status:** the original one-Bot HTTP gateway and startup wiring are
+implemented. Historical local and GitHub verification exists for the Phase 1a
+candidate at <code>7141949</code>, and GitHub CI/CodeQL passed for the later
+Phase 2b commit <code>4d5a9c9</code>. No real Telegram Bot token, API method
+request, webhook registration, send/receive confirmation, or authorized
+test-bot check has occurred.
+
+This is the temporary **legacy one-Bot** guide. New multi-connection
+configuration is documented separately in the
+[Phase 2c guide](runtime-multi-connection-2c.md).
 
 ## Deliberately narrow scope
 
-Phase 1a covers only text messages through the official Telegram Bot API:
+Legacy Phase 1a covers only text messages through the official Telegram Bot
+API:
 
 - <code>POST /v1/telegram-bot/messages</code> is the local operator API for
   sending text. It requires
@@ -32,14 +36,17 @@ An authenticated webhook returns <code>204</code> without a payload. With the
 Phase 2a PostgreSQL configuration present, it appends the canonical incoming
 text event before returning. A repeated
 <code>(connection_id, provider_event_id)</code> does not create a second row,
-and raw provider payloads are not stored. This is still not a user inbox:
-there is no event read API, conversation model, durable outbound retry, or
-backup.
+and raw provider payloads are not stored. The later operator event-read API
+exists, but this is still not a user inbox, conversation model, durable
+outbound retry, or backup.
 
 ## Safe configuration
 
 Copy <code>.env.example</code> to <code>.env</code> and edit it locally, or
-place equivalent values in the deployment environment's secret store.
+place equivalent values in the deployment environment's secret store. These
+variables are for the legacy one-Bot mode only; do not combine them with
+<code>CONNECTIONS_CONFIG_FILE</code> or
+<code>CONNECTIONS_CONFIG_BASE64_FILE</code>.
 <code>.env</code> is ignored by Git.
 
 Do not paste a token or password into a shell command, inline environment
@@ -86,7 +93,9 @@ a placeholder.
 operator API is not automatically exposed outside the host. PostgreSQL has no
 host port and remains on an internal Docker network. For Telegram to deliver a
 webhook, a TLS reverse proxy must provide a public HTTPS URL that forwards
-precisely to <code>/v1/webhooks/telegram-bot</code>.
+precisely to <code>/v1/webhooks/telegram-bot</code>. Multi-connection mode
+instead uses the dynamic route described in the
+[Phase 2c guide](runtime-multi-connection-2c.md).
 
 Compose does not issue a TLS certificate, expose a public port, register a
 webhook automatically, or replace rate limiting and monitoring. Do not expose
@@ -112,10 +121,12 @@ docker compose up -d --force-recreate api
 docker compose exec api npm run telegram:webhook:set
 ```
 
-The command reads its configured bot values from the container environment; it
-takes no token on the command line and reports only a general result. Do not
-replace it with a hand-built Telegram URL containing a token, and do not copy a
-header or payload into a terminal or log.
+In legacy mode, the command reads its configured Bot values from the container
+environment. It takes no token on the command line and reports only a general
+result. Do not replace it with a hand-built Telegram URL containing a token, and
+do not copy a header or payload into a terminal or log. In multi-connection
+mode, the same command reads the mounted secret document and processes each
+configured <code>webhookUrl</code>; use the Phase 2c guide instead.
 
 This command makes a real network request to Telegram. It has **not** run for
 this project state and must be used only with an authorized test bot. Telegram

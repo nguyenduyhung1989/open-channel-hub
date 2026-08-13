@@ -6,6 +6,7 @@ export {
 } from './connector.js';
 export type {
   Channel,
+  ConnectionRegistration,
   ConnectionState,
   ConnectionStatus,
   ConnectorCapability,

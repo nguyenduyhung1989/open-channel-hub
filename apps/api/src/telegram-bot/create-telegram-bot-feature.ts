@@ -2,7 +2,12 @@ import {
   TelegramBotConnectorAdapter,
   TelegramHttpBotGateway
 } from '@open-channel-hub/connector-telegram';
-import type { CanonicalEvent, ProviderCommand, ProviderReceipt } from '@open-channel-hub/contracts';
+import type {
+  CanonicalEvent,
+  ConnectionRegistration,
+  ProviderCommand,
+  ProviderReceipt
+} from '@open-channel-hub/contracts';
 import {
   SendMessage,
   type InboundEventListInput,
@@ -11,8 +16,15 @@ import {
   type SendMessageResult
 } from '@open-channel-hub/domain';
 
-import type { EnabledTelegramBotEnvironment } from '../config/environment.js';
 import type { TelegramBotFeature } from './telegram-bot-feature.js';
+
+export interface TelegramBotConnectionConfiguration {
+  readonly botToken: string;
+  readonly connectionId: string;
+  readonly operatorApiToken: string;
+  readonly webhookSecret: string;
+  readonly webhookUrl?: string;
+}
 
 export interface CreateTelegramBotFeatureOptions {
   readonly fetchImpl?: typeof fetch;
@@ -27,7 +39,7 @@ export interface CreateTelegramBotFeatureOptions {
  * sink supplied by the composition root.
  */
 export const createTelegramBotFeature = async (
-  environment: EnabledTelegramBotEnvironment,
+  environment: TelegramBotConnectionConfiguration,
   options: CreateTelegramBotFeatureOptions
 ): Promise<TelegramBotFeature> => {
   const gateway = new TelegramHttpBotGateway({
@@ -45,13 +57,33 @@ export const createTelegramBotFeature = async (
     send: async (command: ProviderCommand): Promise<ProviderReceipt> => connector.execute(command)
   });
   const sendMessage = new SendMessage(outboundPort);
+  const manifest = connector.manifest();
+  const registration: ConnectionRegistration = Object.freeze({
+    channel: manifest.channel,
+    connectorId: manifest.id,
+    id: environment.connectionId,
+    tier: manifest.tier
+  });
 
   return Object.freeze({
     connectionId: environment.connectionId,
     normalize: (rawEvent: unknown): readonly CanonicalEvent[] => connector.normalize(rawEvent),
     operatorApiToken: environment.operatorApiToken,
     readInboundEvents: options.readInboundEvents,
-    receiveEvents: options.receiveEvents,
+    receiveEvents: async (events: readonly CanonicalEvent[]): Promise<void> => {
+      if (
+        !events.every(
+          (event) =>
+            event.connectionId === environment.connectionId &&
+            event.channel === registration.channel
+        )
+      ) {
+        throw new Error('Telegram inbound events do not match their configured connection.');
+      }
+
+      await options.receiveEvents(events);
+    },
+    registration,
     sendMessage: async (input: unknown): Promise<SendMessageResult> => sendMessage.execute(input),
     webhookSecret: environment.webhookSecret
   });

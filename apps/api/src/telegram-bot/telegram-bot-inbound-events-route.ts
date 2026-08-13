@@ -4,16 +4,26 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import { apiFailure, apiSuccess } from '../http/api-response.js';
-import { matchesBearerToken } from '../http/secret-match.js';
-import type { TelegramBotFeature } from './telegram-bot-feature.js';
+import type { TelegramBotFeatureCatalog } from './telegram-bot-feature-catalog.js';
 
 const DEFAULT_PAGE_SIZE = 50;
 const MAX_CURSOR_LENGTH = 512;
 const MAX_POSTGRES_BIGINT = '9223372036854775807';
+// A cursor only binds an authenticated read to a connection; it is never
+// interpolated into the dynamic webhook path. Keep legacy `.`/`..` labels
+// readable while dynamic runtime configuration rejects those labels at startup.
+const cursorConnectionIdSchema = z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/);
 const sequenceSchema = z.string().regex(/^[1-9][0-9]{0,18}$/);
+const legacyPageCursorSchema = z
+  .object({
+    beforeSequence: sequenceSchema,
+    snapshotMaxSequence: sequenceSchema
+  })
+  .strict();
 const pageCursorSchema = z
   .object({
     beforeSequence: sequenceSchema,
+    connectionId: cursorConnectionIdSchema,
     snapshotMaxSequence: sequenceSchema
   })
   .strict();
@@ -27,17 +37,24 @@ const querySchema = z
   })
   .strict();
 
+export interface TelegramBotInboundEventsRouteOptions {
+  readonly allowLegacyCursor?: boolean;
+}
+
 /**
- * Lists canonical events for the one Telegram connection configured by this
- * process. The opaque cursor prevents callers from selecting another account
- * or constructing storage queries directly.
+ * Lists canonical events for exactly the Telegram connection resolved from the
+ * operator bearer token. The opaque cursor prevents callers from selecting a
+ * different account or constructing storage queries directly.
  */
 export const registerTelegramBotInboundEventsRoute = async (
   app: FastifyInstance,
-  feature: TelegramBotFeature
+  catalog: TelegramBotFeatureCatalog,
+  options: TelegramBotInboundEventsRouteOptions = {}
 ): Promise<void> => {
   app.get('/v1/telegram-bot/inbound-events', async (request, reply) => {
-    if (!matchesBearerToken(request.headers.authorization, feature.operatorApiToken)) {
+    const feature = catalog.findByOperatorAuthorization(request.headers.authorization);
+
+    if (feature === undefined) {
       return reply
         .code(401)
         .send(apiFailure('unauthorized', 'The operator credential is invalid.'));
@@ -49,7 +66,11 @@ export const registerTelegramBotInboundEventsRoute = async (
       return reply.code(400).send(apiFailure('validation_error', 'The request is invalid.'));
     }
 
-    const cursor = decodeCursor(query.data.cursor);
+    const cursor = decodeCursor(
+      query.data.cursor,
+      feature.connectionId,
+      options.allowLegacyCursor === true
+    );
 
     if (cursor === null) {
       return reply.code(400).send(apiFailure('validation_error', 'The request is invalid.'));
@@ -64,13 +85,19 @@ export const registerTelegramBotInboundEventsRoute = async (
     return reply.code(200).send(
       apiSuccess({
         events: page.events.map(toPublicCanonicalEvent),
-        ...(page.nextCursor === undefined ? {} : { nextCursor: encodeCursor(page.nextCursor) })
+        ...(page.nextCursor === undefined
+          ? {}
+          : { nextCursor: encodeCursor(page.nextCursor, feature.connectionId) })
       })
     );
   });
 };
 
-const decodeCursor = (value: string | undefined): InboundEventPageCursor | null | undefined => {
+const decodeCursor = (
+  value: string | undefined,
+  connectionId: string,
+  allowLegacyCursor: boolean
+): InboundEventPageCursor | null | undefined => {
   if (value === undefined) {
     return undefined;
   }
@@ -86,16 +113,31 @@ const decodeCursor = (value: string | undefined): InboundEventPageCursor | null 
       return null;
     }
 
-    const parsed = pageCursorSchema.safeParse(JSON.parse(encoded.toString('utf8')));
+    const decoded = JSON.parse(encoded.toString('utf8'));
+    const parsed = pageCursorSchema.safeParse(decoded);
 
-    return parsed.success && isValidCursor(parsed.data) ? parsed.data : null;
+    return parsed.success && parsed.data.connectionId === connectionId && isValidCursor(parsed.data)
+      ? Object.freeze({
+          beforeSequence: parsed.data.beforeSequence,
+          snapshotMaxSequence: parsed.data.snapshotMaxSequence
+        })
+      : decodeLegacyCursor(decoded, allowLegacyCursor);
   } catch {
     return null;
   }
 };
 
-const encodeCursor = (cursor: InboundEventPageCursor): string => {
-  const parsed = pageCursorSchema.safeParse(cursor);
+const decodeLegacyCursor = (
+  value: unknown,
+  allowLegacyCursor: boolean
+): InboundEventPageCursor | null => {
+  const parsed = legacyPageCursorSchema.safeParse(value);
+
+  return allowLegacyCursor && parsed.success && isValidCursor(parsed.data) ? parsed.data : null;
+};
+
+const encodeCursor = (cursor: InboundEventPageCursor, connectionId: string): string => {
+  const parsed = pageCursorSchema.safeParse({ ...cursor, connectionId });
 
   if (!parsed.success || !isValidCursor(parsed.data)) {
     throw new Error('The inbound-event reader returned an invalid cursor.');

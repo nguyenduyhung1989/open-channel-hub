@@ -1,6 +1,7 @@
 import { buildApp } from './app.js';
 import { EnvironmentConfigurationError, parseEnvironment } from './config/environment.js';
 import { createTelegramBotFeature } from './telegram-bot/create-telegram-bot-feature.js';
+import { loadTelegramBotConnectionConfigurations } from './telegram-bot/telegram-bot-connection-configurations.js';
 import { createPostgresDatabase } from '@open-channel-hub/storage-postgres';
 
 const environment = parseEnvironment(process.env);
@@ -15,21 +16,46 @@ try {
   }
 
   let telegramBot: Awaited<ReturnType<typeof createTelegramBotFeature>> | undefined;
+  let telegramBots: readonly Awaited<ReturnType<typeof createTelegramBotFeature>>[] | undefined;
 
   if (environment.telegramBot.enabled) {
     const inboundEventReader = postgres?.inboundEventReader;
     const inboundEventStore = postgres?.inboundEventStore;
+    const connectionRegistry = postgres?.connectionRegistry;
 
-    if (inboundEventReader === undefined || inboundEventStore === undefined) {
+    if (
+      inboundEventReader === undefined ||
+      inboundEventStore === undefined ||
+      connectionRegistry === undefined
+    ) {
       throw new EnvironmentConfigurationError();
     }
 
-    telegramBot = await createTelegramBotFeature(environment.telegramBot, {
-      readInboundEvents: async (input) => inboundEventReader.list(input),
-      receiveEvents: async (events) => {
-        await inboundEventStore.append(events);
+    const connections = await loadTelegramBotConnectionConfigurations(environment.telegramBot);
+    const features = await Promise.all(
+      connections.map(async (connection) =>
+        createTelegramBotFeature(connection, {
+          readInboundEvents: async (input) => inboundEventReader.list(input),
+          receiveEvents: async (events) => {
+            await inboundEventStore.append(events);
+          }
+        })
+      )
+    );
+
+    await connectionRegistry.ensureRegistered(features.map((feature) => feature.registration));
+
+    if ('configurationFile' in environment.telegramBot) {
+      telegramBots = Object.freeze(features);
+    } else {
+      const feature = features[0];
+
+      if (feature === undefined) {
+        throw new EnvironmentConfigurationError();
       }
-    });
+
+      telegramBot = feature;
+    }
   }
   const app = await buildApp({
     ...(postgres === undefined
@@ -40,7 +66,8 @@ try {
           })
         }),
     sourceOfferUrl: environment.sourceOfferUrl,
-    ...(telegramBot === undefined ? {} : { telegramBot })
+    ...(telegramBot === undefined ? {} : { telegramBot }),
+    ...(telegramBots === undefined ? {} : { telegramBots })
   });
 
   if (postgres !== undefined) {

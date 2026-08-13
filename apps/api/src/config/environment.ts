@@ -8,6 +8,8 @@ const environmentSchema = z.object({
   DATABASE_PASSWORD_FILE: z.string().optional(),
   DATABASE_PORT: z.string().optional(),
   DATABASE_USER: z.string().optional(),
+  CONNECTIONS_CONFIG_BASE64_FILE: z.string().optional(),
+  CONNECTIONS_CONFIG_FILE: z.string().optional(),
   HOST: z.string().min(1).default('127.0.0.1'),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   OPERATOR_API_TOKEN: z.string().optional(),
@@ -39,7 +41,17 @@ export interface EnabledTelegramBotEnvironment {
   readonly webhookUrl?: string;
 }
 
-export type TelegramBotEnvironment = DisabledTelegramBotEnvironment | EnabledTelegramBotEnvironment;
+/** A secret-backed JSON file that can configure more than one Telegram Bot connection. */
+export interface RuntimeConfiguredTelegramBotsEnvironment {
+  readonly configurationEncoding: 'base64url' | 'json';
+  readonly configurationFile: string;
+  readonly enabled: true;
+}
+
+export type TelegramBotEnvironment =
+  | DisabledTelegramBotEnvironment
+  | EnabledTelegramBotEnvironment
+  | RuntimeConfiguredTelegramBotsEnvironment;
 
 export interface PostgresEnvironment {
   readonly database: 'open_channel_hub';
@@ -87,6 +99,33 @@ export const parseEnvironment = (environment: NodeJS.ProcessEnv): AppEnvironment
   }
 
   const resolvedSourceOfferUrl = sourceOfferUrl ?? DEFAULT_SOURCE_OFFER_URL;
+  const configurationFile = optionalNonBlank(configuration.CONNECTIONS_CONFIG_FILE);
+  const base64ConfigurationFile = optionalNonBlank(configuration.CONNECTIONS_CONFIG_BASE64_FILE);
+  const configuredConnectionFile = configurationFile ?? base64ConfigurationFile;
+
+  if (configuredConnectionFile !== undefined) {
+    if (
+      (configurationFile !== undefined && base64ConfigurationFile !== undefined) ||
+      !isAbsoluteFilePath(configuredConnectionFile) ||
+      postgres === undefined ||
+      hasLegacyTelegramConfiguration(configuration)
+    ) {
+      throw new EnvironmentConfigurationError();
+    }
+
+    return Object.freeze({
+      HOST: configuration.HOST,
+      NODE_ENV: configuration.NODE_ENV,
+      PORT: configuration.PORT,
+      postgres,
+      sourceOfferUrl: resolvedSourceOfferUrl,
+      telegramBot: Object.freeze({
+        configurationEncoding: base64ConfigurationFile === undefined ? 'json' : 'base64url',
+        configurationFile: configuredConnectionFile,
+        enabled: true
+      })
+    });
+  }
 
   if (configuration.TELEGRAM_BOT_ENABLED === 'false') {
     return Object.freeze({
@@ -210,6 +249,26 @@ const optionalNonBlank = (value: string | undefined): string | undefined => {
 
   return normalized === undefined || normalized.length === 0 ? undefined : normalized;
 };
+
+const isAbsoluteFilePath = (value: string): boolean =>
+  value.startsWith('/') && value.length <= 1_024 && !value.includes('\u0000');
+
+const hasLegacyTelegramConfiguration = (
+  configuration: Readonly<{
+    OPERATOR_API_TOKEN?: string | undefined;
+    TELEGRAM_BOT_ENABLED: 'true' | 'false';
+    TELEGRAM_BOT_TOKEN?: string | undefined;
+    TELEGRAM_WEBHOOK_SECRET?: string | undefined;
+    TELEGRAM_WEBHOOK_URL?: string | undefined;
+  }>
+): boolean =>
+  configuration.TELEGRAM_BOT_ENABLED === 'true' ||
+  [
+    configuration.OPERATOR_API_TOKEN,
+    configuration.TELEGRAM_BOT_TOKEN,
+    configuration.TELEGRAM_WEBHOOK_SECRET,
+    configuration.TELEGRAM_WEBHOOK_URL
+  ].some((value) => optionalNonBlank(value) !== undefined);
 
 const optionalHttpsUrl = (value: string | undefined): string | undefined => {
   if (value === undefined || value.trim().length === 0) {

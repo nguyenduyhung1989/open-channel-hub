@@ -1,0 +1,181 @@
+# Phase 2c runtime multi-connection configuration
+
+This guide configures the current alpha's official Telegram Bot accounts. It
+does not create a dashboard, user login, organization, public connection API,
+or permission model. It has not been verified with a real Telegram Bot or a
+public TLS endpoint.
+
+## What is configured
+
+One secret JSON document can configure one to one hundred Telegram Bot
+connections. It contains credentials, so treat the entire document as a secret
+even though the connection IDs are opaque internal labels.
+
+The strict document shape is:
+
+```json
+{
+  "version": 1,
+  "connections": [
+    {
+      "id": "telegram-bot-support",
+      "type": "telegram_bot",
+      "botToken": "<Telegram Bot token>",
+      "operatorApiToken": "<unique 32-512 character operator token>",
+      "webhookSecret": "<unique 32-256 character Telegram webhook secret>",
+      "webhookUrl": "https://example.invalid/v1/webhooks/telegram-bot/telegram-bot-support"
+    }
+  ]
+}
+```
+
+<code>webhookUrl</code> is optional. When present, it must be a public HTTPS
+URL with no username, password, query string, or fragment, and its path must
+match that entry's exact dynamic webhook route. Each connection ID uses only
+letters, digits, <code>.</code>, <code>_</code>, <code>:</code>, and
+<code>-</code>, and it must not be exactly <code>.</code> or <code>..</code>
+because it becomes part of a dynamic webhook path. All IDs and all
+Bot/operator/webhook credential values must be unique across the document.
+
+Do not paste a real document in a terminal command, issue, pull request,
+screenshot, log, or repository file. The sample above contains placeholders,
+not usable credentials.
+
+## Choose exactly one configuration mode
+
+### Direct or other non-Compose runtime
+
+Create a local secret document at
+<code>runtime-connections.local.json</code> or outside the repository. The
+recommended repository-local filename is ignored by Git and Docker. For direct
+development, point the Git-ignored <code>.env</code> file at its absolute path;
+another non-Compose runtime can mount the raw secret file and set the same
+environment variable:
+
+```dotenv
+CONNECTIONS_CONFIG_FILE=/absolute/path/to/open-channel-hub/runtime-connections.local.json
+```
+
+PostgreSQL configuration is required in this mode because accepted webhook
+events must be registered and written durably. Start the runtime only after the
+database configuration exists.
+
+### Docker Compose
+
+Compose does **not** consume raw JSON from <code>.env</code>. Provider
+credentials may contain <code>$</code>, which Compose would otherwise treat as
+an interpolation marker. Put the one-line, unpadded base64url encoding of the
+exact JSON document in the local Git-ignored <code>.env</code> as
+<code>CONNECTIONS_CONFIG_BASE64</code>. The base64url alphabet is limited to
+letters, digits, <code>-</code>, and <code>_</code>; omit <code>=</code>
+padding and line breaks.
+
+Base64url is **not encryption**. The encoded value remains a credential-bearing
+secret: generate/store it with a trusted local or deployment-secret workflow
+without printing it to a terminal, issue, pull request, screenshot, or log.
+Compose mounts the encoded bytes only as the
+<code>runtime_connections_base64</code> Docker secret at
+<code>/run/secrets/runtime_connections_base64</code> with UID/GID
+<code>10001:10001</code> and mode <code>0400</code>. It gives the API only the
+path through <code>CONNECTIONS_CONFIG_BASE64_FILE</code>; the encoded value and
+decoded JSON are never API environment values.
+
+Edit the local file with an editor rather than building a shell command that
+contains credentials. Start normally:
+
+```bash
+docker compose up --build
+```
+
+Changing the document requires recreating the API container. A normal
+<code>docker compose down</code> preserves the database volume;
+<code>docker compose down --volumes</code> destroys its canonical events and
+must not be used as a routine restart.
+
+### Temporary legacy one-bot mode
+
+The original environment configuration remains for one Bot only. It uses
+<code>TELEGRAM_BOT_ENABLED=true</code>, <code>TELEGRAM_BOT_TOKEN</code>,
+<code>OPERATOR_API_TOKEN</code>, <code>TELEGRAM_WEBHOOK_SECRET</code>, and an
+optional <code>TELEGRAM_WEBHOOK_URL</code>.
+
+Historical legacy <code>TELEGRAM_CONNECTION_ID</code> values are not rewritten
+by this phase. In contrast, the multi-connection JSON document rejects
+<code>.</code> and <code>..</code> specifically because its IDs appear in the
+dynamic webhook route.
+
+Do not set multi-connection mode together with any of these: a process refuses
+to start if <code>CONNECTIONS_CONFIG_FILE</code> or
+<code>CONNECTIONS_CONFIG_BASE64_FILE</code> is combined with
+<code>TELEGRAM_BOT_ENABLED=true</code> or a nonblank legacy Bot token, operator
+token, webhook secret, or webhook URL. The temporary
+<code>TELEGRAM_CONNECTION_ID</code> has no effect in multi-connection mode.
+
+## Routes and account isolation
+
+| Purpose                  | Multi-connection route                                    | How the account is selected                                                                                                              |
+| ------------------------ | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Telegram webhook ingress | <code>POST /v1/webhooks/telegram-bot/:connectionId</code> | The path resolves a configured connection, then its webhook secret must match. Unknown ID and wrong secret both return <code>401</code>. |
+| Send text                | <code>POST /v1/telegram-bot/messages</code>               | The unique <code>Authorization: Bearer</code> value maps to exactly one configured connection.                                           |
+| Read canonical events    | <code>GET /v1/telegram-bot/inbound-events</code>          | The same bearer token maps to exactly one configured connection. Cursor continuation is bound to that connection.                        |
+
+The caller cannot select a connection ID on either operator route. A cursor
+from one account is rejected when presented with another account's bearer
+token. This limits the current operator API to one account per token; it is not
+user authentication or RBAC.
+
+The legacy one-bot mode retains
+<code>POST /v1/webhooks/telegram-bot</code> only for compatibility. New
+multi-connection configuration uses the dynamic path exclusively.
+
+## Durable registry and migration boundary
+
+At startup, the application derives each configured connection's connector ID,
+channel, and tier from the compiled connector manifest. It writes only that
+metadata plus the opaque connection ID to
+<code>open_channel_hub.connection_registry</code>. It does not store Bot
+names, phone numbers, provider account IDs, tokens, webhook secrets, the JSON
+document, or raw provider payloads.
+
+Migration <code>0004_inbound_events_connection_registry_fk</code> is a
+PostgreSQL foreign key marked <code>NOT VALID</code>. New event writes must
+reference a registered connection. Existing Phase 2a event rows can remain
+without an immediate data rewrite; a future, explicit reconciliation and
+validation migration is required before claiming the historical ledger is fully
+validated. Do not manually modify the registry or foreign key in a deployed
+database.
+
+Connection IDs are durable. Restarting with the same ID and the same compiled
+connector metadata is safe. Reusing an ID for a different connector, channel,
+or tier deliberately fails startup. Removing a connection from the secret
+document stops its runtime feature; it does not delete historical events or its
+registry row.
+
+## Optional webhook registration
+
+The webhook setter makes real Telegram network requests. In multi-connection
+mode it processes every configured entry with a <code>webhookUrl</code>. It
+never accepts a token on the command line and reports only a general result:
+
+```bash
+docker compose exec api npm run telegram:webhook:set
+```
+
+Run it only after the owner has explicitly authorized a test Bot and public TLS
+route. Confirm that the reverse proxy keeps the operator API loopback-only and
+does not log authorization headers, Telegram webhook secrets, or message
+payloads. Registration acceptance alone does not prove webhook delivery,
+account isolation, durable storage, or production readiness.
+
+## Safe local proof
+
+The repository's disposable Compose smoke test uses two synthetic Bot
+connections. It migrates the four immutable schema entries twice, verifies both
+registry rows, posts the same fake provider event to both dynamic webhook paths,
+checks duplicate idempotency within one connection, checks bearer-scoped reads,
+and rejects a cursor from one connection for the other. It makes no Telegram
+network request and uses no real credential or message.
+
+Before a real account is used, still complete TLS/proxy, rate limiting,
+monitoring, backup/restore, retention/deletion, secret rotation, access/audit,
+and production verification work.

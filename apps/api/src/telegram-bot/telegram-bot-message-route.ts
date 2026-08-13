@@ -4,8 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import { apiFailure, apiSuccess } from '../http/api-response.js';
-import { matchesBearerToken } from '../http/secret-match.js';
-import type { TelegramBotFeature } from './telegram-bot-feature.js';
+import type { TelegramBotFeatureCatalog } from './telegram-bot-feature-catalog.js';
 
 const sendTextBodySchema = z
   .object({
@@ -16,10 +15,12 @@ const sendTextBodySchema = z
 
 export const registerTelegramBotMessageRoute = async (
   app: FastifyInstance,
-  feature: TelegramBotFeature
+  catalog: TelegramBotFeatureCatalog
 ): Promise<void> => {
   app.post('/v1/telegram-bot/messages', async (request, reply) => {
-    if (!matchesBearerToken(request.headers.authorization, feature.operatorApiToken)) {
+    const feature = catalog.findByOperatorAuthorization(request.headers.authorization);
+
+    if (feature === undefined) {
       return reply
         .code(401)
         .send(apiFailure('unauthorized', 'The operator credential is invalid.'));

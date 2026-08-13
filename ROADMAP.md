@@ -19,8 +19,10 @@ verification and operating criteria are met.
 - [ ] Owner decision on whether to create the <code>0.1.0</code> release tag.
       This is separate from CI/CodeQL evidence for <code>8b80c3b</code>.
 
-Branch protection is intentionally open pending an owner decision; it must not
-be described as enabled merely because other security services are active.
+The <code>main</code> branch is protected against force pushing and deletion,
+including by administrators. Required status checks and pull-request reviews
+are intentionally absent so the current owner-controlled direct-push workflow
+remains usable; this is not a claim that all collaboration risks are solved.
 
 The Phase 0 evidence contains no real Telegram token or request, database,
 Redis, or web UI. Checked boxes describe repository state, not production
@@ -31,9 +33,10 @@ verification.
 **Status: the Phase 1a implementation is present, but Phase 1a is not
 complete.** Historical local and GitHub evidence exists for candidate
 <code>7141949</code>. Phase 2a GitHub CI and CodeQL succeeded at
-<code>f106bb8</code>. The current Phase 2b work adds a canonical event-read
-path and still needs verification for its own commit. No real Telegram Bot
-token, authenticated Bot API request, or test-bot flow has occurred.
+<code>f106bb8</code>, and the exact Phase 2b commit <code>4d5a9c9</code> also
+has both checks green. The current Phase 2c multi-connection candidate still
+needs its own verification. No real Telegram Bot token, authenticated Bot API
+request, or test-bot flow has occurred.
 
 ### 1a — HTTP boundary and local operation
 
@@ -90,8 +93,9 @@ and GitHub CI/CodeQL evidence at <code>f106bb8</code> are present.**
 
 ### 2b — operator event read path
 
-**Status: implementation is present; final local and GitHub verification for
-its eventual commit remain required.**
+**Status: implementation, final local verification, synthetic Compose proof,
+independent review, and GitHub CI/CodeQL evidence are present for exact commit
+<code>4d5a9c9</code>.**
 
 - [x] <code>GET /v1/telegram-bot/inbound-events</code> requires the local
       operator token, never accepts a caller-selected connection ID, and returns
@@ -102,9 +106,31 @@ its eventual commit remain required.**
       not skip or duplicate events when new events arrive later.
 - [x] Ledger appends serialize sequence allocation and commit before readers
       establish a snapshot. This preserves the stable-pagination invariant.
-- [ ] Final local candidate checks, synthetic Compose verification of the read
-      path, independent review, and fresh GitHub CI/CodeQL for the exact Phase
-      2b commit.
+- [x] Final local candidate checks, synthetic Compose verification of the read
+      path, independent review, and fresh GitHub CI/CodeQL for exact commit
+      <code>4d5a9c9</code>.
+
+### 2c — runtime multi-connection foundation
+
+**Status: implementation, final local verification, a synthetic Compose proof,
+and independent review are complete; fresh GitHub verification remains required
+for its eventual Phase 2c commit.**
+
+- [x] A strict, secret-backed runtime configuration document for one or more
+      official Telegram Bot connections, with no startup provider call.
+- [x] Mutually exclusive temporary legacy one-Bot configuration and
+      multi-connection configuration modes.
+- [x] Token-bound operator routes and dynamic webhook routes that resolve the
+      configured account server side; callers cannot select a connection ID.
+- [x] An immutable PostgreSQL connection registry and an inbound-event foreign
+      key that protects new rows while retaining pre-registry Phase 2a history
+      through <code>NOT VALID</code>.
+- [x] A synthetic two-connection Compose smoke-test source that covers registry
+      registration, per-connection idempotency, bearer isolation, and
+      cross-connection cursor rejection.
+- [x] Final local candidate checks, independent review, and a synthetic
+      Compose verification using two configured accounts.
+- [ ] Fresh GitHub CI/CodeQL for the exact Phase 2c commit.
 
 ### Later Phase 2 work
 

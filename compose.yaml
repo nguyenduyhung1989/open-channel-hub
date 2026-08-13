@@ -5,6 +5,9 @@ name: open-channel-hub
 # SOURCE_OFFER_URL is required because this service uses NODE_ENV=production. It must point to the exact
 # public, unauthenticated corresponding source for this running version; a modified fork must not use upstream as a placeholder.
 # TELEGRAM_WEBHOOK_URL may be blank. When set, it must be a public absolute HTTPS URL with no userinfo, query, fragment, or secret.
+# CONNECTIONS_CONFIG_BASE64 may be blank. When non-blank, Compose writes its unpadded base64url value only to the
+# runtime_connections_base64 Docker secret and points the API at its 0400 secret file; it is never an API environment value.
+# It encodes (but does not encrypt) one or more official Telegram Bot connections and must not be mixed with temporary legacy variables.
 # PostgreSQL is initialized for this hub only: database `open_channel_hub`, schema `open_channel_hub`, and a non-superuser
 # application role. The migration service applies idempotent schema changes before the API starts. This stack still does not provide
 # Redis, a queue, TLS, a public proxy, backups, or a production deployment.
@@ -87,6 +90,8 @@ services:
       HOST: 0.0.0.0
       PORT: '3000'
       SOURCE_OFFER_URL: '${SOURCE_OFFER_URL:-}'
+      # An empty or unset base64url value leaves multi-connection mode disabled while the harmless empty secret remains mounted.
+      CONNECTIONS_CONFIG_BASE64_FILE: '${CONNECTIONS_CONFIG_BASE64:+/run/secrets/runtime_connections_base64}'
       TELEGRAM_BOT_ENABLED: '${TELEGRAM_BOT_ENABLED:-false}'
       TELEGRAM_BOT_TOKEN: '${TELEGRAM_BOT_TOKEN:-}'
       OPERATOR_API_TOKEN: '${OPERATOR_API_TOKEN:-}'
@@ -102,6 +107,11 @@ services:
     secrets:
       - source: database_password
         target: database_password
+        uid: '10001'
+        gid: '10001'
+        mode: 0400
+      - source: runtime_connections_base64
+        target: runtime_connections_base64
         uid: '10001'
         gid: '10001'
         mode: 0400
@@ -124,6 +134,8 @@ secrets:
     environment: DATABASE_PASSWORD
   postgres_password:
     environment: POSTGRES_PASSWORD
+  runtime_connections_base64:
+    environment: CONNECTIONS_CONFIG_BASE64
 
 volumes:
   postgres-data: {}

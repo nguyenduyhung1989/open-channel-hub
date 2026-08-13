@@ -8,6 +8,10 @@ import type { TelegramBotFeature } from './telegram-bot-feature.js';
 
 const OPERATOR_TOKEN = 'operator-token-with-at-least-thirty-two-characters';
 const WEBHOOK_SECRET = 'synthetic_webhook_secret_0123456789';
+const SUPPORT_OPERATOR_TOKEN = 'synthetic_operator_support_01234567890123456789';
+const SUPPORT_WEBHOOK_SECRET = 'synthetic_support_webhook_secret_0123456789';
+const SALES_OPERATOR_TOKEN = 'synthetic_operator_sales_0123456789012345678901';
+const SALES_WEBHOOK_SECRET = 'synthetic_sales_webhook_secret_01234567890123456789';
 const EVENT: CanonicalEvent = Object.freeze({
   channel: 'telegram_bot',
   connectionId: 'telegram-bot-default',
@@ -169,6 +173,92 @@ describe('Telegram Bot routes', () => {
       pageSize: 2
     });
     expect(response.body).not.toContain(rawProviderPayload);
+  });
+
+  it('accepts a Phase 2b cursor only while one legacy connection is configured', async () => {
+    const { feature, readInboundEvents } = createFeature();
+    const app = await buildApp({ telegramBot: feature });
+    applications.push(app);
+    const legacyCursor = Buffer.from(
+      JSON.stringify({ beforeSequence: '29', snapshotMaxSequence: '41' }),
+      'utf8'
+    ).toString('base64url');
+
+    const response = await app.inject({
+      headers: { authorization: `Bearer ${OPERATOR_TOKEN}` },
+      method: 'GET',
+      url: `/v1/telegram-bot/inbound-events?cursor=${legacyCursor}`
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(readInboundEvents).toHaveBeenCalledWith({
+      connectionId: 'telegram-bot-default',
+      cursor: { beforeSequence: '29', snapshotMaxSequence: '41' },
+      pageSize: 50
+    });
+  });
+
+  it('does not expose a dynamic webhook path in legacy one-Bot mode', async () => {
+    const { feature } = createFeature({ connectionId: '.' });
+    const app = await buildApp({ telegramBot: feature });
+    applications.push(app);
+
+    const response = await app.inject({
+      method: 'POST',
+      payload: { update_id: 9001 },
+      url: '/v1/webhooks/telegram-bot/not-a-legacy-route'
+    });
+
+    expect(response.statusCode).toBe(404);
+  });
+
+  it('keeps a bound next cursor usable for a historical legacy dot-segment label', async () => {
+    const readInboundEvents = vi.fn(async (): Promise<InboundEventPage> => ({
+      events: [],
+      nextCursor: { beforeSequence: '29', snapshotMaxSequence: '41' }
+    }));
+    const { feature } = createFeature({ connectionId: '.', readInboundEvents });
+    const app = await buildApp({ telegramBot: feature });
+    applications.push(app);
+
+    const firstResponse = await app.inject({
+      headers: { authorization: `Bearer ${OPERATOR_TOKEN}` },
+      method: 'GET',
+      url: '/v1/telegram-bot/inbound-events'
+    });
+    const nextCursor = firstResponse.json().data.nextCursor as string;
+    const secondResponse = await app.inject({
+      headers: { authorization: `Bearer ${OPERATOR_TOKEN}` },
+      method: 'GET',
+      url: `/v1/telegram-bot/inbound-events?cursor=${nextCursor}`
+    });
+
+    expect(firstResponse.statusCode).toBe(200);
+    expect(secondResponse.statusCode).toBe(200);
+    expect(readInboundEvents).toHaveBeenLastCalledWith({
+      connectionId: '.',
+      cursor: { beforeSequence: '29', snapshotMaxSequence: '41' },
+      pageSize: 50
+    });
+  });
+
+  it('rejects a Phase 2b cursor for runtime-configured connections, even with one connection', async () => {
+    const { feature, readInboundEvents } = createFeature();
+    const app = await buildApp({ telegramBots: [feature] });
+    applications.push(app);
+    const legacyCursor = Buffer.from(
+      JSON.stringify({ beforeSequence: '29', snapshotMaxSequence: '41' }),
+      'utf8'
+    ).toString('base64url');
+
+    const response = await app.inject({
+      headers: { authorization: `Bearer ${OPERATOR_TOKEN}` },
+      method: 'GET',
+      url: `/v1/telegram-bot/inbound-events?cursor=${legacyCursor}`
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(readInboundEvents).not.toHaveBeenCalled();
   });
 
   it('returns a generic failure when inbound-event storage cannot be read', async () => {
@@ -374,19 +464,138 @@ describe('Telegram Bot routes', () => {
     expect(receiveEvents).toHaveBeenCalledWith([EVENT]);
     expect(response.body).not.toContain('Synthetic PostgreSQL failure detail');
   });
+
+  it('scopes operator reads and sends to the connection selected by its bearer token', async () => {
+    const supportReadInboundEvents = vi.fn(async (): Promise<InboundEventPage> => ({
+      events: [Object.freeze({ ...EVENT, connectionId: 'telegram-bot-support' })]
+    }));
+    const salesSendMessage = vi.fn(async (): Promise<SendMessageResult> => ({
+      ok: true,
+      receipt: {
+        acceptedAt: '2026-08-13T00:00:00.000Z',
+        connectionId: 'telegram-bot-sales',
+        providerMessageId: 'sales-301'
+      }
+    }));
+    const { feature: support, sendMessage: supportSendMessage } = createFeature({
+      connectionId: 'telegram-bot-support',
+      operatorApiToken: SUPPORT_OPERATOR_TOKEN,
+      readInboundEvents: supportReadInboundEvents,
+      webhookSecret: SUPPORT_WEBHOOK_SECRET
+    });
+    const { feature: sales, readInboundEvents: salesReadInboundEvents } = createFeature({
+      connectionId: 'telegram-bot-sales',
+      operatorApiToken: SALES_OPERATOR_TOKEN,
+      sendMessage: salesSendMessage,
+      webhookSecret: SALES_WEBHOOK_SECRET
+    });
+    const app = await buildApp({ telegramBots: [support, sales] });
+    applications.push(app);
+
+    const supportRead = await app.inject({
+      headers: { authorization: `Bearer ${SUPPORT_OPERATOR_TOKEN}` },
+      method: 'GET',
+      url: '/v1/telegram-bot/inbound-events'
+    });
+    const salesSend = await app.inject({
+      headers: { authorization: `Bearer ${SALES_OPERATOR_TOKEN}` },
+      method: 'POST',
+      payload: { recipientId: '42', text: 'Synthetic sales message' },
+      url: '/v1/telegram-bot/messages'
+    });
+    const crossConnectionCursor = await app.inject({
+      headers: { authorization: `Bearer ${SALES_OPERATOR_TOKEN}` },
+      method: 'GET',
+      url: `/v1/telegram-bot/inbound-events?cursor=${encodeCursor(
+        { beforeSequence: '1', snapshotMaxSequence: '1' },
+        'telegram-bot-support'
+      )}`
+    });
+
+    expect(supportRead.statusCode).toBe(200);
+    expect(supportReadInboundEvents).toHaveBeenCalledWith({
+      connectionId: 'telegram-bot-support',
+      pageSize: 50
+    });
+    expect(salesReadInboundEvents).not.toHaveBeenCalled();
+    expect(salesSend.statusCode).toBe(200);
+    expect(salesSendMessage).toHaveBeenCalledWith({
+      connectionId: 'telegram-bot-sales',
+      recipientId: '42',
+      text: 'Synthetic sales message'
+    });
+    expect(supportSendMessage).not.toHaveBeenCalled();
+    expect(crossConnectionCursor.statusCode).toBe(400);
+    expect(salesReadInboundEvents).not.toHaveBeenCalled();
+  });
+
+  it('dispatches a dynamic webhook only to its configured connection without revealing an unknown one', async () => {
+    const supportNormalize = vi.fn((): readonly CanonicalEvent[] => [
+      Object.freeze({ ...EVENT, connectionId: 'telegram-bot-support' })
+    ]);
+    const supportReceiveEvents = vi.fn(async (): Promise<void> => undefined);
+    const { feature: support } = createFeature({
+      connectionId: 'telegram-bot-support',
+      normalize: supportNormalize,
+      operatorApiToken: SUPPORT_OPERATOR_TOKEN,
+      receiveEvents: supportReceiveEvents,
+      webhookSecret: SUPPORT_WEBHOOK_SECRET
+    });
+    const { feature: sales, normalize: salesNormalize } = createFeature({
+      connectionId: 'telegram-bot-sales',
+      operatorApiToken: SALES_OPERATOR_TOKEN,
+      webhookSecret: SALES_WEBHOOK_SECRET
+    });
+    const app = await buildApp({ telegramBots: [support, sales] });
+    applications.push(app);
+
+    const unknownConnection = await app.inject({
+      headers: { 'x-telegram-bot-api-secret-token': SUPPORT_WEBHOOK_SECRET },
+      method: 'POST',
+      payload: { update_id: 9001 },
+      url: '/v1/webhooks/telegram-bot/telegram-bot-missing'
+    });
+    const wrongSecret = await app.inject({
+      headers: { 'x-telegram-bot-api-secret-token': SALES_WEBHOOK_SECRET },
+      method: 'POST',
+      payload: { update_id: 9001 },
+      url: '/v1/webhooks/telegram-bot/telegram-bot-support'
+    });
+    const validSupportWebhook = await app.inject({
+      headers: { 'x-telegram-bot-api-secret-token': SUPPORT_WEBHOOK_SECRET },
+      method: 'POST',
+      payload: { update_id: 9001 },
+      url: '/v1/webhooks/telegram-bot/telegram-bot-support'
+    });
+
+    expect(unknownConnection.statusCode).toBe(401);
+    expect(wrongSecret.statusCode).toBe(401);
+    expect(unknownConnection.body).toBe(wrongSecret.body);
+    expect(validSupportWebhook.statusCode).toBe(204);
+    expect(supportNormalize).toHaveBeenCalledOnce();
+    expect(supportReceiveEvents).toHaveBeenCalledOnce();
+    expect(salesNormalize).not.toHaveBeenCalled();
+  });
 });
 
 function createFeature(overrides: Partial<TelegramBotFeature> = {}) {
+  const connectionId = overrides.connectionId ?? 'telegram-bot-default';
   const readInboundEvents = vi.fn(async (): Promise<InboundEventPage> => ({ events: [] }));
   const sendMessage = vi.fn(async (): Promise<SendMessageResult> => SUCCESSFUL_SEND);
   const normalize = vi.fn((): readonly CanonicalEvent[] => [EVENT]);
   const receiveEvents = vi.fn(async (): Promise<void> => undefined);
   const feature: TelegramBotFeature = {
-    connectionId: 'telegram-bot-default',
+    connectionId,
     normalize,
     operatorApiToken: OPERATOR_TOKEN,
     readInboundEvents,
     receiveEvents,
+    registration: Object.freeze({
+      channel: 'telegram_bot',
+      connectorId: 'telegram-bot',
+      id: connectionId,
+      tier: 'OFFICIAL'
+    }),
     sendMessage,
     webhookSecret: WEBHOOK_SECRET,
     ...overrides
@@ -402,5 +611,14 @@ function createFeature(overrides: Partial<TelegramBotFeature> = {}) {
 }
 
 const encodeCursor = (
-  cursor: Readonly<{ beforeSequence: string; snapshotMaxSequence: string }>
-): string => Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url');
+  cursor: Readonly<{ beforeSequence: string; snapshotMaxSequence: string }>,
+  connectionId = 'telegram-bot-default'
+): string =>
+  Buffer.from(
+    JSON.stringify({
+      beforeSequence: cursor.beforeSequence,
+      connectionId,
+      snapshotMaxSequence: cursor.snapshotMaxSequence
+    }),
+    'utf8'
+  ).toString('base64url');

@@ -36,19 +36,36 @@ follows [Semantic Versioning](https://semver.org/).
 - A disposable Compose smoke test in CI source that verifies migration,
   duplicate webhook idempotency, and the operator inbound-event read path using
   synthetic values only.
+- Phase 2c: a strict secret-backed runtime configuration document for one or
+  more official Telegram Bot connections, with a temporary mutually exclusive
+  legacy one-Bot environment mode.
+- Phase 2c: a durable <code>connection_registry</code> containing only opaque
+  connection ID and connector metadata, plus a forward migration that protects
+  new inbound-event rows with a registry foreign key.
+- Phase 2c: token-bound multi-connection operator routes, dynamic webhook
+  ingress at <code>/v1/webhooks/telegram-bot/:connectionId</code>, and cursors
+  bound to the token-resolved connection.
+- Phase 2c: a two-connection synthetic Compose smoke-test source that checks
+  registry rows, same-provider-ID isolation, duplicate idempotency, scoped
+  operator reads, cross-connection cursor rejection, and secret-file mode.
 
 ### Changed
 
-- The current documentation now distinguishes historical Phase 1a verification
-  at <code>7141949</code>, completed Phase 2a GitHub CI/CodeQL at
-  <code>f106bb8</code>, and verification still required for the Phase 2b
-  candidate.
+- The documentation now distinguishes historical Phase 1a verification at
+  <code>7141949</code>, completed Phase 2a GitHub CI/CodeQL at
+  <code>f106bb8</code>, completed Phase 2b GitHub CI/CodeQL at exact commit
+  <code>4d5a9c9</code>, and verification still required for the current Phase
+  2c candidate.
 - An accepted inbound Telegram text event now becomes durable when the
   PostgreSQL configuration is present; a local operator can now list canonical
   inbound events, but this still does not add an inbox, live Telegram proof,
   backup, or retention policy.
 - The runtime has <code>/ready</code> for dependency readiness in addition to
   process liveness at <code>/health</code>.
+- The former process-wide Telegram connection assumption now has a
+  configuration-backed multi-connection path. Operator bearer tokens select
+  one configured account inside the process; HTTP callers do not select an
+  account identifier.
 
 ### Security
 
@@ -66,8 +83,16 @@ follows [Semantic Versioning](https://semver.org/).
   <code>docker compose down --volumes</code> is destructive and must not be
   used as a routine shutdown.
 - The read API validates bounded opaque cursors before storage access, fixes
-  reads to the configured connection, and does not expose raw provider
-  payloads.
+  reads to the configured connection, binds cursors to that connection, and
+  does not expose raw provider payloads.
+- Compose receives an unpadded base64url encoding of the multi-connection JSON
+  as a Docker secret, avoiding <code>.env</code> expansion of credential
+  <code>$</code> characters. The encoded value is not encryption, remains
+  secret, and is mounted only for the API as <code>10001:10001 0400</code>. It
+  is never stored in PostgreSQL, committed, or exposed through an API.
+- The <code>main</code> branch now blocks force pushes and deletion, including
+  for administrators. Required checks and pull-request reviews remain
+  intentionally unset for the owner-controlled direct-push workflow.
 
 There has been no official release. A version is dated here only when its
 release tag is created after final checks.

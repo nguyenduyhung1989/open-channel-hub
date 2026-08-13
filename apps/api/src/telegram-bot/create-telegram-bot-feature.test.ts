@@ -111,4 +111,33 @@ describe('createTelegramBotFeature', () => {
       await app.close();
     }
   });
+
+  it('rejects a normalized event that cannot belong to its configured connection before durable storage', async () => {
+    const receiveEvents = vi.fn(async (): Promise<void> => undefined);
+    const feature = await createTelegramBotFeature(ENVIRONMENT, {
+      fetchImpl: vi.fn<typeof fetch>(),
+      readInboundEvents: async (): Promise<InboundEventPage> => ({ events: [] }),
+      receiveEvents
+    });
+
+    await expect(
+      feature.receiveEvents([
+        {
+          channel: 'telegram_bot',
+          connectionId: 'telegram-bot-other',
+          id: 'telegram:event:9001',
+          message: {
+            conversationId: '42',
+            id: '301',
+            senderId: '42',
+            text: 'Synthetic inbound message'
+          },
+          occurredAt: '2026-08-12T00:00:00.000Z',
+          providerEventId: '9001',
+          type: 'message.received'
+        }
+      ])
+    ).rejects.toThrow('Telegram inbound events do not match their configured connection.');
+    expect(receiveEvents).not.toHaveBeenCalled();
+  });
 });

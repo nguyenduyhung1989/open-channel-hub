@@ -82,6 +82,21 @@ describe('parseEnvironment', () => {
     });
   });
 
+  it('keeps dot-segment connection identifiers valid for the legacy one-Bot route', () => {
+    for (const connectionId of ['.', '..']) {
+      expect(
+        parseEnvironment({
+          ...POSTGRES_ENVIRONMENT,
+          OPERATOR_API_TOKEN: 'operator-token-with-at-least-thirty-two-characters',
+          TELEGRAM_BOT_ENABLED: 'true',
+          TELEGRAM_BOT_TOKEN: 'synthetic-bot-token',
+          TELEGRAM_CONNECTION_ID: connectionId,
+          TELEGRAM_WEBHOOK_SECRET: 'synthetic_webhook_secret_0123456789'
+        }).telegramBot
+      ).toMatchObject({ connectionId, enabled: true });
+    }
+  });
+
   it('requires an exact corresponding-source URL in production', () => {
     expect(() => parseEnvironment({ NODE_ENV: 'production' })).toThrow(
       EnvironmentConfigurationError
@@ -115,6 +130,63 @@ describe('parseEnvironment', () => {
         TELEGRAM_WEBHOOK_SECRET: 'synthetic_webhook_secret_0123456789'
       })
     ).toThrow(EnvironmentConfigurationError);
+  });
+
+  it('selects a multi-connection configuration file only with PostgreSQL and without legacy secrets', () => {
+    expect(
+      parseEnvironment({
+        ...POSTGRES_ENVIRONMENT,
+        CONNECTIONS_CONFIG_FILE: '/run/secrets/runtime_connections'
+      }).telegramBot
+    ).toEqual({
+      configurationEncoding: 'json',
+      configurationFile: '/run/secrets/runtime_connections',
+      enabled: true
+    });
+
+    for (const invalidConfiguration of [
+      { CONNECTIONS_CONFIG_FILE: 'relative-runtime-connections.json' },
+      {
+        ...POSTGRES_ENVIRONMENT,
+        CONNECTIONS_CONFIG_FILE: '/run/secrets/runtime_connections',
+        TELEGRAM_BOT_ENABLED: 'true'
+      },
+      {
+        ...POSTGRES_ENVIRONMENT,
+        CONNECTIONS_CONFIG_FILE: '/run/secrets/runtime_connections',
+        TELEGRAM_BOT_TOKEN: 'synthetic-legacy-token'
+      },
+      {
+        ...POSTGRES_ENVIRONMENT,
+        CONNECTIONS_CONFIG_FILE: '/run/secrets/runtime_connections',
+        OPERATOR_API_TOKEN: 'synthetic_legacy_operator_token_0123456789'
+      },
+      {
+        ...POSTGRES_ENVIRONMENT,
+        CONNECTIONS_CONFIG_BASE64_FILE: '/run/secrets/runtime_connections_base64',
+        CONNECTIONS_CONFIG_FILE: '/run/secrets/runtime_connections'
+      },
+      {
+        ...POSTGRES_ENVIRONMENT,
+        CONNECTIONS_CONFIG_BASE64_FILE: '/run/secrets/runtime_connections_base64',
+        TELEGRAM_BOT_ENABLED: 'true'
+      }
+    ]) {
+      expect(() => parseEnvironment(invalidConfiguration)).toThrow(EnvironmentConfigurationError);
+    }
+  });
+
+  it('selects a base64url connection secret file without allowing a raw-file collision', () => {
+    expect(
+      parseEnvironment({
+        ...POSTGRES_ENVIRONMENT,
+        CONNECTIONS_CONFIG_BASE64_FILE: '/run/secrets/runtime_connections_base64'
+      }).telegramBot
+    ).toEqual({
+      configurationEncoding: 'base64url',
+      configurationFile: '/run/secrets/runtime_connections_base64',
+      enabled: true
+    });
   });
 
   it('rejects partial, unsafe, or differently named PostgreSQL configuration', () => {

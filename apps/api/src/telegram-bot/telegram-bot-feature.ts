@@ -1,4 +1,4 @@
-import type { CanonicalEvent } from '@open-channel-hub/contracts';
+import type { CanonicalEvent, ConnectionRegistration } from '@open-channel-hub/contracts';
 import type {
   InboundEventListInput,
   InboundEventPage,
@@ -15,6 +15,7 @@ export interface TelegramBotFeature {
   readonly operatorApiToken: string;
   readonly readInboundEvents: (input: InboundEventListInput) => Promise<InboundEventPage>;
   readonly receiveEvents: (events: readonly CanonicalEvent[]) => Promise<void>;
+  readonly registration: ConnectionRegistration;
   readonly sendMessage: (input: unknown) => Promise<SendMessageResult>;
   readonly webhookSecret: string;
 }

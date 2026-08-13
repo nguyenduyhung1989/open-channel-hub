@@ -4,6 +4,8 @@ coverage/
 .env
 .env.*
 !.env.example
+# Recommended direct-development multi-connection secret document.
+runtime-connections.local.json
 *.log
 .DS_Store
 *.tsbuildinfo
