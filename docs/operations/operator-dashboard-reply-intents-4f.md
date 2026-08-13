@@ -1,8 +1,12 @@
 # Phase 4f dashboard source-bound reply intents
 
-**Status:** candidate documentation. It describes the proposed Phase 4f source
-boundary and must not be read as final local verification, public-TLS,
-live-provider, or production evidence.
+**Status:** source verified at exact commit `74fca30`. It passed `npm run
+check` (54 test files / 358 tests and build), `npm audit --audit-level=low`
+with zero findings, Gitleaks with no secrets, `git diff --check`, a synthetic
+Compose smoke with cleanup, an independent security audit APPROVE with zero
+high/medium findings, and GitHub checks `Verify Node 24.18.1` and `Analyze
+JavaScript and TypeScript`. This evidence must not be read as public-TLS,
+live-provider, provider-send, or production evidence.
 
 Phase 4f adds one constrained browser write: a configured dashboard principal
 may record a source-bound reply intent from a persisted inbound event for an
@@ -66,8 +70,9 @@ event ID, the current anti-forgery token, and a freshly generated UUIDv4 client
 operation ID. The form carries no caller-editable recipient, source channel,
 or source-message field, and it exposes no inbox bearer, provider credential,
 reply target, command ID, or provider-send control. The ordinary inbound event
-card may separately show its canonical channel as a read-only display field;
-that display is not a reply-form authority.
+card renders only its canonical channel, occurrence time, message text, and
+connection ID. It omits `conversationId`, `senderId`, a reply target, and a
+source-message ID; its read-only channel display is not a reply-form authority.
 
 Those hidden source values are not a security boundary. A submitted form is
 validated again at the server, the principal's explicit write grant is resolved
@@ -135,8 +140,9 @@ Before exposing this endpoint beyond a controlled network, configure and test
 the HTTPS proxy to rate-limit `POST /operator/reply-intents`, preserve the
 exact `Origin` header, avoid logging cookies/form bodies/message text, and keep
 PostgreSQL private. The supplied Docker Compose smoke remains loopback HTTP and
-does not configure the dashboard, submit this form, or prove the required
-external HTTPS cookie/origin behavior.
+does not configure the dashboard or submit this form. The passed smoke with
+cleanup proves only the unchanged synthetic base stack; it does not prove the
+required external HTTPS cookie/origin behavior.
 
 ## What Phase 4f deliberately does not do
 

@@ -157,15 +157,15 @@ follows [Semantic Versioning](https://semver.org/).
   connection ID, and a recorded-not-sent label; it exposes no browser bearer,
   command/provider-event ID, private target/source metadata, client operation
   ID, credential, or delivery data.
-- Phase 4f candidate: optional strict `dashboard.principals[]`
+- Phase 4f: optional strict `dashboard.principals[]`
   `replyIntentInboxIds` entries. They are explicit unique subsets of each
   principal's readable inboxes; omission remains read-only.
-- Phase 4f candidate: `POST /operator/reply-intents`, a server-rendered native
+- Phase 4f: `POST /operator/reply-intents`, a server-rendered native
   event-card form that requires signed dashboard session, exact origin,
   anti-forgery value, explicit per-inbox write grant, strict source-bound
   fields, and the existing immutable Phase 4c command capability. It uses
   `303` post/redirect/get to queued history after a create or exact replay.
-- Phase 4f candidate: server-generated UUIDv4 operation IDs, a bounded local
+- Phase 4f: server-generated UUIDv4 operation IDs, a bounded local
   20-attempt-per-principal rolling-minute guard, and no browser bearer,
   recipient field, provider request, worker, dispatch, retry, delivery state,
   command mutation, migration, or Compose change.
@@ -226,10 +226,15 @@ follows [Semantic Versioning](https://semver.org/).
   high- or medium-severity finding, and GitHub CI plus CodeQL succeeded for
   that exact commit. This remains no public-TLS, live-provider, or production
   deployment claim.
-- Phase 4f is documented as a candidate only. It has not yet completed final
-  local verification, independent security review, synthetic Docker evidence,
-  or fresh GitHub CI/CodeQL, and it is not a public-TLS, provider-send, or
-  production claim.
+- Exact commit <code>74fca30</code> completed Phase 4f source verification:
+  <code>npm run check</code> (54 test files / 358 tests and build),
+  <code>npm audit --audit-level=low</code> with zero findings, Gitleaks with no
+  secrets, <code>git diff --check</code>, a synthetic Compose smoke with
+  cleanup, and an independent security audit APPROVE with zero high/medium
+  findings. GitHub checks <code>Verify Node 24.18.1</code> and
+  <code>Analyze JavaScript and TypeScript</code> succeeded for that exact
+  commit. This remains no public-TLS, live-provider, provider-send, or
+  production-deployment claim.
 
 ### Security
 
@@ -291,7 +296,7 @@ follows [Semantic Versioning](https://semver.org/).
   signed browser session before query/cursor processing, then resolves only a
   configured principal's inbox. It makes no provider request and adds no
   dashboard write, command mutation, or browser bearer capability.
-- The Phase 4f candidate requires a signed dashboard session, exact configured
+- The verified Phase 4f source requires a signed dashboard session, exact configured
   HTTPS origin, anti-forgery form value, and explicit principal/inbox write
   grant before it invokes the existing source-bound command store. Its hidden
   source and UUID operation fields are revalidated transport inputs, not

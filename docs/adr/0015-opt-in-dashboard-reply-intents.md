@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-13
 
-**Status:** proposed
+**Status:** accepted
 
 ## Context
 
@@ -22,7 +22,7 @@ origin, signed-session, anti-forgery, scope, and data-minimization controls.
 
 ### Make dashboard write access an explicit per-inbox opt-in
 
-Phase 4f proposes an optional `replyIntentInboxIds` array on each configured
+Phase 4f adds an optional `replyIntentInboxIds` array on each configured
 `dashboard.principals[]` entry. It is a strict, unique subset of that
 principal's already readable `inboxIds`, and every entry must name an existing
 configured inbox. When the field is absent, it becomes an empty immutable
@@ -49,8 +49,10 @@ grant before calling the source-bound Phase 4c command capability. The
 underlying command path independently verifies that the source event is in the
 configured inbox scope and derives the private reply target from that source.
 The browser never supplies a recipient or receives that target. Its ordinary
-inbound-event card may display canonical channel data read-only, but the form
-does not carry a caller-editable channel or source-message field.
+inbound-event card renders only canonical channel, occurrence time, message
+text, and connection ID; it omits `conversationId`, `senderId`, the private
+reply target, and a source-message ID. The form does not carry a caller-editable
+channel or source-message field.
 
 The form body is capped at 32 KiB before parsing. This is a transport bound,
 not a message-length exception: the editable text still has its own 2,000
@@ -126,7 +128,10 @@ receipt design.
 - The per-principal throttle is an abuse guard, not a production multi-instance
   control. A public deployment needs edge rate limiting and verified proxy,
   logging, TLS, and incident procedures.
-- Final local verification, independent security review, and fresh GitHub
-  checks are still required before this proposed candidate becomes an accepted
-  source decision. None of those checks would by themselves prove public TLS,
-  a real provider send, or production deployment.
+- Exact commit `74fca30` passed `npm run check` (54 test files / 358 tests and
+  build), `npm audit --audit-level=low` with zero findings, Gitleaks with no
+  secrets, `git diff --check`, a synthetic Compose smoke with cleanup, an
+  independent security audit APPROVE with zero high/medium findings, and GitHub
+  checks `Verify Node 24.18.1` and `Analyze JavaScript and TypeScript`. This
+  accepted source decision still does not prove public TLS, a real provider
+  send, or production deployment.

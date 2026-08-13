@@ -70,7 +70,7 @@ organization has accepted the project.
   an already assigned inbox through `GET /operator/outbound-commands`. The
   page uses the existing scope-bound Phase 4d cursor, has a fixed 50-row page,
   and keeps an inbox bearer out of the browser.
-- The candidate renders escaped recorded text, creation time, source connection
+- The source renders escaped recorded text, creation time, source connection
   ID, and a recorded-not-sent label only. It omits command/provider-event IDs,
   private target/source metadata, client operation IDs, credentials, and
   delivery data. It adds no migration, command write, browser API bearer,
@@ -80,9 +80,9 @@ organization has accepted the project.
   CI/CodeQL. It is a verified source feature, not public-TLS proof, a
   production deployment, or evidence of provider dispatch.
 
-## Phase 4f candidate, not yet verified
+## Verified Phase 4f source
 
-- The candidate adds an optional strict
+- Phase 4f adds an optional strict
   `dashboard.principals[].replyIntentInboxIds` array. Each value must be an
   already readable configured inbox for that principal; omission becomes an
   empty immutable set, so existing dashboard principals remain read-only.
@@ -91,6 +91,9 @@ organization has accepted the project.
   and UUIDv4 operation inputs, then requires a signed session, exact HTTPS
   origin, anti-forgery value, explicit principal/inbox write grant, and the
   existing Phase 4c durable source-scope check before it can record `queued`.
+  The card shows only channel, occurrence time, message text, and connection
+  ID; it omits `conversationId`, `senderId`, private target, and source-message
+  ID.
 - The URL-encoded form parser rejects a whole body above 32 KiB before strict
   validation or the recorder; the reply text remains separately limited to
   2,000 characters.
@@ -102,13 +105,17 @@ organization has accepted the project.
 - The in-process guard limits one configured principal to 20 record attempts
   per rolling minute. It is not a proxy, multi-host, distributed, or production
   rate-limit claim.
-- This candidate adds no migration, Compose service, provider client/request,
+- Phase 4f adds no migration, Compose service, provider client/request,
   provider token/OAuth storage, worker, dispatch, retry, attempt, receipt,
-  delivery/read state, or command mutation. It must complete focused tests,
-  final local gates, independent security review, and fresh GitHub CI/CodeQL on
-  one frozen commit before this document can call it verified. Any synthetic
-  Docker rerun covers the unchanged base stack only and cannot prove the
-  required HTTPS dashboard form boundary.
+  delivery/read state, or command mutation. Exact commit <code>74fca30</code>
+  passed <code>npm run check</code> (54 test files / 358 tests and build),
+  <code>npm audit --audit-level=low</code> with zero findings, Gitleaks with no
+  secrets, <code>git diff --check</code>, a synthetic Compose smoke with
+  cleanup, an independent security audit APPROVE with zero high/medium findings,
+  and GitHub checks <code>Verify Node 24.18.1</code> and
+  <code>Analyze JavaScript and TypeScript</code>. This source evidence does not
+  prove the required HTTPS dashboard boundary, public TLS, live provider
+  operation, or production deployment.
 
 ## Verified GitHub evidence
 
@@ -131,6 +138,9 @@ organization has accepted the project.
   candidate at <code>160414e</code>.
 - GitHub CI and CodeQL succeeded for the Phase 4e dashboard-history source at
   exact commit <code>465186e</code>.
+- GitHub checks <code>Verify Node 24.18.1</code> and
+  <code>Analyze JavaScript and TypeScript</code> succeeded for the Phase 4f
+  dashboard reply-intent source at exact commit <code>74fca30</code>.
 - GitHub Private Vulnerability Reporting, secret scanning, Dependabot alerts,
   and automatic security fixes are enabled.
 - The <code>main</code> branch blocks force pushes and deletion, including by
@@ -163,7 +173,7 @@ organization has accepted the project.
   additionally stores outgoing reply text and private source-derived target
   metadata; Phase 4d returns that recorded text to the authorized scoped inbox
   bearer. The Phase 4e source renders a smaller escaped projection through
-  an authenticated dashboard session. The Phase 4f candidate receives escaped
+  an authenticated dashboard session. The verified Phase 4f source receives escaped
   hidden source transport values and user-entered reply text through that same
   authenticated boundary. Protect every path to that text to the same standard
   and keep messages out of examples, logs, screenshots, and public discussion.
@@ -172,7 +182,7 @@ organization has accepted the project.
   attempt/timeout/receipt model, migration, review, and verification. The legacy
   Phase 1a Telegram direct-send route is separate compatibility behavior, not
   evidence that all sends are durable. Phase 4e renders intent history and the
-  Phase 4f candidate can record the existing source-bound intent; neither
+  verified Phase 4f source can record the existing source-bound intent; neither
   changes that boundary.
 - Keep examples, fixtures, screenshots, logs, and public discussions free of
   user data and secrets.

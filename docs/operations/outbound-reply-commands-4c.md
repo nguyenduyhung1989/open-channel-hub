@@ -7,7 +7,7 @@ acceptance, sent, delivered, or read status.
 
 This is a deliberately small API boundary, not a dispatcher, worker, retry
 queue, delivery tracker, or provider-integration proof. No provider request is
-made by this route. The separate Phase 4f candidate may call this same
+made by this route. The separate verified Phase 4f source may call this same
 source-bound capability through an explicitly granted server-rendered dashboard
 form; it does not change this API's provider boundary.
 
@@ -114,7 +114,7 @@ but never the private target/source fields or client operation ID. The Phase 4e
 source renders a smaller escaped dashboard projection through a signed
 session, not a browser bearer; see the
 [queued command-history guide](outbound-command-history-4d.md) and
-[Phase 4e guide](operator-dashboard-queued-history-4e.md) and the candidate
+[Phase 4e guide](operator-dashboard-queued-history-4e.md) and the verified
 [Phase 4f guide](operator-dashboard-reply-intents-4f.md).
 
 ## What this deliberately does not do
@@ -124,7 +124,7 @@ session, not a browser bearer; see the
 - No mutation of the command after `queued`; no claim that it was sent.
 - No recipient, send, retry, cancellation, or provider action. The Phase 4e
   source only renders queued-history text and source connection IDs. The
-  Phase 4f candidate separately renders a form only when the configured
+  verified Phase 4f source separately renders a form only when the configured
   dashboard principal has an explicit per-inbox write grant; it forwards only
   a source-bound request into this same immutable command path and still does
   not send a provider message.

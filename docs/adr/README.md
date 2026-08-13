@@ -20,7 +20,7 @@ it does not mean a feature is complete.
 | [0012](0012-source-bound-durable-reply-commands.md)    | accepted | Source-bound durable reply commands before provider dispatch    |
 | [0013](0013-scoped-queued-reply-command-history.md)    | accepted | Scoped queued reply-command history without delivery semantics  |
 | [0014](0014-server-rendered-queued-command-history.md) | accepted | Server-rendered queued command history for dashboard principals |
-| [0015](0015-opt-in-dashboard-reply-intents.md)         | proposed | Opt-in source-bound dashboard reply-intent recording            |
+| [0015](0015-opt-in-dashboard-reply-intents.md)         | accepted | Opt-in source-bound dashboard reply-intent recording            |
 
 Template for a new ADR:
 

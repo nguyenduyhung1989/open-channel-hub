@@ -402,39 +402,43 @@ public-TLS or production claim.**
 
 ### 4f — opt-in server-rendered source-bound reply intents
 
-**Status: candidate source and documentation. Focused dashboard behavior and
-security verification, final local gates, independent security review, and
-GitHub CI/CodeQL evidence remain required before this phase can be called
-verified. A synthetic Docker rerun can cover the unchanged base stack only; it
-cannot prove the required HTTPS dashboard form boundary.**
+**Status: source verified at exact commit <code>74fca30</code>. It passed
+<code>npm run check</code> (54 test files / 358 tests and build),
+<code>npm audit --audit-level=low</code> with zero findings, Gitleaks with no
+secrets, <code>git diff --check</code>, a synthetic Compose smoke with cleanup,
+an independent security audit APPROVE with zero high/medium findings, and
+GitHub checks <code>Verify Node 24.18.1</code> and <code>Analyze JavaScript and
+TypeScript</code>. The synthetic smoke remains loopback-only and this evidence
+does not prove external HTTPS cookies, public TLS, a live provider send, or a
+production deployment.**
 
-- [ ] An optional strict `replyIntentInboxIds` array belongs to each configured
+- [x] An optional strict `replyIntentInboxIds` array belongs to each configured
       dashboard principal. It must be a unique subset of that principal's
       existing readable `inboxIds`; omission becomes an empty immutable
       allow-list so every existing principal remains read-only by default.
-- [ ] `POST /operator/reply-intents` requires an active signed dashboard
+- [x] `POST /operator/reply-intents` requires an active signed dashboard
       session, exact configured HTTPS origin, matching anti-forgery value, and
       a strict single-value native form. The server resolves a per-principal,
       per-inbox write closure before it calls the existing Phase 4c source-bound
       command capability.
-- [ ] A form appears only for an explicitly enabled inbox and one already
+- [x] A form appears only for an explicitly enabled inbox and one already
       rendered durable inbound event. It has editable reply text only; the
       server generates the UUIDv4 operation ID and renders the canonical source
       reference as escaped hidden input. Hidden inputs never replace server-side
       scope and source verification.
-- [ ] The native form parser has a fixed 32 KiB whole-body cap before strict
+- [x] The native form parser has a fixed 32 KiB whole-body cap before strict
       validation; text remains separately bounded to 2,000 characters. An
       oversized submission returns `413` before the recorder is called.
-- [ ] A created command or exact idempotent replay redirects with `303` to the
+- [x] A created command or exact idempotent replay redirects with `303` to the
       authenticated queued-history page without a command-result URL signal.
       The queued-history row is the only browser evidence of a durable record.
       A `queued` row remains intent only, never a provider acceptance, send,
       delivery, or read result.
-- [ ] A bounded in-process guard limits one configured principal to 20
+- [x] A bounded in-process guard limits one configured principal to 20
       recording attempts in a rolling minute. It is not a multi-process,
       multi-host, or edge rate limit; proxy controls remain required before
       public exposure.
-- [ ] No inbox bearer/browser API, recipient picker, provider credential or
+- [x] No inbox bearer/browser API, recipient picker, provider credential or
       HTTP request, dispatch worker, retry, attempt, timeout policy, receipt,
       delivery/read state, command mutation, database migration, table, index,
       trigger, or Compose service is part of this phase.

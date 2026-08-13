@@ -2,12 +2,12 @@
 
 > A self-hosted, official-first multichannel messaging hub.
 
-**Status: Phase 4f alpha candidate.** The repository contains a durable
+**Status: Phase 4f alpha source verified.** The repository contains a durable
 PostgreSQL inbound-event ledger, account-scoped operator read APIs, a
 configured multi-connection inbox API, an optional server-rendered read-only
 operator dashboard, a durable source-bound reply-command ledger, a scoped
 queued-command history API, a verified server-rendered queued-command history
-page, a candidate opt-in server-rendered reply-intent form, secret-backed
+page, a verified opt-in server-rendered reply-intent form, secret-backed
 runtime configuration for official accounts, and narrow
 official Zalo Official Account (OA), Facebook Page, and WhatsApp Business
 signed inbound-text boundaries. Phase 4a passed final local checks,
@@ -22,7 +22,12 @@ a provider message. The Phase 4e dashboard-history source passed final local
 verification, independent security review, a synthetic Docker proof, and
 GitHub CI/CodeQL for exact commit <code>465186e</code>. That proves the frozen
 source and synthetic local path only; it does not prove an external TLS proxy
-or production browser deployment. Phase 1a remains
+or production browser deployment. The Phase 4f dashboard reply-intent source
+passed its final local evidence, independent security review, synthetic Compose
+smoke, and GitHub checks at exact commit <code>74fca30</code>. That verifies
+the frozen source and synthetic local path only; it does not prove an external
+TLS proxy, a live provider operation, or production browser deployment. Phase
+1a remains
 incomplete until an owner-authorized Telegram test bot works through public
 TLS; Phases 3a, 3b, and 3c likewise have no owner-authorized real provider
 proof.
@@ -161,19 +166,29 @@ secret scan, diff check, a synthetic Compose proof, independent security
 review, and GitHub CI/CodeQL. This is source verification only, not a
 public-TLS or production deployment claim.
 
-Phase 4f is a candidate opt-in extension of the existing dashboard. A
+Phase 4f is a verified source extension of the existing dashboard. A
 configured principal stays read-only unless its optional
 <code>replyIntentInboxIds</code> field explicitly grants one of its already
 readable inboxes. For a granted inbox, the server renders one native form per
 persisted inbound event at <code>/operator</code>; the only editable value is
-reply text. The server creates the client operation ID, revalidates the signed
+reply text. The inbound card renders only its canonical channel, occurrence
+time, message text, and connection ID. It omits <code>conversationId</code>,
+<code>senderId</code>, a reply target, and a source-message ID. The form's
+hidden source connection/provider-event values and server-created client
+operation ID are transport inputs only; the server revalidates the signed
 session, exact HTTPS origin, anti-forgery token, write scope, and source event,
 then records only the existing source-bound <code>queued</code> intent. Success
 redirects to queued history without a command-result URL signal; the queued
 history itself is the only browser evidence of a durable record. It does not
 expose an inbox bearer or provider credential, accept a recipient, send, retry,
-dispatch, or claim delivery. This candidate has no final verification,
-public-TLS, live-provider, or production claim.
+dispatch, or claim delivery. Exact commit <code>74fca30</code> passed
+<code>npm run check</code> (54 test files / 358 tests and build), a
+low-threshold dependency audit with zero findings, Gitleaks with no secrets,
+<code>git diff --check</code>, a synthetic Compose smoke with cleanup, an
+independent security audit APPROVE with zero high/medium findings, and GitHub
+checks <code>Verify Node 24.18.1</code> and <code>Analyze JavaScript and
+TypeScript</code>. This source verification is not public-TLS, live-provider,
+or production evidence.
 
 Multi-connection IDs are opaque safe route labels; <code>.</code> and
 <code>..</code> are rejected because webhook ingress places the ID in a dynamic
@@ -215,7 +230,7 @@ CAPTCHA bypass, fingerprint spoofing, session theft, or bulk-spam capabilities.
   It uses local configured password principals and browser session cookies;
   it never exposes an inbox bearer or provider credential to the browser. The
   verified Phase 4e source adds a principal-scoped queued-command history page.
-  The Phase 4f candidate adds a source-bound intent form only for an explicit
+  The verified Phase 4f source adds a source-bound intent form only for an explicit
   per-principal, per-inbox write allow-list; it is not a send action.
 - Dynamic multi-connection webhook ingress that resolves the account server
   side, uses a separate webhook secret, and gives unknown account IDs and wrong
@@ -254,7 +269,7 @@ The following remain plans or explicitly incomplete operational work:
 - Redis, a dispatch queue/worker, provider delivery, retries, attempts,
   delivery/read status, and a provider-specific outbox policy. Phase 4c–4d
   store and list immutable reply intent only; Phase 4e renders that history
-  through the dashboard and the Phase 4f candidate can record it through a
+  through the dashboard and the verified Phase 4f source can record it through a
   narrower dashboard form.
 - User accounts, role-based access control, multiple
   organizations, webhook administration, public connection management, or a
@@ -448,8 +463,8 @@ or more configured principals scoped to existing inboxes. Password values are
 stored only as exact-profile Argon2id PHC hashes.
 
 Its read-only HTML pages are `/operator/login` and `/operator`; Phase 4e also
-adds `/operator/outbound-commands` for queued command history. The Phase 4f
-candidate adds an optional `replyIntentInboxIds` subset to each configured
+adds `/operator/outbound-commands` for queued command history. Phase 4f adds
+an optional `replyIntentInboxIds` subset to each configured
 principal. When it explicitly includes the selected readable inbox,
 `/operator` renders one native source-bound intent form per persisted inbound
 event. The browser may edit reply text only; the server supplies the source
@@ -471,7 +486,7 @@ The
 [Phase 4e dashboard queued-command history guide](docs/operations/operator-dashboard-queued-history-4e.md)
 records the verified source's separate no-send/history boundary. The
 [Phase 4f dashboard reply-intent guide](docs/operations/operator-dashboard-reply-intents-4f.md)
-records the candidate's explicit opt-in write scope, per-principal local rate
+records the verified source's explicit opt-in write scope, per-principal local rate
 guard, and no-send boundary.
 
 ## Corresponding-source offer

@@ -1,4 +1,4 @@
-# Public checkpoint: Phase 4a–4e verified; Phase 4f candidate
+# Public checkpoint: Phase 4a–4f verified source
 
 **Verified scope:** Phase 4a is a configured, read-only aggregate feed across
 an explicit set of existing official connections. It builds on the Telegram
@@ -32,7 +32,7 @@ returned APPROVE with no high- or medium-severity finding. GitHub checks
 This verifies the frozen source and synthetic local path; it does not prove
 public TLS, a live provider, or production deployment.
 
-**Candidate Phase 4f source scope:** Phase 4f proposes one opt-in,
+**Verified Phase 4f source scope:** Phase 4f adds one opt-in,
 source-bound dashboard write. A configured principal remains read-only unless
 its optional `replyIntentInboxIds` allow-list explicitly includes a selected
 readable inbox. For that inbox only, each persisted inbound event can render a
@@ -40,9 +40,14 @@ native reply-intent form whose editable value is text; the server creates the
 operation ID and rechecks session, exact origin, anti-forgery, write scope, and
 durable source before it invokes the existing Phase 4c command store. A
 successful create or exact replay redirects to queued history; `queued` is
-still not sent, delivered, or read. This is candidate scope only: it has no
-final local verification, independent approval, GitHub CI/CodeQL, public TLS,
-live-provider, or production claim.
+still not sent, delivered, or read. Exact commit <code>74fca30</code> passed
+<code>npm run check</code> (54 test files / 358 tests and build),
+<code>npm audit --audit-level=low</code> with zero findings, Gitleaks with no
+secrets, <code>git diff --check</code>, a synthetic Compose smoke with cleanup,
+an independent security audit APPROVE with zero high/medium findings, and
+GitHub checks <code>Verify Node 24.18.1</code> and <code>Analyze JavaScript and
+TypeScript</code>. This source evidence is not public TLS, live-provider, or
+production evidence.
 
 ## Exact verified history
 
@@ -72,9 +77,12 @@ live-provider, or production claim.
   independent security review, a synthetic Compose proof, and fresh GitHub
   CI/CodeQL for exact commit <code>465186e</code>; its `Verify Node 24.18.1`
   and `Analyze JavaScript and TypeScript` checks both succeeded.
+- Phase 4f's server-rendered source-bound reply-intent form passed final local
+  evidence, independent security review, a synthetic Compose smoke with
+  cleanup, and fresh GitHub checks for exact commit <code>74fca30</code>.
 - Historical evidence proves only those exact revisions. It does not verify any
   live provider account, provider send, public TLS endpoint, production
-  deployment, or the later Phase 4f candidate source.
+  deployment, or the Phase 4f source beyond its exact verified commit.
 
 ## Verified Phase 4a source
 
@@ -245,7 +253,7 @@ outbound capability into the browser:
   command creation/mutation, send/retry/cancel control, worker, provider HTTP
   request, token/OAuth storage, attempt, timeout policy, receipt, or state
   transition. A page view only performs the existing dashboard-session touch.
-  The later Phase 4f candidate is documented separately and is not part of
+  The separate verified Phase 4f source is documented separately and is not part of
   this verified Phase 4e boundary.
 
 Exact commit <code>465186e</code> completed focused dashboard-history tests,
@@ -253,9 +261,9 @@ the relevant local checks, independent security review, and fresh GitHub
 CI/CodeQL evidence. It still does not prove external HTTPS/proxy behavior or a
 production deployment.
 
-## Candidate Phase 4f source
+## Verified Phase 4f source
 
-The candidate adds a deliberately smaller dashboard write than the existing
+The verified source adds a deliberately smaller dashboard write than the existing
 inbox-bearer API:
 
 - `dashboard.principals[].replyIntentInboxIds` is optional. It is a strict
@@ -271,7 +279,9 @@ inbox-bearer API:
   persisted inbound event. Text is the only editable field; source connection,
   provider event, selected inbox, anti-forgery token, and fresh UUIDv4 client
   operation ID are escaped hidden inputs. They are revalidated and do not grant
-  a recipient or bypass source-scope enforcement.
+  a recipient or bypass source-scope enforcement. The rendered inbound card
+  shows only channel, occurrence time, message text, and connection ID; it
+  omits `conversationId`, `senderId`, private target, and source-message ID.
 - The URL-encoded form has a fixed 32 KiB whole-body cap before strict parsing;
   text remains separately limited to 2,000 characters. An oversized form is
   rejected with `413` before the recorder is called. Operator HTML responses,
@@ -281,7 +291,7 @@ inbox-bearer API:
   queued-history row is the only browser evidence of a durable record and does
   not expose a bearer, command ID, target, provider result, or delivery status.
   A fabricated `notice` query value is rejected by the strict history query.
-- The candidate has a bounded local guard of 20 recording attempts per rolling
+- Phase 4f has a bounded local guard of 20 recording attempts per rolling
   minute per configured principal. It is not a distributed/edge rate limit;
   public deployment still requires verified proxy rate limiting and log
   redaction.
@@ -290,9 +300,12 @@ inbox-bearer API:
   mutation, migration, table, index, trigger, or Compose change. It reuses the
   existing Phase 4c immutable `queued` command store and migration `0009`.
 
-This candidate must complete focused behavior/security tests, final local
-checks, independent review, and fresh GitHub CI/CodeQL on one frozen commit
-before the checkpoint can name it verified. Those steps would still not prove
+Exact commit <code>74fca30</code> completed the focused behavior/security
+checks and final local evidence: <code>npm run check</code> (54 test files / 358
+tests and build), <code>npm audit --audit-level=low</code> with zero findings,
+Gitleaks with no secrets, <code>git diff --check</code>, and a synthetic Compose
+smoke with cleanup. The independent security audit returned APPROVE with zero
+high/medium findings, and both GitHub checks succeeded. This does not prove
 public TLS, a real provider send, or production deployment.
 
 ## Explicitly not proven or not implemented
@@ -313,7 +326,7 @@ public TLS, a real provider send, or production deployment.
   template, media, OAuth, provider access-token storage, Graph API request,
   Facebook User, Zalo User, or WhatsApp User surface exists. Phase 4c has only
   an immutable intent ledger, Phase 4d has only its scoped history, Phase 4e
-  renders that history, and the Phase 4f candidate can record the same
+  renders that history, and the verified Phase 4f source can record the same
   source-bound intent through an explicit dashboard write grant; none is a
   delivery engine.
 - A `200` from the local synthetic feed or a green test/GitHub check does not
@@ -322,11 +335,12 @@ public TLS, a real provider send, or production deployment.
 
 ## Next authorized work
 
-Keep the verified Phase 4e evidence frozen at <code>465186e</code>. Any change
-to its dashboard history, session/scope boundary, or browser projection must
-start as a new candidate with focused checks, independent security review, and
-fresh exact CI evidence. Keep all live provider use separate: require explicit
-owner authorization before connecting a real account or exposing public TLS.
-Any later full user/organization authorization, conversation model, dispatch
+Keep the verified Phase 4e and Phase 4f evidence frozen at
+<code>465186e</code> and <code>74fca30</code>. Any change to their dashboard
+history/form, session/scope boundary, or browser projection must start as a new
+candidate with focused checks, independent security review, and fresh exact CI
+evidence. Keep all live provider use separate: require explicit owner
+authorization before connecting a real account or exposing public TLS. Any
+later full user/organization authorization, conversation model, dispatch
 engine, or dashboard deployment must start with its own bounded design,
 migration/security review, and verification criteria.

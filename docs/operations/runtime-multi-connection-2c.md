@@ -4,9 +4,9 @@ This guide configures the current alpha's official Telegram Bot, Zalo Official
 Account (OA), Facebook Page, WhatsApp Business, optional inbox entries, and
 optional Phase 4b operator dashboard. The dashboard is a small
 server-rendered local-principal surface, not a full user, organization,
-public-connection, or permission model. The Phase 4f candidate adds an
-explicit opt-in write subset for source-bound reply intents; it has not been
-verified with a real provider account or public TLS endpoint.
+public-connection, or permission model. The verified Phase 4f source adds an
+explicit opt-in write subset for source-bound reply intents; it still has not
+been verified with a real provider account or public TLS endpoint.
 
 ## What is configured
 
@@ -204,10 +204,10 @@ must be deployed behind a real TLS proxy. Follow the
 hashing, proxy controls, session rotation, and limits. The Phase 4e source
 adds no configuration field: it uses the same signed session to render one
 assigned inbox's queued history with no browser bearer or outbound action. The
-Phase 4f candidate adds only `replyIntentInboxIds` and uses it to gate one
-server-rendered source-bound intent form per persisted inbound event; it does
-not add provider configuration, a browser bearer, recipient selection, or a
-provider send. See the [Phase 4f reply-intent guide](operator-dashboard-reply-intents-4f.md).
+The verified Phase 4f source adds only `replyIntentInboxIds` and uses it to
+gate one server-rendered source-bound intent form per persisted inbound event;
+it does not add provider configuration, a browser bearer, recipient selection,
+or a provider send. See the [Phase 4f reply-intent guide](operator-dashboard-reply-intents-4f.md).
 
 Do not paste a real document in a terminal command, issue, pull request,
 screenshot, log, or repository file. The samples above contain placeholders,

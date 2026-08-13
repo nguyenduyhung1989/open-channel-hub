@@ -3,8 +3,8 @@
 Phase 4b adds an optional, read-only-by-default browser dashboard. It renders
 HTML on the server at `/operator`; the browser receives no inbox bearer,
 provider credential, password hash, or JavaScript API client. The separate
-Phase 4f candidate proposes a deliberately narrower opt-in source-bound intent
-form. This document describes the implemented and candidate boundaries, not a
+verified Phase 4f source adds a deliberately narrower opt-in source-bound
+intent form. This document describes the implemented boundaries, not a
 claim that a TLS proxy or production deployment has been verified.
 
 The dashboard is absent when the `dashboard` object is absent from the runtime
@@ -145,7 +145,7 @@ an inbox bearer in the browser. See the
 [queued-command history guide](operator-dashboard-queued-history-4e.md)
 for its narrower projection and explicit no-send boundary.
 
-The Phase 4f candidate adds `POST /operator/reply-intents` only for a
+The verified Phase 4f source adds `POST /operator/reply-intents` only for a
 principal/inbox pair explicitly present in `replyIntentInboxIds`. It renders
 one native form inside each already persisted inbound event card at `/operator`.
 Reply text is the only editable value; the source reference and fresh UUIDv4
@@ -155,7 +155,7 @@ queued-history page without a command-result URL signal. The queued-history row
 is the only browser evidence of a durable record. This is not a recipient
 picker, provider send, retry, or delivery control. Follow the dedicated
 [Phase 4f reply-intent guide](operator-dashboard-reply-intents-4f.md) before
-enabling this candidate write grant.
+enabling this write grant.
 
 Use the dashboard's **Log out** form when leaving the workstation. It revokes
 the server-side session and clears the cookie. Sessions also expire after 30
@@ -175,7 +175,7 @@ eight hours from issue time.
   ten-minute in-process block. It deliberately does not record an IP address,
   password, or raw form value. Configure edge rate limiting before exposing
   the login route to untrusted networks.
-- The Phase 4f candidate form additionally requires an active signed session,
+- The Phase 4f form additionally requires an active signed session,
   exact `Origin`, matching anti-forgery value, and strict non-duplicated form
   body before it resolves the explicit write grant. Its local guard permits at
   most 20 recording attempts per rolling minute per configured principal. That
@@ -215,12 +215,12 @@ for a documented operation.
   attachment, provider dispatch, provider access-token, OAuth, or live provider
   operation. Phase 4c's API-only source-bound reply-command ledger and Phase
   4d's API-only queued-history reader remain unchanged. The Phase 4e source
-  renders history only. The Phase 4f candidate can record only the existing
+  renders history only. The verified Phase 4f source can record only the existing
   source-bound `queued` intent through an explicit per-inbox grant; it has no
   recipient, send, retry, cancellation, or delivery control.
 
 The repository's Compose smoke test deliberately validates only the database
 migration count and existing synthetic API paths over loopback HTTP. Dashboard
-authentication and the Phase 4f candidate form are tested at the route layer
+authentication and the Phase 4f form are tested at the route layer
 with synthetic features; they are not forced through HTTP Compose because that
 would not prove the required HTTPS cookie and origin behavior.
