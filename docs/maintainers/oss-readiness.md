@@ -39,10 +39,10 @@ organization has accepted the project.
   ingress and a bearer-scoped canonical-event reader. Its final local
   verification, synthetic Compose proof, independent review, GitHub CI, and
   CodeQL succeeded for exact commit <code>fd802cb</code>.
-- The current Phase 4a source adds a configured read-only inbox bearer with an
-  explicit multi-connection allow-list and canonical aggregate event feed. Its
-  final local verification, synthetic Compose proof, independent review, and
-  GitHub checks remain required for the exact candidate commit.
+- Phase 4a added a configured read-only inbox bearer with an explicit
+  multi-connection allow-list and canonical aggregate event feed. Its final
+  local verification, synthetic Compose proof, independent review, GitHub CI,
+  and CodeQL succeeded for exact commit <code>705db0a</code>.
 
 ## Verified GitHub evidence
 
@@ -59,6 +59,8 @@ organization has accepted the project.
   <code>c933102</code>.
 - GitHub CI and CodeQL succeeded for the Phase 3c WhatsApp Business candidate
   at <code>fd802cb</code>.
+- GitHub CI and CodeQL succeeded for the Phase 4a configured inbox candidate
+  at <code>705db0a</code>.
 - GitHub Private Vulnerability Reporting, secret scanning, Dependabot alerts,
   and automatic security fixes are enabled.
 - The <code>main</code> branch blocks force pushes and deletion, including by

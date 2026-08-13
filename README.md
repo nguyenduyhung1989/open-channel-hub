@@ -6,10 +6,9 @@
 inbound-event ledger, account-scoped operator read APIs, a configured
 multi-connection read-only inbox API, secret-backed runtime configuration for
 official accounts, and narrow official Zalo Official Account (OA), Facebook
-Page, and WhatsApp Business signed inbound-text boundaries. Phase 3c passed
+Page, and WhatsApp Business signed inbound-text boundaries. Phase 4a passed
 final local checks, independent review, a synthetic Docker proof, and GitHub
-CI/CodeQL for exact commit <code>fd802cb</code>. The current Phase 4a source
-needs its own final local and GitHub verification. Phase 1a remains incomplete
+CI/CodeQL for exact commit <code>705db0a</code>. Phase 1a remains incomplete
 until an owner-authorized Telegram test bot works through public TLS; Phases
 3a, 3b, and 3c likewise have no owner-authorized real provider proof.
 

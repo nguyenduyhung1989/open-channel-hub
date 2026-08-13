@@ -129,11 +129,11 @@ proof added two synthetic Facebook Pages on one fake App, raw-byte HMAC checks,
 and Facebook fingerprints. The verified Phase 3c proof added two synthetic
 WhatsApp business phones on that same fake App, the common Meta callback,
 raw-byte HMAC checks, and WhatsApp fingerprints for exact commit
-<code>fd802cb</code>. The current Phase 4a smoke-test source adds separate
-support and sales inboxes across those accounts, aggregate bearer scope,
-cross-inbox cursor rejection, and canonical-only output; its final candidate
-verification is separate. No proof path calls a provider or uses a real
-credential or message.
+<code>fd802cb</code>. Phase 4a's exact commit <code>705db0a</code> adds
+separate support and sales inboxes across those accounts, aggregate bearer
+scope, cross-inbox cursor rejection, and canonical-only output; it passed its
+final local verification, independent review, and GitHub CI/CodeQL. No proof
+path calls a provider or uses a real credential or message.
 
 ## Container and network boundary
 

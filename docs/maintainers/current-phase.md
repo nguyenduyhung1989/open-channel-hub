@@ -1,4 +1,4 @@
-# Public checkpoint: Phase 4a
+# Public checkpoint: Phase 4a verified
 
 **Scope:** a configured, read-only aggregate feed across an explicit set of
 existing official connections. It builds on the Telegram Bot, Zalo OA, Facebook
@@ -22,10 +22,13 @@ deployment.
 - Phase 3c's WhatsApp Business source passed final local checks, independent
   review, a synthetic Compose proof, and fresh GitHub CI/CodeQL for exact
   commit <code>fd802cb</code>.
-- Historical evidence proves only those exact revisions. It does not verify the
-  current Phase 4a source or any live provider account.
+- Phase 4a's configured inbox source passed final local checks, independent
+  review, a synthetic Compose proof, and fresh GitHub CI/CodeQL for exact
+  commit <code>705db0a</code>.
+- Historical evidence proves only those exact revisions. It does not verify any
+  live provider account.
 
-## Current Phase 4a source
+## Verified Phase 4a source
 
 The source now has a bounded configured-inbox vertical slice:
 
@@ -61,14 +64,15 @@ The [Phase 4a unified inbox guide](../operations/unified-inbox-4a.md) and
 [ADR-0010](../adr/0010-configured-read-only-inbox-principals.md) describe the
 contract, rationale, and boundaries.
 
-## Required verification before a Phase 4a release claim
+## Exact Phase 4a evidence
 
-1. Freeze the source and run formatting, lint, strict type checking, targeted
-   and full tests, build, low-threshold dependency audit, Compose configuration,
-   secret scan, and the expanded synthetic Docker smoke test.
-2. Obtain an independent bounded review of the frozen candidate.
-3. Commit and push the verified candidate, then read fresh GitHub CI and CodeQL
-   for that exact commit.
+- Frozen commit <code>705db0a</code> passed formatting, lint, strict type
+  checking, 41 test files / 285 tests, build, low-threshold dependency audit,
+  Compose configuration, secret scan, and the expanded synthetic Docker smoke
+  test.
+- An independent bounded review found no remaining actionable high- or
+  medium-severity issue in that frozen source.
+- GitHub CI and CodeQL both succeeded for exact commit <code>705db0a</code>.
 
 The synthetic proof must use fake IDs, secrets, tokens, and messages only. It
 must verify multiple provider connections in each of two configured inboxes,
@@ -99,8 +103,7 @@ TLS, dashboard, or production-authorization proof.
 
 ## Next authorized work
 
-After final local and GitHub evidence for the exact Phase 4a commit, keep all
-live provider use separate: require explicit owner authorization before
+Keep all live provider use separate: require explicit owner authorization before
 connecting a real account or exposing public TLS. A later browser dashboard,
 user/organization authorization, conversation model, or outbound engine must
 start with its own bounded design, migration/security review, and verification

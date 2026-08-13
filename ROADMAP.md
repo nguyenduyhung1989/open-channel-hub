@@ -253,9 +253,9 @@ independent review, and GitHub CI/CodeQL evidence are complete for exact commit
 
 ### 4a — explicit multi-connection inbound feed
 
-**Status: source implementation is present; final local candidate verification,
-synthetic Compose proof, independent review, and fresh GitHub CI/CodeQL remain
-required for its exact commit.**
+**Status: implementation, final local verification, a synthetic Compose proof,
+independent review, and GitHub CI/CodeQL evidence are complete for exact commit
+<code>705db0a</code>.**
 
 - [x] An optional strict `inboxes` array in the version-1 runtime secret
       document. Each entry has an opaque ID, a unique bearer token that cannot
@@ -274,9 +274,9 @@ required for its exact commit.**
 - [x] No browser dashboard, user identity, organization/RBAC model,
       conversation summary, search, attachment, outbound action, provider
       access token, or live-provider call is implied by this read-only API.
-- [ ] Final local candidate checks, synthetic Compose verification, and
+- [x] Final local candidate checks, synthetic Compose verification, and
       independent review.
-- [ ] Fresh GitHub CI/CodeQL for the exact Phase 4a commit.
+- [x] Fresh GitHub CI/CodeQL for exact commit <code>705db0a</code>.
 
 ### Later Phase 4 work
 

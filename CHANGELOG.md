@@ -128,8 +128,8 @@ follows [Semantic Versioning](https://semver.org/).
   <code>b930d29</code>, completed Phase 3b GitHub CI/CodeQL at
   <code>c933102</code>, and completed Phase 3c final local checks,
   independent review, synthetic Compose proof, and GitHub CI/CodeQL at exact
-  commit <code>fd802cb</code>. Verification remains required for the current
-  Phase 4a candidate.
+  commit <code>fd802cb</code>; Phase 4a completed the same evidence at exact
+  commit <code>705db0a</code>.
 - An accepted inbound Telegram text event now becomes durable when the
   PostgreSQL configuration is present; a local operator can now list canonical
   inbound events, but this still does not add an inbox, live Telegram proof,
