@@ -35,6 +35,9 @@ describe('PostgreSQL migrations', () => {
     expect(sql).toContain('ADD COLUMN provider_identity_fingerprint text');
     expect(sql).toContain("provider_identity_fingerprint ~ '^[a-f0-9]{64}$'");
     expect(sql).toContain("channel <> 'zalo_oa' OR provider_identity_fingerprint IS NOT NULL");
+    expect(sql).toContain(
+      "channel <> 'facebook_page' OR provider_identity_fingerprint IS NOT NULL"
+    );
     expect(sql).toContain('INSERT INTO open_channel_hub.schema_migrations');
     expect(sql).not.toContain('public.');
     expect(
@@ -46,7 +49,8 @@ describe('PostgreSQL migrations', () => {
       '0002_inbound_event_ledger_sequence',
       '0003_connection_registry',
       '0004_inbound_events_connection_registry_fk',
-      '0005_connection_registry_provider_identity'
+      '0005_connection_registry_provider_identity',
+      '0006_connection_registry_facebook_page_provider_identity'
     ]);
     expect(pool.releaseCount).toBe(1);
   });
@@ -69,6 +73,9 @@ describe('PostgreSQL migrations', () => {
     expect(secondRunSql).not.toContain('CREATE TABLE open_channel_hub.connection_registry');
     expect(secondRunSql).not.toContain('ADD CONSTRAINT inbound_events_connection_registry_fk');
     expect(secondRunSql).not.toContain('ADD COLUMN provider_identity_fingerprint text');
+    expect(secondRunSql).not.toContain(
+      'ADD CONSTRAINT connection_registry_facebook_page_provider_identity_required'
+    );
     expect(secondRunSql).not.toContain('INSERT INTO open_channel_hub.schema_migrations');
     expect(pool.releaseCount).toBe(2);
   });

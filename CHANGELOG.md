@@ -65,6 +65,24 @@ follows [Semantic Versioning](https://semver.org/).
   idempotency, provider-ID isolation, bearer/cursor isolation, registry
   metadata, secret-file mode, and PostgreSQL role safety without provider
   network access.
+- Phase 3b: an official Facebook Page receive-only connector package that
+  supports canonical customer-text normalization and rejects every provider
+  command.
+- Phase 3b: fixed `GET`/`POST /v1/webhooks/facebook-page` routes that handle
+  Meta verification, resolve all batch Page IDs to one configured App, verify
+  `X-Hub-Signature-256` over exact raw request bytes, and append canonical text
+  before acknowledging it.
+- Phase 3b: a token-bound `GET /v1/facebook-page/inbound-events` route with
+  canonical-only fields and Page-bound opaque cursors.
+- Phase 3b: a forward-only PostgreSQL registry migration that binds each
+  Facebook Page connection ID to a non-secret SHA-256 fingerprint of its
+  configured `(appId, pageId)` pair, preventing silent rebinding after durable
+  history exists.
+- A synthetic Compose smoke-test source with two Facebook Page configurations
+  on one fake App. It checks verification challenge handling, raw-byte HMAC
+  rejection, multi-Page durable append, duplicate idempotency, Page
+  bearer/cursor isolation, registry metadata, secret-file mode, and PostgreSQL
+  role safety without provider network access.
 
 ### Changed
 
@@ -87,6 +105,9 @@ follows [Semantic Versioning](https://semver.org/).
 - The version-1 runtime document now also supports `zalo_oa` entries. It does
   not assume that OA entries sharing an App ID must share an OA secret; each
   configured `(appId, oaId)` pair resolves its own secret at webhook time.
+- The version-1 runtime document now also supports `facebook_page` entries.
+  Multiple Pages can share one configured App only when their App secret and
+  verification token match exactly; Page IDs and operator bearers remain unique.
 
 ### Security
 
@@ -115,6 +136,10 @@ follows [Semantic Versioning](https://semver.org/).
   `(appId, oaId)` pair and are calculated from the original UTF-8 JSON bytes.
   Unknown identity and invalid signature receive the same `401` response; raw
   provider payloads and OA secrets never enter the database.
+- Facebook Page webhook signatures are compared only after every batch Page ID
+  resolves to one configured App. The HMAC uses the original raw request bytes;
+  unknown/malformed/cross-App batches and invalid signatures return the same
+  `401`, while raw payloads and App credentials never enter the database.
 - The <code>main</code> branch now blocks force pushes and deletion, including
   for administrators. Required checks and pull-request reviews remain
   intentionally unset for the owner-controlled direct-push workflow.

@@ -13,6 +13,7 @@ it does not mean a feature is complete.
 | [0005](0005-postgresql-inbound-event-ledger.md)        | accepted | Dedicated PostgreSQL schema and canonical inbound-event ledger |
 | [0006](0006-stable-inbound-event-pagination.md)        | accepted | Stable, connection-scoped inbound-event pagination             |
 | [0007](0007-runtime-configured-connection-registry.md) | accepted | Runtime connection registry and token-bound account selection  |
+| [0008](0008-facebook-page-signed-inbound.md)           | accepted | Facebook Page signed inbound text boundary                     |
 
 Template for a new ADR:
 

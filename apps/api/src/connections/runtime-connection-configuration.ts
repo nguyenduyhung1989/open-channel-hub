@@ -25,7 +25,24 @@ export interface RuntimeZaloOaConnection {
   readonly webhookUrl?: string;
 }
 
-export type RuntimeConnection = RuntimeTelegramBotConnection | RuntimeZaloOaConnection;
+/**
+ * Facebook Page inbound credentials stay deliberately separate from Graph API
+ * access tokens. Phase 3b validates signed webhooks only; it does not call
+ * Meta, subscribe a Page, send messages, or store OAuth credentials.
+ */
+export interface RuntimeFacebookPageConnection {
+  readonly appId: string;
+  readonly appSecret: string;
+  readonly id: string;
+  readonly operatorApiToken: string;
+  readonly pageId: string;
+  readonly type: 'facebook_page';
+  readonly webhookUrl?: string;
+  readonly webhookVerifyToken: string;
+}
+
+export type RuntimeConnection =
+  RuntimeTelegramBotConnection | RuntimeZaloOaConnection | RuntimeFacebookPageConnection;
 
 export interface RuntimeConnectionConfiguration {
   readonly connections: readonly RuntimeConnection[];
@@ -64,10 +81,21 @@ const ZALO_OA_CONNECTION_REQUIRED_KEYS = Object.freeze([
   'operatorApiToken'
 ]);
 const ZALO_OA_CONNECTION_OPTIONAL_KEYS = Object.freeze(['webhookUrl']);
+const FACEBOOK_PAGE_CONNECTION_REQUIRED_KEYS = Object.freeze([
+  'id',
+  'type',
+  'appId',
+  'pageId',
+  'appSecret',
+  'webhookVerifyToken',
+  'operatorApiToken'
+]);
+const FACEBOOK_PAGE_CONNECTION_OPTIONAL_KEYS = Object.freeze(['webhookUrl']);
 const CONNECTION_ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
 const PRINTABLE_TOKEN_PATTERN = /^[!-~]+$/;
 const WEBHOOK_SECRET_PATTERN = /^[A-Za-z0-9_-]{32,256}$/;
 const ZALO_IDENTIFIER_PATTERN = /^[0-9]{1,32}$/;
+const FACEBOOK_IDENTIFIER_PATTERN = /^[0-9]{1,32}$/;
 const PRIVATE_HOSTNAME_SUFFIXES = Object.freeze(['.localhost', '.local', '.internal']);
 
 /**
@@ -156,6 +184,12 @@ const parseRuntimeConnectionConfiguration = (value: unknown): RuntimeConnectionC
   const exclusiveCredentials = new Set<string>();
   const zaloOaSecrets = new Set<string>();
   const zaloOaPairs = new Set<string>();
+  const facebookCredentials = new Set<string>();
+  const facebookPageIds = new Set<string>();
+  const facebookApps = new Map<
+    string,
+    Readonly<{ appSecret: string; webhookVerifyToken: string }>
+  >();
   const connections = value.connections.map((candidate) => {
     const connection = parseConnection(candidate);
 
@@ -168,7 +202,8 @@ const parseRuntimeConnectionConfiguration = (value: unknown): RuntimeConnectionC
     if (
       operatorTokens.has(connection.operatorApiToken) ||
       exclusiveCredentials.has(connection.operatorApiToken) ||
-      zaloOaSecrets.has(connection.operatorApiToken)
+      zaloOaSecrets.has(connection.operatorApiToken) ||
+      facebookCredentials.has(connection.operatorApiToken)
     ) {
       throw new RuntimeConnectionConfigurationError();
     }
@@ -178,21 +213,67 @@ const parseRuntimeConnectionConfiguration = (value: unknown): RuntimeConnectionC
 
     if (connection.type === 'telegram_bot') {
       for (const credential of [connection.botToken, connection.webhookSecret]) {
-        if (exclusiveCredentials.has(credential) || zaloOaSecrets.has(credential)) {
+        if (
+          exclusiveCredentials.has(credential) ||
+          zaloOaSecrets.has(credential) ||
+          facebookCredentials.has(credential)
+        ) {
           throw new RuntimeConnectionConfigurationError();
         }
 
         exclusiveCredentials.add(credential);
       }
-    } else {
+    } else if (connection.type === 'zalo_oa') {
       const pairKey = `${connection.appId}\u0000${connection.oaId}`;
 
-      if (exclusiveCredentials.has(connection.oaSecretKey) || zaloOaPairs.has(pairKey)) {
+      if (
+        exclusiveCredentials.has(connection.oaSecretKey) ||
+        facebookCredentials.has(connection.oaSecretKey) ||
+        zaloOaPairs.has(pairKey)
+      ) {
         throw new RuntimeConnectionConfigurationError();
       }
 
       zaloOaSecrets.add(connection.oaSecretKey);
       zaloOaPairs.add(pairKey);
+    } else {
+      const existingApp = facebookApps.get(connection.appId);
+
+      if (facebookPageIds.has(connection.pageId)) {
+        throw new RuntimeConnectionConfigurationError();
+      }
+
+      if (
+        existingApp !== undefined &&
+        (existingApp.appSecret !== connection.appSecret ||
+          existingApp.webhookVerifyToken !== connection.webhookVerifyToken)
+      ) {
+        throw new RuntimeConnectionConfigurationError();
+      }
+
+      if (existingApp === undefined) {
+        for (const credential of [connection.appSecret, connection.webhookVerifyToken]) {
+          if (
+            exclusiveCredentials.has(credential) ||
+            zaloOaSecrets.has(credential) ||
+            facebookCredentials.has(credential)
+          ) {
+            throw new RuntimeConnectionConfigurationError();
+          }
+        }
+
+        facebookCredentials.add(connection.appSecret);
+        facebookCredentials.add(connection.webhookVerifyToken);
+        facebookApps.set(
+          connection.appId,
+          Object.freeze({
+            appSecret: connection.appSecret,
+            webhookVerifyToken: connection.webhookVerifyToken
+          })
+        );
+      }
+
+      facebookPageIds.add(connection.pageId);
     }
 
     return connection;
@@ -212,6 +293,10 @@ const parseConnection = (value: unknown): RuntimeConnection => {
 
   if (value.type === 'zalo_oa') {
     return parseZaloOaConnection(value);
+  }
+
+  if (value.type === 'facebook_page') {
+    return parseFacebookPageConnection(value);
   }
 
   throw new RuntimeConnectionConfigurationError();
@@ -287,6 +372,45 @@ const parseZaloOaConnection = (value: unknown): RuntimeZaloOaConnection => {
   });
 };
 
+const parseFacebookPageConnection = (value: unknown): RuntimeFacebookPageConnection => {
+  if (
+    !hasExactKeys(
+      value,
+      FACEBOOK_PAGE_CONNECTION_REQUIRED_KEYS,
+      FACEBOOK_PAGE_CONNECTION_OPTIONAL_KEYS
+    ) ||
+    !isConnectionId(value.id) ||
+    value.type !== 'facebook_page' ||
+    !isFacebookIdentifier(value.appId) ||
+    !isFacebookIdentifier(value.pageId) ||
+    !isPrintableToken(value.appSecret, 32) ||
+    !isPrintableToken(value.webhookVerifyToken, 32) ||
+    !isPrintableToken(value.operatorApiToken, 32)
+  ) {
+    throw new RuntimeConnectionConfigurationError();
+  }
+
+  const webhookUrl = value.webhookUrl;
+
+  if (
+    webhookUrl !== undefined &&
+    (!isString(webhookUrl) || !isValidPublicFacebookPageWebhookUrl(webhookUrl))
+  ) {
+    throw new RuntimeConnectionConfigurationError();
+  }
+
+  return Object.freeze({
+    appId: value.appId,
+    appSecret: value.appSecret,
+    id: value.id,
+    operatorApiToken: value.operatorApiToken,
+    pageId: value.pageId,
+    type: 'facebook_page',
+    webhookVerifyToken: value.webhookVerifyToken,
+    ...(webhookUrl === undefined ? {} : { webhookUrl })
+  });
+};
+
 const isValidFilePath = (value: unknown): value is string =>
   isString(value) &&
   value.length <= MAXIMUM_FILE_PATH_LENGTH &&
@@ -327,6 +451,9 @@ const isWebhookSecret = (value: unknown): value is string =>
 const isZaloIdentifier = (value: unknown): value is string =>
   isString(value) && ZALO_IDENTIFIER_PATTERN.test(value);
 
+const isFacebookIdentifier = (value: unknown): value is string =>
+  isString(value) && FACEBOOK_IDENTIFIER_PATTERN.test(value);
+
 const isValidPublicWebhookUrl = (value: string, connectionId: string): boolean => {
   try {
     const url = new URL(value);
@@ -356,6 +483,24 @@ const isValidPublicZaloOaWebhookUrl = (value: string): boolean => {
       url.search === '' &&
       url.hash === '' &&
       url.pathname === '/v1/webhooks/zalo-oa' &&
+      isPublicHostname(url.hostname)
+    );
+  } catch {
+    return false;
+  }
+};
+
+const isValidPublicFacebookPageWebhookUrl = (value: string): boolean => {
+  try {
+    const url = new URL(value);
+
+    return (
+      url.protocol === 'https:' &&
+      url.username === '' &&
+      url.password === '' &&
+      url.search === '' &&
+      url.hash === '' &&
+      url.pathname === '/v1/webhooks/facebook-page' &&
       isPublicHostname(url.hostname)
     );
   } catch {

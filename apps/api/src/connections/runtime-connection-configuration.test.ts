@@ -221,6 +221,73 @@ describe('loadRuntimeConnectionConfiguration', () => {
       await expectGenericFailure(loadRuntimeConnectionConfiguration(CONFIGURATION_PATH));
     }
   });
+
+  it('accepts multiple Facebook Pages for one App when its App credentials are identical', async () => {
+    const configuration = validFacebookPageConfiguration();
+    readFileMock.mockResolvedValue(JSON.stringify(configuration));
+
+    await expect(loadRuntimeConnectionConfiguration(CONFIGURATION_PATH)).resolves.toEqual({
+      connections: configuration.connections
+    });
+  });
+
+  it('rejects ambiguous Facebook Page mappings, App credential drift, and cross-role reuse', async () => {
+    const duplicatePage = validFacebookPageConfiguration();
+    duplicatePage.connections[1]!.pageId = duplicatePage.connections[0]!.pageId;
+
+    const appSecretDrift = validFacebookPageConfiguration();
+    appSecretDrift.connections[1]!.appSecret = 'synthetic-facebook-app-secret-sales-012345678901';
+
+    const verifyTokenAcrossApps = validFacebookPageConfiguration();
+    verifyTokenAcrossApps.connections[1]!.appId = '1234567890123456790';
+
+    const facebookWithZalo = validFacebookPageConfiguration();
+    facebookWithZalo.connections.push(
+      validZaloOaConnection({
+        id: 'zalo-oa-collision',
+        oaId: '9876543210987654333',
+        oaSecretKey: facebookWithZalo.connections[0]!.appSecret
+      }) as unknown as MutableRuntimeFacebookPageConnection
+    );
+
+    for (const configuration of [
+      duplicatePage,
+      appSecretDrift,
+      verifyTokenAcrossApps,
+      facebookWithZalo
+    ]) {
+      readFileMock.mockResolvedValueOnce(JSON.stringify(configuration));
+      await expectGenericFailure(loadRuntimeConnectionConfiguration(CONFIGURATION_PATH));
+    }
+  });
+
+  it('rejects malformed Facebook identifiers, short credentials, and a webhook URL outside its fixed path', async () => {
+    const invalidConnections: readonly Readonly<Partial<MutableRuntimeFacebookPageConnection>>[] = [
+      { appId: 'app-123' },
+      { pageId: 'page-456' },
+      { id: '..' },
+      { appSecret: 'too-short' },
+      { webhookVerifyToken: 'too-short' }
+    ];
+
+    for (const override of invalidConnections) {
+      const configuration = validFacebookPageConfiguration();
+      Object.assign(configuration.connections[0]!, override);
+      readFileMock.mockResolvedValueOnce(JSON.stringify(configuration));
+      await expectGenericFailure(loadRuntimeConnectionConfiguration(CONFIGURATION_PATH));
+    }
+
+    for (const webhookUrl of [
+      'https://example.test/v1/webhooks/facebook-page?credential=synthetic',
+      'https://example.test/v1/webhooks/facebook-page/another-page',
+      'https://localhost/v1/webhooks/facebook-page'
+    ]) {
+      const configuration = validFacebookPageConfiguration();
+      configuration.connections[0]!.webhookUrl = webhookUrl;
+      readFileMock.mockResolvedValueOnce(JSON.stringify(configuration));
+      await expectGenericFailure(loadRuntimeConnectionConfiguration(CONFIGURATION_PATH));
+    }
+  });
 });
 
 const validConfiguration = (): MutableRuntimeConnectionConfiguration => ({
@@ -297,6 +364,48 @@ interface MutableRuntimeZaloOaConnection {
   operatorApiToken: string;
   type: string;
   webhookUrl?: string;
+}
+
+const validFacebookPageConfiguration = (): MutableRuntimeFacebookPageConfiguration => ({
+  version: 1,
+  connections: [
+    validFacebookPageConnection(),
+    validFacebookPageConnection({
+      id: 'facebook-page-sales',
+      operatorApiToken: 'synthetic_facebook_sales_operator_012345678901234567',
+      pageId: '9876543210987654322'
+    })
+  ]
+});
+
+const validFacebookPageConnection = (
+  overrides: Readonly<Partial<MutableRuntimeFacebookPageConnection>> = {}
+): MutableRuntimeFacebookPageConnection => ({
+  appId: '1234567890123456789',
+  appSecret: 'synthetic-facebook-app-secret-01234567890123456789',
+  id: 'facebook-page-support',
+  operatorApiToken: 'synthetic_facebook_operator_support_012345678901234567',
+  pageId: '9876543210987654321',
+  type: 'facebook_page',
+  webhookUrl: 'https://example.test/v1/webhooks/facebook-page',
+  webhookVerifyToken: 'synthetic-facebook-verify-token-012345678901234567',
+  ...overrides
+});
+
+interface MutableRuntimeFacebookPageConfiguration {
+  version: number;
+  connections: MutableRuntimeFacebookPageConnection[];
+}
+
+interface MutableRuntimeFacebookPageConnection {
+  appId: string;
+  appSecret: string;
+  id: string;
+  operatorApiToken: string;
+  pageId: string;
+  type: string;
+  webhookUrl?: string;
+  webhookVerifyToken: string;
 }
 
 const expectGenericFailure = async (promise: Promise<unknown>): Promise<Error> => {

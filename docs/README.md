@@ -12,9 +12,12 @@
   compatibility boundary.
 - [Phase 3a Zalo OA inbound text](operations/zalo-oa-3a.md): official signed
   raw-JSON ingress, account isolation, and intentionally excluded Zalo surface.
-- [Phase 0–3a threat model](security/threat-model.md): assets, trust
+- [Phase 3b Facebook Page inbound text](operations/facebook-page-3b.md):
+  official GET verification, raw-byte HMAC ingress, Page isolation, and the
+  intentionally excluded Meta surface.
+- [Phase 0–3b threat model](security/threat-model.md): assets, trust
   boundaries, current controls, and planned work.
 - [Open-source readiness](maintainers/oss-readiness.md): an honest operating
   checklist for maintainers.
-- [Phase 3a checkpoint](maintainers/current-phase.md): verified milestones,
+- [Phase 3b checkpoint](maintainers/current-phase.md): verified milestones,
   code state, risks, and exact next verification.

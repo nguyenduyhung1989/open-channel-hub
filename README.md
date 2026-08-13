@@ -2,14 +2,15 @@
 
 > A self-hosted, official-first multichannel messaging hub.
 
-**Status: Phase 3a alpha.** The repository contains a durable PostgreSQL
+**Status: Phase 3b alpha.** The repository contains a durable PostgreSQL
 inbound-event ledger, account-scoped operator read APIs, secret-backed runtime
-configuration for several official accounts, and a narrow official Zalo
-Official Account (OA) signed inbound-text boundary. GitHub CI and CodeQL
-succeeded for the exact Phase 2c commit <code>8352b51</code>. The current
-Phase 3a source still needs its own final local and GitHub verification. Phase
+configuration for several official accounts, and narrow official Zalo Official
+Account (OA) and Facebook Page signed inbound-text boundaries. GitHub CI and
+CodeQL succeeded for exact Phase 3a commit <code>b930d29</code>. The current
+Phase 3b source still needs its own final local and GitHub verification. Phase
 1a remains incomplete until an owner-authorized Telegram test bot works through
-public TLS; Phase 3a similarly has no owner-authorized real Zalo OA proof.
+public TLS; Phase 3a and 3b likewise have no owner-authorized real provider
+proof.
 
 The official Telegram Bot HTTP transport is wired for a deliberately narrow
 text send/receive slice. Legacy mode uses <code>OPERATOR_API_TOKEN</code>;
@@ -46,12 +47,24 @@ bearer exposes only that OA's canonical events at
 storage, outbound Zalo message, attachment, Zalo User, live provider call, or
 automatic webhook registration.
 
-For Zalo OA only, the registry also stores a domain-separated SHA-256
+For Zalo OA and Facebook Page, the registry also stores a domain-separated SHA-256
 fingerprint of the configured <code>(appId, oaId)</code> pair. It is not the
 plain provider identity or a credential; it prevents an opaque Zalo connection
-ID with durable history from silently being reused for a different OA. Telegram
-does not yet have an equivalent non-secret provider-account identity in this
-configuration, so its registry binding remains connector/channel/tier only.
+ID with durable history from silently being reused for a different OA. Facebook
+Page uses the same mechanism for its configured <code>(appId, pageId)</code>
+pair. Telegram does not yet have an equivalent non-secret provider-account
+identity in this configuration, so its registry binding remains
+connector/channel/tier only.
+
+Phase 3b adds official Facebook Page inbound text only. Its fixed
+<code>GET</code>/<code>POST /v1/webhooks/facebook-page</code> endpoint handles
+Meta's verification challenge, maps every untrusted `entry[].id` Page in a
+batch to one configured App, verifies `X-Hub-Signature-256` over exact raw
+request bytes, then returns <code>200</code> only after canonical text is
+durable. A unique operator bearer exposes only that Page's canonical events at
+<code>GET /v1/facebook-page/inbound-events</code>. There is no Facebook User,
+OAuth, Page access-token storage, Graph API request, outbound Page message,
+attachment, live provider call, or automatic webhook registration.
 
 Multi-connection IDs are opaque safe route labels; <code>.</code> and
 <code>..</code> are rejected because webhook ingress places the ID in a dynamic
@@ -81,8 +94,8 @@ CAPTCHA bypass, fingerprint spoofing, session theft, or bulk-spam capabilities.
 - Data contracts, connector ports, and capability checks for the Telegram Bot
   slice.
 - A temporary legacy one-Bot environment mode and a mutually exclusive,
-  secret-backed multi-connection mode for official Telegram Bot and Zalo OA
-  accounts. The latter maps each unique operator token to exactly one
+  secret-backed multi-connection mode for official Telegram Bot, Zalo OA, and
+  Facebook Page accounts. The latter maps each unique operator token to exactly one
   configured account.
 - Dynamic multi-connection webhook ingress that resolves the account server
   side, uses a separate webhook secret, and gives unknown account IDs and wrong
@@ -95,6 +108,9 @@ CAPTCHA bypass, fingerprint spoofing, session theft, or bulk-spam capabilities.
   not database rows or raw provider payloads.
 - A narrow official Zalo OA receive-only boundary: a fixed signed raw-JSON
   webhook for text messages and a separate bearer-scoped canonical-event reader.
+- A narrow official Facebook Page receive-only boundary: a fixed GET/POST
+  signed raw-byte webhook for text messages and a separate bearer-scoped
+  canonical-event reader.
 - An isolated PostgreSQL database and schema, a non-superuser application role,
   immutable migration ledger, a runtime connection registry, and readiness that
   refuses traffic when the expected migration is unavailable.
@@ -114,9 +130,10 @@ The following remain plans or explicitly incomplete operational work:
 - A web dashboard, user accounts, role-based access control, multiple
   organizations, webhook administration, public connection management, or a
   connection listing API.
-- A real Telegram Bot/TLS verification, real Zalo OA/TLS verification, Zalo OA
-  OAuth/access tokens/outbound messages/attachments, Facebook Page, Facebook
-  User, Zalo User, and WhatsApp.
+- A real Telegram Bot/TLS verification, real Zalo OA/TLS verification, real
+  Facebook Page/TLS verification, Zalo OA OAuth/access tokens/outbound
+  messages/attachments, Facebook Page access-token handling/outbound messages,
+  Facebook User, Zalo User, and WhatsApp.
 
 See [ROADMAP.md](ROADMAP.md) for the criteria before each phase can be called
 complete.
@@ -173,8 +190,9 @@ Before the first start, copy <code>.env.example</code> to
 3. Either keep Telegram disabled, use the temporary legacy one-Bot variables,
    or configure the shared multi-connection secret document. Do not mix the
    legacy Telegram variables with the shared document. See the
-   [Phase 2c multi-connection guide](docs/operations/runtime-multi-connection-2c.md)
-   and [Phase 3a Zalo OA guide](docs/operations/zalo-oa-3a.md).
+   [Phase 2c multi-connection guide](docs/operations/runtime-multi-connection-2c.md),
+   [Phase 3a Zalo OA guide](docs/operations/zalo-oa-3a.md), and
+   [Phase 3b Facebook Page guide](docs/operations/facebook-page-3b.md).
 
 ```bash
 docker compose up --build
@@ -216,10 +234,11 @@ Do **not** casually run <code>docker compose down --volumes</code>. It deletes
 the named PostgreSQL volume and therefore every stored inbound event. Backups
 and restore drills are not implemented yet.
 
-Telegram and Zalo OA require public HTTPS webhooks. Put a TLS reverse proxy in
+Telegram, Zalo OA, and Facebook Page require public HTTPS webhooks. Put a TLS reverse proxy in
 front of Compose, keep the operator API on loopback, and follow the
 [Phase 2c multi-connection guide](docs/operations/runtime-multi-connection-2c.md),
 [Phase 3a Zalo OA guide](docs/operations/zalo-oa-3a.md), or
+[Phase 3b Facebook Page guide](docs/operations/facebook-page-3b.md), or
 [Phase 1a legacy guide](docs/operations/telegram-bot-1a.md) only after an
 authorized test is agreed. Starting Compose does not provide TLS or register a
 webhook automatically.
@@ -227,9 +246,10 @@ webhook automatically.
 ## Read canonical inbound events
 
 When a configured connector and PostgreSQL are enabled, a local operator can
-call <code>GET /v1/telegram-bot/inbound-events</code> for Telegram or
-<code>GET /v1/zalo-oa/inbound-events</code> for Zalo OA with the bearer token
-assigned to one configured account. Each route accepts an optional
+call <code>GET /v1/telegram-bot/inbound-events</code> for Telegram,
+<code>GET /v1/zalo-oa/inbound-events</code> for Zalo OA, or
+<code>GET /v1/facebook-page/inbound-events</code> for Facebook Page with the
+bearer token assigned to one configured account. Each route accepts an optional
 <code>limit</code> from 1 to 100 (default 50) and an optional opaque
 <code>cursor</code> returned by the preceding page. Neither accepts a connection
 ID: in legacy Telegram mode it reads the one configured Bot, and in the shared

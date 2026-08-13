@@ -1,0 +1,14 @@
+{
+  "name": "@open-channel-hub/connector-facebook-page",
+  "version": "0.1.0",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@open-channel-hub/connector-sdk": "file:../connector-sdk",
+    "@open-channel-hub/contracts": "file:../contracts"
+  }
+}

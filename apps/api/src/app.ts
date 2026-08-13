@@ -9,6 +9,10 @@ import {
   registerSourceOfferRoute,
   sourceOfferLinkHeader
 } from './source/source-offer.js';
+import type { FacebookPageFeature } from './facebook-page/facebook-page-feature.js';
+import { createFacebookPageFeatureCatalog } from './facebook-page/facebook-page-feature-catalog.js';
+import { registerFacebookPageInboundEventsRoute } from './facebook-page/facebook-page-inbound-events-route.js';
+import { registerFacebookPageWebhookRoute } from './facebook-page/facebook-page-webhook-route.js';
 import type { TelegramBotFeature } from './telegram-bot/telegram-bot-feature.js';
 import { createTelegramBotFeatureCatalog } from './telegram-bot/telegram-bot-feature-catalog.js';
 import { registerTelegramBotInboundEventsRoute } from './telegram-bot/telegram-bot-inbound-events-route.js';
@@ -22,6 +26,7 @@ import { registerZaloOaWebhookRoute } from './zalo-oa/zalo-oa-webhook-route.js';
 export interface BuildAppOptions {
   readonly readiness?: ReadinessCheck;
   readonly sourceOfferUrl?: string;
+  readonly facebookPages?: readonly FacebookPageFeature[];
   readonly telegramBot?: TelegramBotFeature;
   readonly telegramBots?: readonly TelegramBotFeature[];
   readonly zaloOas?: readonly ZaloOaFeature[];
@@ -109,6 +114,13 @@ export const buildApp = async (options: BuildAppOptions = {}): Promise<FastifyIn
 
     await registerZaloOaInboundEventsRoute(app, catalog);
     await registerZaloOaWebhookRoute(app, catalog);
+  }
+
+  if (options.facebookPages !== undefined) {
+    const catalog = createFacebookPageFeatureCatalog(options.facebookPages);
+
+    await registerFacebookPageInboundEventsRoute(app, catalog);
+    await registerFacebookPageWebhookRoute(app, catalog);
   }
 
   return app;

@@ -1,6 +1,8 @@
 import { buildApp } from './app.js';
 import { EnvironmentConfigurationError, parseEnvironment } from './config/environment.js';
 import { loadRuntimeConnections } from './connections/load-runtime-connections.js';
+import { createFacebookPageFeature } from './facebook-page/create-facebook-page-feature.js';
+import { toFacebookPageConnectionConfigurations } from './facebook-page/facebook-page-connection-configurations.js';
 import { createTelegramBotFeature } from './telegram-bot/create-telegram-bot-feature.js';
 import {
   loadTelegramBotConnectionConfigurations,
@@ -24,6 +26,7 @@ try {
   let telegramBot: Awaited<ReturnType<typeof createTelegramBotFeature>> | undefined;
   let telegramBots: readonly Awaited<ReturnType<typeof createTelegramBotFeature>>[] | undefined;
   let zaloOas: readonly Awaited<ReturnType<typeof createZaloOaFeature>>[] | undefined;
+  let facebookPages: readonly Awaited<ReturnType<typeof createFacebookPageFeature>>[] | undefined;
 
   if (environment.connectorRuntime.enabled) {
     const inboundEventReader = postgres?.inboundEventReader;
@@ -50,7 +53,11 @@ try {
       configuredConnections === undefined
         ? Object.freeze([])
         : toZaloOaConnectionConfigurations(configuredConnections);
-    const [telegramFeatures, zaloOaFeatures] = await Promise.all([
+    const facebookPageConnections =
+      configuredConnections === undefined
+        ? Object.freeze([])
+        : toFacebookPageConnectionConfigurations(configuredConnections);
+    const [telegramFeatures, zaloOaFeatures, facebookPageFeatures] = await Promise.all([
       Promise.all(
         telegramConnections.map(async (connection) =>
           createTelegramBotFeature(connection, {
@@ -70,12 +77,23 @@ try {
             }
           })
         )
+      ),
+      Promise.all(
+        facebookPageConnections.map(async (connection) =>
+          createFacebookPageFeature(connection, {
+            readInboundEvents: async (input) => inboundEventReader.list(input),
+            receiveEvents: async (events) => {
+              await inboundEventStore.append(events);
+            }
+          })
+        )
       )
     ]);
 
     await connectionRegistry.ensureRegistered([
       ...telegramFeatures.map((feature) => feature.registration),
-      ...zaloOaFeatures.map((feature) => feature.registration)
+      ...zaloOaFeatures.map((feature) => feature.registration),
+      ...facebookPageFeatures.map((feature) => feature.registration)
     ]);
 
     if (configuredConnections !== undefined) {
@@ -85,6 +103,10 @@ try {
 
       if (zaloOaFeatures.length > 0) {
         zaloOas = Object.freeze(zaloOaFeatures);
+      }
+
+      if (facebookPageFeatures.length > 0) {
+        facebookPages = Object.freeze(facebookPageFeatures);
       }
     } else {
       const feature = telegramFeatures[0];
@@ -107,7 +129,8 @@ try {
     sourceOfferUrl: environment.sourceOfferUrl,
     ...(telegramBot === undefined ? {} : { telegramBot }),
     ...(telegramBots === undefined ? {} : { telegramBots }),
-    ...(zaloOas === undefined ? {} : { zaloOas })
+    ...(zaloOas === undefined ? {} : { zaloOas }),
+    ...(facebookPages === undefined ? {} : { facebookPages })
   });
 
   if (postgres !== undefined) {

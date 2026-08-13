@@ -35,8 +35,9 @@ complete.** Historical local and GitHub evidence exists for candidate
 <code>7141949</code>. Phase 2a GitHub CI and CodeQL succeeded at
 <code>f106bb8</code>, and the exact Phase 2b commit <code>4d5a9c9</code> also
 has both checks green. The exact Phase 2c multi-connection commit
-<code>8352b51</code> also has both checks green. The current Phase 3a Zalo OA
-candidate needs its own verification. No real Telegram Bot token,
+<code>8352b51</code> and the exact Phase 3a Zalo OA commit
+<code>b930d29</code> also have both checks green. The current Phase 3b Facebook
+Page candidate needs its own verification. No real Telegram Bot token,
 authenticated Bot API request, or test-bot flow has occurred.
 
 ### 1a — HTTP boundary and local operation
@@ -145,9 +146,9 @@ independent review, and GitHub CI/CodeQL evidence are complete for exact commit
 
 ### 3a — official Zalo OA signed inbound text
 
-**Status: source implementation complete; final local candidate verification,
-synthetic Docker proof, independent review, and fresh GitHub CI/CodeQL remain
-required for its exact commit.**
+**Status: implementation, final local verification, synthetic Docker proof,
+independent review, and fresh GitHub CI/CodeQL are complete for exact commit
+<code>b930d29</code>. A real provider acceptance test remains separate.**
 
 - [x] An official receive-only Zalo OA connector package that exposes only
       `message.receive.text` and rejects every outbound command.
@@ -168,17 +169,47 @@ required for its exact commit.**
 - [x] No OAuth, access-token storage/refresh, provider HTTP client, outbound
       messages, attachments, Zalo User, automatic webhook registration, or live
       provider request.
-- [ ] Final local candidate checks, synthetic Compose verification, and
+- [x] Final local candidate checks, synthetic Compose verification, and
       independent review.
-- [ ] Fresh GitHub CI/CodeQL for the exact Phase 3a commit.
+- [x] Fresh GitHub CI/CodeQL for exact commit <code>b930d29</code>.
 - [ ] Owner-authorized public TLS and real signed Zalo OA webhook proof without
       exposing a secret, header, or customer message.
+
+### 3b — official Facebook Page signed inbound text
+
+**Status: source implementation is present; final local candidate verification,
+synthetic Docker proof, independent review, and fresh GitHub CI/CodeQL remain
+required for its exact commit.**
+
+- [x] An official receive-only Facebook Page connector package that exposes only
+      `message.receive.text` and rejects every outbound command.
+- [x] A fixed `GET`/`POST /v1/webhooks/facebook-page` boundary that handles
+      Meta verification, resolves all batch Page IDs internally, verifies
+      `X-Hub-Signature-256` over exact raw request bytes, and makes canonical
+      customer text durable before acknowledging it.
+- [x] A strict runtime-document entry for `facebook_page`, with opaque
+      connection ID, `appId`, `pageId`, App secret, verify token, unique operator
+      bearer, and optional fixed public webhook URL. It permits several Pages on
+      one App only with matching App credentials.
+- [x] A bearer-scoped `GET /v1/facebook-page/inbound-events` route with
+      canonical-only fields, bounded pagination, and Page-bound opaque cursors.
+- [x] A forward-only registry migration that binds each Facebook Page connection
+      ID to a non-secret SHA-256 fingerprint of its configured `(appId, pageId)`
+      pair, preventing silent rebinding after durable history exists.
+- [x] No Facebook User, OAuth, Page access-token storage, Graph API client,
+      outbound message, attachment, automatic subscription, or live provider
+      request.
+- [ ] Final local candidate checks, synthetic Compose verification, and
+      independent review.
+- [ ] Fresh GitHub CI/CodeQL for the exact Phase 3b commit.
+- [ ] Owner-authorized public TLS and real signed Facebook Page webhook proof
+      without exposing a secret, header, or customer message.
 
 ### Later Phase 3 work
 
 - A dashboard, accounts/organizations, and tested authorization.
-- Evaluation of Facebook Page and WhatsApp against current official
-  documentation and policy at implementation time.
+- Evaluation of WhatsApp against current official documentation and policy at
+  implementation time.
 - A capability matrix, health state, and separate contract tests for each
   connector.
 

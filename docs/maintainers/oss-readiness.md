@@ -25,10 +25,15 @@ organization has accepted the project.
   account selection, dynamic webhook ingress, and a durable connection registry.
   Its final local verification, synthetic Compose proof, GitHub CI, and CodeQL
   succeeded for exact commit <code>8352b51</code>.
-- The current Phase 3a source adds a deliberately receive-only official Zalo OA
-  boundary: a fixed raw-JSON signed webhook and bearer-scoped canonical-event
-  reader. Its final local verification, synthetic Compose proof, independent
-  review, and GitHub checks remain required for the exact candidate commit.
+- Phase 3a added a deliberately receive-only official Zalo OA boundary: a fixed
+  raw-JSON signed webhook and bearer-scoped canonical-event reader. Its final
+  local verification, synthetic Compose proof, independent review, GitHub CI,
+  and CodeQL succeeded for exact commit <code>b930d29</code>.
+- The current Phase 3b source adds a deliberately receive-only official Facebook
+  Page boundary: a fixed GET verification/raw-byte HMAC webhook and
+  bearer-scoped canonical-event reader. Its final local verification, synthetic
+  Compose proof, independent review, and GitHub checks remain required for the
+  exact candidate commit.
 
 ## Verified GitHub evidence
 
@@ -39,6 +44,8 @@ organization has accepted the project.
   <code>7141949</code>, the Phase 2a candidate at <code>f106bb8</code>, and
   the Phase 2b candidate at <code>4d5a9c9</code>, and the Phase 2c candidate
   at <code>8352b51</code>.
+- GitHub CI and CodeQL succeeded for the Phase 3a Zalo OA candidate at
+  <code>b930d29</code>.
 - GitHub Private Vulnerability Reporting, secret scanning, Dependabot alerts,
   and automatic security fixes are enabled.
 - The <code>main</code> branch blocks force pushes and deletion, including by
@@ -59,8 +66,9 @@ organization has accepted the project.
 - Treat the runtime multi-connection document as a secret. Never commit it,
   publish it through a ticket/log/screenshot, store it in PostgreSQL, or mix it
   with legacy Telegram Bot credentials in one process. It can contain Telegram
-  Bot and Zalo OA credentials, but Phase 3a does not store or transmit Zalo's
-  provider access token.
+  Bot, Zalo OA, and Facebook Page credentials, but Phase 3a does not store or
+  transmit Zalo's provider access token, and Phase 3b does not store a Facebook
+  Page access token or make a Graph API request.
 - Treat canonical message text and identifiers as sensitive data. Build and
   test backup/restore, retention/deletion, secret rotation, access controls,
   and operational observability before operating real customer data.

@@ -153,6 +153,24 @@ ALTER TABLE ${POSTGRES_SCHEMA}.connection_registry
   ADD CONSTRAINT connection_registry_zalo_oa_provider_identity_required CHECK (
     channel <> 'zalo_oa' OR provider_identity_fingerprint IS NOT NULL
   )
+  `
+]);
+
+/**
+ * Facebook Page registrations bind an opaque connection id to a non-secret
+ * fingerprint of the Meta App/Page pair. This is a separate immutable
+ * migration because migration 0005 has already been applied by Phase 3a
+ * installations and its checksum must never change.
+ */
+const CONNECTION_REGISTRY_FACEBOOK_PAGE_PROVIDER_IDENTITY_ID =
+  '0006_connection_registry_facebook_page_provider_identity';
+
+const CONNECTION_REGISTRY_FACEBOOK_PAGE_PROVIDER_IDENTITY_STATEMENTS = Object.freeze([
+  `
+ALTER TABLE ${POSTGRES_SCHEMA}.connection_registry
+  ADD CONSTRAINT connection_registry_facebook_page_provider_identity_required CHECK (
+    channel <> 'facebook_page' OR provider_identity_fingerprint IS NOT NULL
+  )
 `
 ]);
 
@@ -190,6 +208,14 @@ const MIGRATIONS = Object.freeze([
       CONNECTION_REGISTRY_PROVIDER_IDENTITY_STATEMENTS
     ),
     statements: CONNECTION_REGISTRY_PROVIDER_IDENTITY_STATEMENTS
+  }),
+  Object.freeze({
+    id: CONNECTION_REGISTRY_FACEBOOK_PAGE_PROVIDER_IDENTITY_ID,
+    checksum: checksumFor(
+      CONNECTION_REGISTRY_FACEBOOK_PAGE_PROVIDER_IDENTITY_ID,
+      CONNECTION_REGISTRY_FACEBOOK_PAGE_PROVIDER_IDENTITY_STATEMENTS
+    ),
+    statements: CONNECTION_REGISTRY_FACEBOOK_PAGE_PROVIDER_IDENTITY_STATEMENTS
   })
 ]);
 

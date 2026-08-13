@@ -138,7 +138,7 @@ const isConnectionRegistration = (value: unknown): value is ConnectionRegistrati
   isConnectorTier(value.tier) &&
   (value.providerIdentityFingerprint === undefined ||
     isProviderIdentityFingerprint(value.providerIdentityFingerprint)) &&
-  (value.channel !== 'zalo_oa' ||
+  (!requiresProviderIdentityFingerprint(value.channel) ||
     (value.providerIdentityFingerprint !== undefined &&
       isProviderIdentityFingerprint(value.providerIdentityFingerprint)));
 
@@ -153,6 +153,9 @@ const isChannel = (value: unknown): value is Channel =>
 
 const isConnectorTier = (value: unknown): value is ConnectorTier =>
   typeof value === 'string' && (CONNECTOR_TIERS as readonly string[]).includes(value);
+
+const requiresProviderIdentityFingerprint = (channel: Channel): boolean =>
+  channel === 'zalo_oa' || channel === 'facebook_page';
 
 const isProviderIdentityFingerprint = (value: unknown): value is string =>
   typeof value === 'string' && PROVIDER_IDENTITY_FINGERPRINT_PATTERN.test(value);
