@@ -308,9 +308,9 @@ independent review, and GitHub CI/CodeQL evidence are complete for exact commit
 
 ### 4c — durable source-bound reply-command ledger
 
-**Status: implementation candidate. Final local verification, synthetic Compose
-proof, independent security review, and fresh GitHub CI/CodeQL evidence are
-still required before this source can be called verified.**
+**Status: implementation, final local verification, synthetic Compose proof,
+independent security review, and GitHub CI/CodeQL evidence are complete for
+the combined Phase 4c–4d revision at exact commit <code>160414e</code>.**
 
 - [x] `POST /v1/inbox/outbound-commands` resolves an existing configured inbox
       bearer before body parsing. It accepts only `clientOperationId`,
@@ -333,15 +333,16 @@ still required before this source can be called verified.**
       retry, attempt, delivery/read receipt, state transition, or dashboard
       send form is part of this phase. <code>queued</code> records intent only;
       it is not a sent or delivered claim.
-- [ ] Freeze this candidate, run its full local checks and synthetic Compose
-      proof, complete independent security review, then record fresh exact
-      GitHub CI/CodeQL evidence.
+- [x] Exact commit <code>160414e</code> passed formatting, lint, strict type
+      checking, 53 test files / 349 tests, build, low-threshold dependency
+      audit, secret scan, synthetic Compose proof, independent security review,
+      and fresh GitHub CI/CodeQL.
 
 ### 4d — scoped queued reply-command history
 
-**Status: implementation candidate. Final local verification, synthetic Compose
-proof, independent security review, and fresh GitHub CI/CodeQL evidence are
-still required before this source can be called verified.**
+**Status: implementation, final local verification, synthetic Compose proof,
+independent security review, and GitHub CI/CodeQL evidence are complete for
+the combined Phase 4c–4d revision at exact commit <code>160414e</code>.**
 
 - [x] `GET /v1/inbox/outbound-commands` resolves a configured inbox bearer
       before it validates query input or decodes a cursor. It accepts only an
@@ -363,9 +364,10 @@ still required before this source can be called verified.**
 - [x] No dashboard history UI, worker, dispatch, provider HTTP call, token/OAuth
       storage, retry, attempt, timeout policy, receipt, delivery/read state, or
       command mutation is part of this phase.
-- [ ] Freeze this candidate, run its full local checks and synthetic Compose
-      proof, complete independent security review, then record fresh exact
-      GitHub CI/CodeQL evidence.
+- [x] Exact commit <code>160414e</code> passed formatting, lint, strict type
+      checking, 53 test files / 349 tests, build, low-threshold dependency
+      audit, secret scan, synthetic Compose proof, independent security review,
+      and fresh GitHub CI/CodeQL.
 
 ### Later Phase 4 work
 

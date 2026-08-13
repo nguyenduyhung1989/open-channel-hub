@@ -51,21 +51,17 @@ organization has accepted the project.
   <code>7672be9</code>. The local smoke intentionally remains dashboard-free
   because it is HTTP on loopback and cannot prove the required external HTTPS
   browser boundary.
-- Phase 4c adds an implementation candidate for an immutable source-bound
-  reply-command ledger. A configured inbox bearer can record an intent against
-  an already durable in-scope event; PostgreSQL derives the private reply target
-  from canonical source data. The candidate has no provider dispatch, retry,
-  receipt, OAuth/token storage, or dashboard send form. Do not claim final
-  local verification, synthetic Compose proof, independent review, or GitHub
-  evidence until the exact frozen revision has completed them.
-- Phase 4d adds an implementation candidate for a read-only history of those
-  `queued` intents. The same inbox bearer can read only its fixed scope through
-  a separate version-1 cursor; the projection returns recorded text with safe
+- Phase 4c adds an immutable source-bound reply-command ledger. A configured
+  inbox bearer can record an intent against an already durable in-scope event;
+  PostgreSQL derives the private reply target from canonical source data. Phase
+  4d adds a read-only history of those `queued` intents through a separate
+  version-1 cursor; its projection returns recorded text with safe
   command/source metadata but omits private target/source metadata and client
-  operation IDs. It adds no migration, provider request, dispatch, retry,
-  delivery state, or dashboard history UI. Do not claim final local
-  verification, synthetic Compose proof, independent review, or GitHub evidence
-  until the exact frozen Phase 4c–4d revision has completed them.
+  operation IDs. Neither adds a migration beyond `0009`, provider request,
+  dispatch, retry, receipt, OAuth/token storage, delivery state, or dashboard
+  send/history UI. Exact commit <code>160414e</code> passed final local
+  verification, synthetic Compose proof, independent security review, GitHub
+  CI, and CodeQL.
 
 ## Verified GitHub evidence
 
@@ -84,6 +80,8 @@ organization has accepted the project.
   at <code>fd802cb</code>.
 - GitHub CI and CodeQL succeeded for the Phase 4a configured inbox candidate
   at <code>705db0a</code>.
+- GitHub CI and CodeQL succeeded for the combined Phase 4c–4d reply-command
+  candidate at <code>160414e</code>.
 - GitHub Private Vulnerability Reporting, secret scanning, Dependabot alerts,
   and automatic security fixes are enabled.
 - The <code>main</code> branch blocks force pushes and deletion, including by

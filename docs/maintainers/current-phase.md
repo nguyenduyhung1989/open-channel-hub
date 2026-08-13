@@ -1,4 +1,4 @@
-# Public checkpoint: Phase 4a–4b verified; Phase 4c–4d candidates
+# Public checkpoint: Phase 4a–4d verified source
 
 **Verified scope:** Phase 4a is a configured, read-only aggregate feed across
 an explicit set of existing official connections. It builds on the Telegram
@@ -11,13 +11,13 @@ browser service or a full user login, organization/RBAC model,
 conversation/thread model, search service, attachment store, outbound queue,
 provider credential manager, real provider test, or production deployment.
 
-**Current candidate scope:** Phase 4c adds a durable, source-bound reply-command
+**Verified source scope:** Phase 4c adds a durable, source-bound reply-command
 ledger behind an existing configured inbox bearer. Phase 4d adds a scoped,
-read-only history over those same immutable `queued` intents. Neither candidate
-dispatches a provider message, retries, tracks an attempt/receipt, or adds a
-dashboard reply or history surface. Final local verification, synthetic Compose
-proof, independent security review, and fresh GitHub CI/CodeQL evidence remain
-pending for the frozen Phase 4c–4d candidate.
+read-only history over those same immutable `queued` intents. Neither dispatches
+a provider message, retries, tracks an attempt/receipt, or adds a dashboard
+reply or history surface. Exact commit <code>160414e</code> passed final local
+verification, a synthetic Compose proof, independent security review, and
+GitHub CI/CodeQL.
 
 ## Exact verified history
 
@@ -39,8 +39,13 @@ pending for the frozen Phase 4c–4d candidate.
 - Phase 4b's operator dashboard source passed final local checks, independent
   security review, a synthetic Compose proof, and fresh GitHub CI/CodeQL for
   exact commit <code>7672be9</code>.
+- Phase 4c's source-bound reply-command ledger and Phase 4d's scoped queued
+  history passed final local checks, independent security review, a synthetic
+  Compose proof, and fresh GitHub CI/CodeQL for exact commit
+  <code>160414e</code>.
 - Historical evidence proves only those exact revisions. It does not verify any
-  live provider account or the current Phase 4c–4d candidate.
+  live provider account, provider send, public TLS endpoint, or production
+  deployment.
 
 ## Verified Phase 4a source
 
@@ -131,9 +136,9 @@ medium-severity issue, and GitHub CI plus CodeQL both succeeded for that exact
 commit. An external TLS proxy, edge rate limit, cookie/header log policy, and
 real public origin remain separate operational proof.
 
-## Current Phase 4c–4d candidates
+## Verified Phase 4c–4d source
 
-The candidate adds one narrow write capability to a configured inbox bearer:
+The verified source adds one narrow write capability to a configured inbox bearer:
 
 - `POST /v1/inbox/outbound-commands` resolves that bearer before Fastify parses
   the request body. The body is strict and accepts only `clientOperationId`,
@@ -178,8 +183,11 @@ The candidate adds one narrow write capability to a configured inbox bearer:
   provider token/OAuth storage, or browser send UI. The route is a read-only
   view of durable intent, not a delivery engine.
 
-The candidates must not be described as locally verified until their exact
-frozen revision completes the relevant checks and independent review.
+Exact commit <code>160414e</code> passed formatting, lint, strict type
+checking, 53 test files / 349 tests, build, low-threshold dependency audit,
+secret scan, the synthetic Compose proof, independent security review, and
+GitHub CI/CodeQL. This is source verification only; it is not a provider-send,
+public-TLS, or production claim.
 
 ## Explicitly not proven or not implemented
 
@@ -206,10 +214,8 @@ frozen revision completes the relevant checks and independent review.
 
 ## Next authorized work
 
-Freeze and verify Phase 4c–4d before claiming either candidate: run the frozen
-candidate's full local checks, synthetic Compose proof, independent security
-review, and fresh GitHub CI/CodeQL. Keep all live provider use separate: require explicit owner
-authorization before connecting a real account or exposing public TLS. Any later
-full user/organization authorization, conversation model, dispatch engine, or
+Keep all live provider use separate: require explicit owner authorization before
+connecting a real account or exposing public TLS. Any later full
+user/organization authorization, conversation model, dispatch engine, or
 dashboard deployment must start with its own bounded design, migration/security
 review, and verification criteria.

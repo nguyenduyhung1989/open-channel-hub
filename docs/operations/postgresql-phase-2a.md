@@ -164,15 +164,17 @@ commit <code>7672be9</code> adds the eighth migration for HMAC-only dashboard
 sessions; it passed the same local verification, independent review, synthetic
 Compose proof, and GitHub CI/CodeQL. The smoke remains dashboard-free because
 it is loopback HTTP, not proof of browser cookies over external HTTPS. Phase
-4c's candidate extends the synthetic proof to a source-bound reply command:
+4c's verified <code>160414e</code> revision extends the synthetic proof to a
+source-bound reply command:
 one `201` create and one `200` exact replay produce one immutable row; a
 different payload under the same operation ID returns `409`; absent and
 out-of-scope sources share `404`; SQL proves that the stored reply target is
 the source conversation. The proof makes no provider request and treats
 `queued` as an unsent intent.
-Phase 4d's candidate extends the same smoke source with queued-history scope,
-safe-projection, continuation, and foreign/malformed-cursor assertions. It
-still makes no provider request and does not turn a queued row into a send.
+Phase 4d's verified <code>160414e</code> revision extends the same smoke source
+with queued-history scope, safe-projection, continuation, and
+foreign/malformed-cursor assertions. It still makes no provider request and
+does not turn a queued row into a send.
 
 ## Container and network boundary
 

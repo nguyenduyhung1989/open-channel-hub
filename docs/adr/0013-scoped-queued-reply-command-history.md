@@ -4,9 +4,10 @@
 
 **Status:** accepted
 
-This ADR records the Phase 4d design decision. The implementation remains a
-verification candidate until its frozen revision completes the required local,
-synthetic Compose, independent-review, and GitHub evidence.
+This ADR records the Phase 4d design decision. Its combined Phase 4c–4d
+revision at exact commit <code>160414e</code> passed final local checks, a
+synthetic Compose proof, independent review, and GitHub CI/CodeQL. That
+evidence does not prove a live provider send, public TLS, or production flow.
 
 ## Context
 

@@ -14,7 +14,10 @@ independent review, a synthetic Docker proof, and GitHub CI/CodeQL for exact
 commit <code>705db0a</code>. Phase 4b passed the same local verification,
 independent review, synthetic Docker proof, and GitHub CI/CodeQL for exact
 commit <code>7672be9</code>. It still does not prove a TLS proxy or production
-browser deployment. Phase 1a remains
+browser deployment. Phases 4c–4d passed the same local verification,
+independent review, synthetic Docker proof, and GitHub CI/CodeQL for exact
+commit <code>160414e</code>; they still record and list intent only, never send
+a provider message. Phase 1a remains
 incomplete until an owner-authorized Telegram test bot works through public
 TLS; Phases 3a, 3b, and 3c likewise have no owner-authorized real provider
 proof.

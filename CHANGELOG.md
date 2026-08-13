@@ -161,7 +161,9 @@ follows [Semantic Versioning](https://semver.org/).
   independent review, synthetic Compose proof, and GitHub CI/CodeQL at exact
   commit <code>fd802cb</code>; Phase 4a completed the same evidence at exact
   commit <code>705db0a</code>; Phase 4b completed the same evidence at exact
-  commit <code>7672be9</code>.
+  commit <code>7672be9</code>; and the combined Phase 4c–4d reply-intent and
+  history revision completed the same evidence at exact commit
+  <code>160414e</code>.
 - An accepted inbound Telegram text event now becomes durable when the
   PostgreSQL configuration is present; a local operator can now list canonical
   inbound events, but this still does not add an inbox, live Telegram proof,

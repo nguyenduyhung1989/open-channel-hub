@@ -5,10 +5,10 @@ Phase 4c. It does **not** send, retry, update, deliver, or mark a message read.
 Every returned `queued` record means only that an immutable intent was already
 committed to PostgreSQL.
 
-This documentation describes an implementation candidate. It is not final
-verification evidence until the frozen Phase 4c–4d revision completes the
-required local checks, synthetic Compose proof, independent review, and GitHub
-checks.
+Exact commit <code>160414e</code> passed final local checks, a synthetic
+Compose proof, independent review, and GitHub CI/CodeQL for the combined Phase
+4c–4d revision. This is not evidence of a live provider send, public TLS, or
+production operation.
 
 The history route is API-only. The Phase 4b dashboard remains read-only and
 does not show or create reply commands.
