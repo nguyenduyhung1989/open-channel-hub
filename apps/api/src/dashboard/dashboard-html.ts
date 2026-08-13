@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import type { CanonicalEvent } from '@open-channel-hub/contracts';
 import type { OutboundReplyCommandHistoryEntry } from '@open-channel-hub/domain';
 
@@ -12,6 +14,7 @@ export interface DashboardPageInput {
   readonly inboxes: readonly Readonly<{ id: string }>[];
   readonly nextCursor?: string;
   readonly principalId: string;
+  readonly replyIntentEnabled: boolean;
   readonly selectedInboxId: string;
 }
 
@@ -71,7 +74,9 @@ export const renderDashboardPage = (input: DashboardPageInput): string => {
   const eventRows =
     input.events.length === 0
       ? '<p class="empty-state">Chưa có tín hiệu nào trong phạm vi này.</p>'
-      : `<ol class="event-list">${input.events.map(renderEvent).join('')}</ol>`;
+      : `<ol class="event-list">${input.events
+          .map((event) => renderEvent(event, input))
+          .join('')}</ol>`;
   const nextPage =
     input.nextCursor === undefined
       ? ''
@@ -84,7 +89,7 @@ export const renderDashboardPage = (input: DashboardPageInput): string => {
       <main class="dashboard-shell" aria-labelledby="dashboard-title">
         <header class="dashboard-header">
           <div>
-            <p class="eyebrow">OPEN CHANNEL HUB / READ ONLY</p>
+            <p class="eyebrow">OPEN CHANNEL HUB / BẢNG ĐIỀU HÀNH</p>
             <h1 id="dashboard-title">Bảng tín hiệu</h1>
           </div>
           <form action="/operator/logout" method="post">
@@ -176,7 +181,7 @@ export const renderDashboardOutboundCommandHistoryPage = (
   });
 };
 
-const renderEvent = (event: CanonicalEvent): string => `
+const renderEvent = (event: CanonicalEvent, input: DashboardPageInput): string => `
   <li class="event-card">
     <div class="event-meta">
       <span>${escapeHtml(event.channel)}</span>
@@ -185,10 +190,28 @@ const renderEvent = (event: CanonicalEvent): string => `
     <p class="event-message">${escapeHtml(event.message.text)}</p>
     <dl>
       <div><dt>Kết nối</dt><dd>${escapeHtml(event.connectionId)}</dd></div>
-      <div><dt>Hội thoại</dt><dd>${escapeHtml(event.message.conversationId)}</dd></div>
-      <div><dt>Người gửi</dt><dd>${escapeHtml(event.message.senderId)}</dd></div>
     </dl>
+    ${input.replyIntentEnabled ? renderReplyIntentForm(event, input) : ''}
   </li>`;
+
+/**
+ * Associates one native form with one persisted inbound event. The only
+ * editable value is reply text; source identity and the UUID idempotency key
+ * are freshly generated server-side and encoded as escaped hidden inputs.
+ */
+const renderReplyIntentForm = (event: CanonicalEvent, input: DashboardPageInput): string => `
+  <form action="/operator/reply-intents" method="post" class="reply-intent-form">
+    <input type="hidden" name="csrf" value="${escapeAttribute(input.csrfToken)}">
+    <input type="hidden" name="inbox" value="${escapeAttribute(input.selectedInboxId)}">
+    <input type="hidden" name="sourceConnectionId" value="${escapeAttribute(event.connectionId)}">
+    <input type="hidden" name="sourceProviderEventId" value="${escapeAttribute(event.providerEventId)}">
+    <input type="hidden" name="clientOperationId" value="${escapeAttribute(randomUUID())}">
+    <label>
+      <span>Nội dung trả lời</span>
+      <textarea maxlength="2000" name="text" required rows="4"></textarea>
+    </label>
+    <button type="submit">Ghi ý định trả lời</button>
+  </form>`;
 
 const renderOutboundCommand = (command: OutboundReplyCommandHistoryEntry): string => `
   <li class="command-card">

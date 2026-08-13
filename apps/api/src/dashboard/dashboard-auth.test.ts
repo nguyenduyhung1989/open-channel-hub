@@ -15,7 +15,8 @@ describe('dashboard authentication helpers', () => {
     const principal: DashboardPrincipal = {
       id: 'support-agent',
       inboxIds: ['support-inbox'],
-      passwordHash
+      passwordHash,
+      replyIntentInboxIds: []
     };
 
     await expect(verifyDashboardPassword(principal, 'synthetic dashboard password')).resolves.toBe(

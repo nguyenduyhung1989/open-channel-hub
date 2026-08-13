@@ -2,12 +2,13 @@
 
 > A self-hosted, official-first multichannel messaging hub.
 
-**Status: Phase 4e alpha source verified.** The repository contains a durable
+**Status: Phase 4f alpha candidate.** The repository contains a durable
 PostgreSQL inbound-event ledger, account-scoped operator read APIs, a
 configured multi-connection inbox API, an optional server-rendered read-only
 operator dashboard, a durable source-bound reply-command ledger, a scoped
-queued-command history API, a candidate server-rendered queued-command history
-page, secret-backed runtime configuration for official accounts, and narrow
+queued-command history API, a verified server-rendered queued-command history
+page, a candidate opt-in server-rendered reply-intent form, secret-backed
+runtime configuration for official accounts, and narrow
 official Zalo Official Account (OA), Facebook Page, and WhatsApp Business
 signed inbound-text boundaries. Phase 4a passed final local checks,
 independent review, a synthetic Docker proof, and GitHub CI/CodeQL for exact
@@ -160,6 +161,20 @@ secret scan, diff check, a synthetic Compose proof, independent security
 review, and GitHub CI/CodeQL. This is source verification only, not a
 public-TLS or production deployment claim.
 
+Phase 4f is a candidate opt-in extension of the existing dashboard. A
+configured principal stays read-only unless its optional
+<code>replyIntentInboxIds</code> field explicitly grants one of its already
+readable inboxes. For a granted inbox, the server renders one native form per
+persisted inbound event at <code>/operator</code>; the only editable value is
+reply text. The server creates the client operation ID, revalidates the signed
+session, exact HTTPS origin, anti-forgery token, write scope, and source event,
+then records only the existing source-bound <code>queued</code> intent. Success
+redirects to queued history without a command-result URL signal; the queued
+history itself is the only browser evidence of a durable record. It does not
+expose an inbox bearer or provider credential, accept a recipient, send, retry,
+dispatch, or claim delivery. This candidate has no final verification,
+public-TLS, live-provider, or production claim.
+
 Multi-connection IDs are opaque safe route labels; <code>.</code> and
 <code>..</code> are rejected because webhook ingress places the ID in a dynamic
 path. This restriction does not rewrite a historical legacy one-Bot environment
@@ -199,8 +214,9 @@ CAPTCHA bypass, fingerprint spoofing, session theft, or bulk-spam capabilities.
 - An optional server-rendered, no-JavaScript, read-only operator dashboard.
   It uses local configured password principals and browser session cookies;
   it never exposes an inbox bearer or provider credential to the browser. The
-  Phase 4e adds a principal-scoped queued-command history page, not
-  an outbound action.
+  verified Phase 4e source adds a principal-scoped queued-command history page.
+  The Phase 4f candidate adds a source-bound intent form only for an explicit
+  per-principal, per-inbox write allow-list; it is not a send action.
 - Dynamic multi-connection webhook ingress that resolves the account server
   side, uses a separate webhook secret, and gives unknown account IDs and wrong
   secrets the same <code>401</code> response.
@@ -237,8 +253,9 @@ The following remain plans or explicitly incomplete operational work:
   to provide those capabilities.
 - Redis, a dispatch queue/worker, provider delivery, retries, attempts,
   delivery/read status, and a provider-specific outbox policy. Phase 4c–4d
-  store and list immutable reply intent only; Phase 4e only
-  renders that history through the dashboard.
+  store and list immutable reply intent only; Phase 4e renders that history
+  through the dashboard and the Phase 4f candidate can record it through a
+  narrower dashboard form.
 - User accounts, role-based access control, multiple
   organizations, webhook administration, public connection management, or a
   connection listing API.
@@ -310,6 +327,7 @@ Before the first start, copy <code>.env.example</code> to
    and [Phase 4a unified inbox guide](docs/operations/unified-inbox-4a.md).
    Do not add `dashboard` for this loopback HTTP runner; see the
    [Phase 4b operator dashboard guide](docs/operations/operator-dashboard-4b.md)
+   and the [Phase 4f dashboard reply-intent guide](docs/operations/operator-dashboard-reply-intents-4f.md)
    only when an external HTTPS proxy is in scope.
 
 ```bash
@@ -361,6 +379,7 @@ front of Compose, keep the operator API on loopback, and follow the
 [Phase 4a unified inbox guide](docs/operations/unified-inbox-4a.md), or
 [Phase 4d queued command-history guide](docs/operations/outbound-command-history-4d.md), or
 [Phase 4e dashboard queued-command history guide](docs/operations/operator-dashboard-queued-history-4e.md), or
+[Phase 4f dashboard reply-intent guide](docs/operations/operator-dashboard-reply-intents-4f.md), or
 [Phase 4b operator dashboard guide](docs/operations/operator-dashboard-4b.md), or
 [Phase 1a legacy guide](docs/operations/telegram-bot-1a.md) only after an
 authorized test is agreed. Starting Compose does not provide TLS or register a
@@ -429,7 +448,15 @@ or more configured principals scoped to existing inboxes. Password values are
 stored only as exact-profile Argon2id PHC hashes.
 
 Its read-only HTML pages are `/operator/login` and `/operator`; Phase 4e also
-adds `/operator/outbound-commands` for queued command history.
+adds `/operator/outbound-commands` for queued command history. The Phase 4f
+candidate adds an optional `replyIntentInboxIds` subset to each configured
+principal. When it explicitly includes the selected readable inbox,
+`/operator` renders one native source-bound intent form per persisted inbound
+event. The browser may edit reply text only; the server supplies the source
+reference and client operation ID, then rechecks the signed session, exact
+origin, anti-forgery token, configured write scope, and durable source.
+The whole form is capped at 32 KiB and its editable text remains limited to
+2,000 characters; an oversized request reaches no recorder.
 The CSS is same-origin at `/operator/assets/dashboard.css`. Login and logout
 require the configured browser origin and anti-forgery tokens. Sessions expire
 after 30 minutes idle or eight hours absolute. The supplied Compose smoke
@@ -439,9 +466,13 @@ prove the required HTTPS cookie behavior.
 Read [the Phase 4b operator dashboard guide](docs/operations/operator-dashboard-4b.md)
 before configuring a proxy, password hash, or session-key rotation. It records
 the current limits: no self-service accounts, role model, audit trail,
-production TLS proof, cross-instance rate-limit proof, or outbound action. The
+production TLS proof, cross-instance rate-limit proof, or provider delivery.
+The
 [Phase 4e dashboard queued-command history guide](docs/operations/operator-dashboard-queued-history-4e.md)
-records the verified source's separate no-send/history boundary.
+records the verified source's separate no-send/history boundary. The
+[Phase 4f dashboard reply-intent guide](docs/operations/operator-dashboard-reply-intents-4f.md)
+records the candidate's explicit opt-in write scope, per-principal local rate
+guard, and no-send boundary.
 
 ## Corresponding-source offer
 

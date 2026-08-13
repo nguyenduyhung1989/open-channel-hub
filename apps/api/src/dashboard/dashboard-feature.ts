@@ -1,4 +1,5 @@
 import type {
+  CreateOutboundReplyCommandResult,
   DashboardSessionStore,
   InboundEventPage,
   InboundEventPageCursor,
@@ -11,6 +12,8 @@ export interface DashboardPrincipal {
   readonly id: string;
   readonly inboxIds: readonly string[];
   readonly passwordHash: string;
+  /** The configured subset allowed to record source-bound reply intent. */
+  readonly replyIntentInboxIds: readonly string[];
 }
 
 /**
@@ -24,6 +27,26 @@ export interface DashboardInbox {
   readonly readOutboundReplyCommandHistory: (
     input: DashboardOutboundCommandHistoryReadInput
   ) => Promise<OutboundReplyCommandHistoryPage>;
+}
+
+/** The exact source-bound fields a dashboard form may record. */
+export interface DashboardReplyIntentInput {
+  readonly clientOperationId: string;
+  readonly sourceConnectionId: string;
+  readonly sourceProviderEventId: string;
+  readonly text: string;
+}
+
+/**
+ * A server-only write capability bound to one configured inbox. It intentionally
+ * omits bearer credentials, provider clients, delivery actions, and generic
+ * storage access.
+ */
+export interface DashboardReplyIntentInbox {
+  readonly id: string;
+  readonly recordReplyIntent: (
+    input: DashboardReplyIntentInput
+  ) => Promise<CreateOutboundReplyCommandResult>;
 }
 
 /** A dashboard page request whose effective connection scope is immutable. */
@@ -49,6 +72,10 @@ export interface DashboardFeature {
   readonly sessionIdPepper: string;
   readonly sessionStore: DashboardSessionStore;
   findInbox: (principalId: string, inboxId: string) => DashboardInbox | undefined;
+  findReplyIntentInbox: (
+    principalId: string,
+    inboxId: string
+  ) => DashboardReplyIntentInbox | undefined;
   findPrincipal: (principalId: string) => DashboardPrincipal | undefined;
   listInboxes: (principalId: string) => readonly DashboardInbox[];
 }

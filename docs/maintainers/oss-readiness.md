@@ -80,6 +80,36 @@ organization has accepted the project.
   CI/CodeQL. It is a verified source feature, not public-TLS proof, a
   production deployment, or evidence of provider dispatch.
 
+## Phase 4f candidate, not yet verified
+
+- The candidate adds an optional strict
+  `dashboard.principals[].replyIntentInboxIds` array. Each value must be an
+  already readable configured inbox for that principal; omission becomes an
+  empty immutable set, so existing dashboard principals remain read-only.
+- An enabled dashboard event card renders a same-origin native form with reply
+  text as its only editable value. The server supplies escaped source reference
+  and UUIDv4 operation inputs, then requires a signed session, exact HTTPS
+  origin, anti-forgery value, explicit principal/inbox write grant, and the
+  existing Phase 4c durable source-scope check before it can record `queued`.
+- The URL-encoded form parser rejects a whole body above 32 KiB before strict
+  validation or the recorder; the reply text remains separately limited to
+  2,000 characters.
+- A new record or exact idempotent replay uses `303` post/redirect/get to the
+  queued-history page without a command-result URL signal. The queued-history
+  row is the only browser evidence of a durable record. The browser sees
+  neither an inbox bearer nor provider credential, recipient, private target,
+  command result, or delivery state.
+- The in-process guard limits one configured principal to 20 record attempts
+  per rolling minute. It is not a proxy, multi-host, distributed, or production
+  rate-limit claim.
+- This candidate adds no migration, Compose service, provider client/request,
+  provider token/OAuth storage, worker, dispatch, retry, attempt, receipt,
+  delivery/read state, or command mutation. It must complete focused tests,
+  final local gates, independent security review, and fresh GitHub CI/CodeQL on
+  one frozen commit before this document can call it verified. Any synthetic
+  Docker rerun covers the unchanged base stack only and cannot prove the
+  required HTTPS dashboard form boundary.
+
 ## Verified GitHub evidence
 
 - GitHub CI and CodeQL succeeded at commit <code>8b80c3b</code>. This evidence
@@ -133,15 +163,17 @@ organization has accepted the project.
   additionally stores outgoing reply text and private source-derived target
   metadata; Phase 4d returns that recorded text to the authorized scoped inbox
   bearer. The Phase 4e source renders a smaller escaped projection through
-  an authenticated dashboard session. Protect every path to that text to the
-  same standard and keep messages out of examples, logs, screenshots, and
-  public discussion.
+  an authenticated dashboard session. The Phase 4f candidate receives escaped
+  hidden source transport values and user-entered reply text through that same
+  authenticated boundary. Protect every path to that text to the same standard
+  and keep messages out of examples, logs, screenshots, and public discussion.
 - Do not mistake Phase 4c `queued` intents or Phase 4d history rows for sends.
   A future provider dispatcher needs a separate official-provider policy,
   attempt/timeout/receipt model, migration, review, and verification. The legacy
   Phase 1a Telegram direct-send route is separate compatibility behavior, not
-  evidence that all sends are durable. Phase 4e only renders
-  intent history and does not change that boundary.
+  evidence that all sends are durable. Phase 4e renders intent history and the
+  Phase 4f candidate can record the existing source-bound intent; neither
+  changes that boundary.
 - Keep examples, fixtures, screenshots, logs, and public discussions free of
   user data and secrets.
 - Respond to issues and pull requests, record material decisions, and create

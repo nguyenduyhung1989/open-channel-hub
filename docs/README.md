@@ -33,9 +33,13 @@
 - [Phase 4e dashboard queued-command history](operations/operator-dashboard-queued-history-4e.md):
   a server-rendered, principal-scoped queued-history view with no browser
   bearer or outbound action.
-- [Phase 0–4e threat model](security/threat-model.md): assets, trust
+- [Phase 4f dashboard reply intents](operations/operator-dashboard-reply-intents-4f.md):
+  candidate opt-in, source-bound durable intent recording through a
+  server-rendered form; no provider send or browser bearer.
+- [Phase 0–4f threat model](security/threat-model.md): assets, trust
   boundaries, current controls, and planned work.
 - [Open-source readiness](maintainers/oss-readiness.md): an honest operating
   checklist for maintainers.
-- [Phase 4a–4e checkpoint](maintainers/current-phase.md):
-  verified milestones, current source boundaries, risks, and next design work.
+- [Phase 4a–4f checkpoint](maintainers/current-phase.md):
+  verified milestones, the Phase 4f candidate boundary, risks, and next design
+  work.

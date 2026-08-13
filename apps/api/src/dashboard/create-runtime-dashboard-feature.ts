@@ -5,7 +5,13 @@ import type {
   RuntimeDashboardPrincipal
 } from '../connections/runtime-connection-configuration.js';
 import type { InboxFeature } from '../inbox/inbox-feature.js';
-import type { DashboardFeature, DashboardInbox, DashboardPrincipal } from './dashboard-feature.js';
+import type {
+  DashboardFeature,
+  DashboardInbox,
+  DashboardPrincipal,
+  DashboardReplyIntentInput,
+  DashboardReplyIntentInbox
+} from './dashboard-feature.js';
 
 /** A non-diagnostic composition failure for an invalid server-only dashboard graph. */
 export class RuntimeDashboardFeatureError extends Error {
@@ -26,6 +32,7 @@ export const createRuntimeDashboardFeature = (
   sessionStore: DashboardSessionStore
 ): DashboardFeature => {
   const inboxById = toInboxSnapshot(inboxes);
+  const replyIntentInboxById = toReplyIntentInboxSnapshot(inboxes);
   const principalById = toPrincipalSnapshot(configuration.principals, inboxById);
   const inboxesByPrincipal = new Map<string, readonly DashboardInbox[]>();
 
@@ -50,6 +57,16 @@ export const createRuntimeDashboardFeature = (
       return principal === undefined || !principal.inboxIds.includes(inboxId)
         ? undefined
         : inboxById.get(inboxId);
+    },
+    findReplyIntentInbox: (
+      principalId: string,
+      inboxId: string
+    ): DashboardReplyIntentInbox | undefined => {
+      const principal = principalById.get(principalId);
+
+      return principal === undefined || !principal.replyIntentInboxIds.includes(inboxId)
+        ? undefined
+        : replyIntentInboxById.get(inboxId);
     },
     findPrincipal: (principalId: string): DashboardPrincipal | undefined =>
       principalById.get(principalId),
@@ -84,6 +101,43 @@ const toInboxSnapshot = (inboxes: readonly InboxFeature[]): ReadonlyMap<string, 
   return inboxById;
 };
 
+/**
+ * Deliberately creates a second, narrower view rather than adding a write
+ * method to DashboardInbox. Read-only rendering code cannot accidentally gain
+ * the ability to record an intent.
+ */
+const toReplyIntentInboxSnapshot = (
+  inboxes: readonly InboxFeature[]
+): ReadonlyMap<string, DashboardReplyIntentInbox> => {
+  const inboxById = new Map<string, DashboardReplyIntentInbox>();
+
+  for (const inbox of inboxes) {
+    if (inboxById.has(inbox.id)) {
+      throw new RuntimeDashboardFeatureError();
+    }
+
+    const recordReplyIntent = inbox.createOutboundReplyCommand;
+
+    inboxById.set(
+      inbox.id,
+      Object.freeze({
+        id: inbox.id,
+        recordReplyIntent: async (input: DashboardReplyIntentInput) =>
+          recordReplyIntent(
+            Object.freeze({
+              clientOperationId: input.clientOperationId,
+              sourceConnectionId: input.sourceConnectionId,
+              sourceProviderEventId: input.sourceProviderEventId,
+              text: input.text
+            })
+          )
+      })
+    );
+  }
+
+  return inboxById;
+};
+
 const toPrincipalSnapshot = (
   principals: readonly RuntimeDashboardPrincipal[],
   inboxById: ReadonlyMap<string, DashboardInbox>
@@ -93,7 +147,10 @@ const toPrincipalSnapshot = (
   for (const principal of principals) {
     if (
       principalById.has(principal.id) ||
-      principal.inboxIds.some((inboxId) => !inboxById.has(inboxId))
+      principal.inboxIds.some((inboxId) => !inboxById.has(inboxId)) ||
+      principal.replyIntentInboxIds.some(
+        (inboxId) => !inboxById.has(inboxId) || !principal.inboxIds.includes(inboxId)
+      )
     ) {
       throw new RuntimeDashboardFeatureError();
     }
@@ -103,7 +160,8 @@ const toPrincipalSnapshot = (
       Object.freeze({
         id: principal.id,
         inboxIds: Object.freeze([...principal.inboxIds]),
-        passwordHash: principal.passwordHash
+        passwordHash: principal.passwordHash,
+        replyIntentInboxIds: Object.freeze([...principal.replyIntentInboxIds])
       })
     );
   }

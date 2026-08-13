@@ -1,5 +1,6 @@
 import argon2 from 'argon2';
 import type {
+  CreateOutboundReplyCommandResult,
   DashboardSession,
   DashboardSessionCreateInput,
   DashboardSessionReadInput,
@@ -10,15 +11,22 @@ import type {
   OutboundReplyCommandHistoryEntry,
   OutboundReplyCommandHistoryPage
 } from '@open-channel-hub/domain';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 import { buildApp } from '../app.js';
-import type { DashboardFeature, DashboardInbox, DashboardPrincipal } from './dashboard-feature.js';
+import type {
+  DashboardFeature,
+  DashboardInbox,
+  DashboardPrincipal,
+  DashboardReplyIntentInput,
+  DashboardReplyIntentInbox
+} from './dashboard-feature.js';
 
 const PUBLIC_ORIGIN = 'https://dashboard.example.test';
 const SUPPORT_INBOX_TOKEN = 'synthetic_inbox_support_token_01234567890123456789';
 const SALES_INBOX_TOKEN = 'synthetic_inbox_sales_token_01234567890123456789012';
 const SUPPORT_CONNECTION_IDS = Object.freeze(['telegram-bot-support']);
+type ReplyIntentRecord = Mock<DashboardReplyIntentInbox['recordReplyIntent']>;
 
 describe('dashboard routes', () => {
   const applications: Awaited<ReturnType<typeof buildApp>>[] = [];
@@ -371,17 +379,446 @@ describe('dashboard routes', () => {
     expect(response.headers.location).toBe('/operator/login');
     expect(harness.store.touchActive).not.toHaveBeenCalled();
   });
+
+  it('keeps inbound pages read-only by default and renders only event-bound writable forms', async () => {
+    const supportRead = vi.fn(async (): Promise<InboundEventPage> => ({
+      events: [
+        canonicalEvent({
+          conversationId: 'synthetic-private-reply-target',
+          providerEventId:
+            'synthetic-&quot;><script>source xss must remain attribute text</script>',
+          senderId: 'synthetic-private-reply-target'
+        })
+      ]
+    }));
+    const readOnlyHarness = await createHarness({ supportRead });
+    applications.push(readOnlyHarness.app);
+    const readOnlySessionCookie = await loginAndGetSessionCookie(readOnlyHarness.app);
+
+    const readOnlyPage = await readOnlyHarness.app.inject({
+      headers: { cookie: cookiePair(readOnlySessionCookie) },
+      method: 'GET',
+      url: '/operator'
+    });
+
+    expect(readOnlyPage.statusCode).toBe(200);
+    expect(readOnlyPage.body).not.toContain('action="/operator/reply-intents"');
+    expect(readOnlyPage.body).not.toContain('name="clientOperationId"');
+    expect(readOnlyPage.body).not.toContain('name="text"');
+
+    const writableHarness = await createHarness({
+      replyIntentInboxIds: ['support-inbox'],
+      supportRead
+    });
+    applications.push(writableHarness.app);
+    const writableSessionCookie = await loginAndGetSessionCookie(writableHarness.app);
+    const writablePage = await writableHarness.app.inject({
+      headers: { cookie: cookiePair(writableSessionCookie) },
+      method: 'GET',
+      url: '/operator'
+    });
+
+    expect(writablePage.statusCode).toBe(200);
+    expect(writablePage.headers['cache-control']).toBe('no-store');
+    expect(writablePage.body).toContain('action="/operator/reply-intents"');
+    expect(writablePage.body).toContain('telegram_bot');
+    expect(writablePage.body).toContain('2026-08-13T00:00:00.000Z');
+    expect(writablePage.body).toContain('Synthetic dashboard message');
+    expect(writablePage.body).toContain('<dt>Kết nối</dt><dd>telegram-bot-support</dd>');
+    expect(writablePage.body).toContain('name="sourceConnectionId" value="telegram-bot-support"');
+    expect(writablePage.body).toContain(
+      'value="synthetic-&amp;quot;&gt;&lt;script&gt;source xss must remain attribute text&lt;/script&gt;"'
+    );
+    expect(writablePage.body).not.toContain('<script>');
+    expect(writablePage.body).not.toContain('synthetic-private-reply-target');
+    expect(writablePage.body).not.toContain('Hội thoại');
+    expect(writablePage.body).not.toContain('Người gửi');
+    expect(writablePage.body).not.toContain('name="recipientId"');
+    expect(writablePage.body).not.toContain('name="channel"');
+    expect(writablePage.body).not.toContain('name="sourceMessageId"');
+    expect(writablePage.body).not.toContain('name="attempt"');
+    expect(writablePage.body).not.toContain('name="send"');
+    expect(writablePage.body).not.toContain('name="retry"');
+    expect(writablePage.body).not.toContain('name="cancel"');
+
+    const firstForm = replyIntentFormFrom(writablePage.body);
+
+    expect(firstForm.clientOperationId).toMatch(UUID_V4_PATTERN);
+    expect(firstForm.sourceConnectionId).toBe('telegram-bot-support');
+    expect(writablePage.body).toContain(
+      '<textarea maxlength="2000" name="text" required rows="4"></textarea>'
+    );
+
+    const secondPage = await writableHarness.app.inject({
+      headers: { cookie: cookiePair(writableSessionCookie) },
+      method: 'GET',
+      url: '/operator'
+    });
+
+    expect(replyIntentFormFrom(secondPage.body).clientOperationId).not.toBe(
+      firstForm.clientOperationId
+    );
+
+    const history = await writableHarness.app.inject({
+      headers: { cookie: cookiePair(writableSessionCookie) },
+      method: 'GET',
+      url: '/operator/outbound-commands'
+    });
+
+    expect(history.statusCode).toBe(200);
+    expect(history.body).not.toContain('action="/operator/reply-intents"');
+  });
+
+  it('records exactly the source-bound form fields then redirects to durable history', async () => {
+    const supportRead = vi.fn(async (): Promise<InboundEventPage> => ({
+      events: [canonicalEvent()]
+    }));
+    const replyIntentRecord = vi.fn(
+      async (input: DashboardReplyIntentInput): Promise<CreateOutboundReplyCommandResult> => {
+        void input;
+
+        return Object.freeze({
+          command: Object.freeze({
+            createdAt: '2026-08-13T00:00:00.000Z',
+            id: '44',
+            sourceConnectionId: 'telegram-bot-support',
+            sourceProviderEventId: 'synthetic-provider-event-101',
+            state: 'queued' as const
+          }),
+          kind: 'created' as const
+        });
+      }
+    );
+    const harness = await createHarness({
+      replyIntentInboxIds: ['support-inbox'],
+      replyIntentRecord,
+      supportRead
+    });
+    applications.push(harness.app);
+    const sessionCookie = await loginAndGetSessionCookie(harness.app);
+    const page = await harness.app.inject({
+      headers: { cookie: cookiePair(sessionCookie) },
+      method: 'GET',
+      url: '/operator'
+    });
+    const form = replyIntentFormFrom(page.body);
+    const text = 'đ'.repeat(2_000);
+    const payload = replyIntentPayload(form, text);
+
+    expect(Buffer.byteLength(payload, 'utf8')).toBeGreaterThan(4_096);
+    expect(Buffer.byteLength(payload, 'utf8')).toBeLessThan(32 * 1_024);
+
+    const response = await harness.app.inject({
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        cookie: cookiePair(sessionCookie),
+        origin: PUBLIC_ORIGIN
+      },
+      method: 'POST',
+      payload,
+      url: '/operator/reply-intents'
+    });
+
+    expect(response.statusCode).toBe(303);
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(response.headers.location).toBe('/operator/outbound-commands?inbox=support-inbox');
+    expect(response.body).not.toContain(text);
+    expect(replyIntentRecord).toHaveBeenCalledWith({
+      clientOperationId: form.clientOperationId,
+      sourceConnectionId: 'telegram-bot-support',
+      sourceProviderEventId: 'synthetic-provider-event-101',
+      text
+    });
+    expect(Object.keys(replyIntentRecord.mock.calls[0]?.[0] ?? {}).sort()).toEqual([
+      'clientOperationId',
+      'sourceConnectionId',
+      'sourceProviderEventId',
+      'text'
+    ]);
+    expect(JSON.stringify(replyIntentRecord.mock.calls)).not.toContain('replyTargetId');
+    expect(JSON.stringify(replyIntentRecord.mock.calls)).not.toContain('recipientId');
+
+    const history = await harness.app.inject({
+      headers: { cookie: cookiePair(sessionCookie) },
+      method: 'GET',
+      url: '/operator/outbound-commands?inbox=support-inbox'
+    });
+
+    expect(history.statusCode).toBe(200);
+    expect(history.body).not.toContain('action="/operator/reply-intents"');
+
+    const forgedNotice = await harness.app.inject({
+      headers: { cookie: cookiePair(sessionCookie) },
+      method: 'GET',
+      url: '/operator/outbound-commands?inbox=support-inbox&notice=recorded'
+    });
+
+    expect(forgedNotice.statusCode).toBe(400);
+    expect(forgedNotice.body).not.toContain('Ý định trả lời đã được ghi nhận;');
+  });
+
+  it('rejects reply-intent origin, authentication, CSRF, malformed, and out-of-scope requests before recording', async () => {
+    const supportRead = vi.fn(async (): Promise<InboundEventPage> => ({
+      events: [canonicalEvent()]
+    }));
+    const harness = await createHarness({
+      replyIntentInboxIds: ['support-inbox'],
+      supportRead
+    });
+    applications.push(harness.app);
+    const sessionCookie = await loginAndGetSessionCookie(harness.app);
+    const page = await harness.app.inject({
+      headers: { cookie: cookiePair(sessionCookie) },
+      method: 'GET',
+      url: '/operator'
+    });
+    const form = replyIntentFormFrom(page.body);
+    const text = 'synthetic text must never be echoed';
+    const payload = replyIntentPayload(form, text);
+    const readsBeforeOriginFailure = harness.store.readActive.mock.calls.length;
+
+    const originFailure = await harness.app.inject({
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        cookie: cookiePair(sessionCookie),
+        origin: 'https://attacker.example.test'
+      },
+      method: 'POST',
+      payload,
+      url: '/operator/reply-intents'
+    });
+
+    expect(originFailure.statusCode).toBe(403);
+    expect(harness.store.readActive.mock.calls.length).toBe(readsBeforeOriginFailure);
+
+    const unauthenticated = await harness.app.inject({
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        origin: PUBLIC_ORIGIN
+      },
+      method: 'POST',
+      payload,
+      url: '/operator/reply-intents'
+    });
+    const csrfFailure = await harness.app.inject({
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        cookie: cookiePair(sessionCookie),
+        origin: PUBLIC_ORIGIN
+      },
+      method: 'POST',
+      payload: replyIntentPayload(
+        { ...form, csrf: Buffer.alloc(32, 5).toString('base64url') },
+        text
+      ),
+      url: '/operator/reply-intents'
+    });
+    const malformed = await harness.app.inject({
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        cookie: cookiePair(sessionCookie),
+        origin: PUBLIC_ORIGIN
+      },
+      method: 'POST',
+      payload: `${payload}&recipientId=forbidden`,
+      url: '/operator/reply-intents'
+    });
+    const duplicate = await harness.app.inject({
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        cookie: cookiePair(sessionCookie),
+        origin: PUBLIC_ORIGIN
+      },
+      method: 'POST',
+      payload: `${payload}&sourceConnectionId=telegram-bot-support`,
+      url: '/operator/reply-intents'
+    });
+    const oversized = await harness.app.inject({
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        cookie: cookiePair(sessionCookie),
+        origin: PUBLIC_ORIGIN
+      },
+      method: 'POST',
+      payload: replyIntentPayload(form, 'x'.repeat(32 * 1_024)),
+      url: '/operator/reply-intents'
+    });
+    const outOfScope = await harness.app.inject({
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        cookie: cookiePair(sessionCookie),
+        origin: PUBLIC_ORIGIN
+      },
+      method: 'POST',
+      payload: replyIntentPayload({ ...form, inbox: 'sales-inbox' }, text),
+      url: '/operator/reply-intents'
+    });
+
+    expect(unauthenticated.statusCode).toBe(303);
+    expect(unauthenticated.headers.location).toBe('/operator/login?error=invalid');
+    expect(unauthenticated.headers['set-cookie']).toContain('__Host-och_dashboard_session=;');
+    expect(csrfFailure.statusCode).toBe(403);
+    expect(malformed.statusCode).toBe(400);
+    expect(duplicate.statusCode).toBe(400);
+    expect(oversized.statusCode).toBe(413);
+    expect(oversized.headers['cache-control']).toBe('no-store');
+    expect(outOfScope.statusCode).toBe(404);
+
+    for (const response of [originFailure, csrfFailure, malformed, duplicate, outOfScope]) {
+      expect(response.body).toContain('Yêu cầu không thể xử lý an toàn.');
+      expect(response.body).not.toContain(text);
+    }
+
+    expect(oversized.body).toContain('"code":"validation_error"');
+    expect(oversized.body).not.toContain(text);
+
+    expect(unauthenticated.body).not.toContain(text);
+
+    expect(harness.replyIntentRecord).not.toHaveBeenCalled();
+  });
+
+  it('handles idempotent, source-unavailable, conflict, and storage-failure reply results without leaking text', async () => {
+    const supportRead = vi.fn(async (): Promise<InboundEventPage> => ({
+      events: [canonicalEvent()]
+    }));
+    const idempotentHarness = await createHarness({
+      replyIntentInboxIds: ['support-inbox'],
+      replyIntentRecord: vi.fn(async (): Promise<CreateOutboundReplyCommandResult> =>
+        Object.freeze({
+          command: Object.freeze({
+            createdAt: '2026-08-13T00:00:00.000Z',
+            id: '45',
+            sourceConnectionId: 'telegram-bot-support',
+            sourceProviderEventId: 'synthetic-provider-event-101',
+            state: 'queued' as const
+          }),
+          kind: 'idempotent_replay' as const
+        })
+      ),
+      supportRead
+    });
+    const sourceUnavailableHarness = await createHarness({
+      replyIntentInboxIds: ['support-inbox'],
+      replyIntentRecord: vi.fn(async (): Promise<CreateOutboundReplyCommandResult> =>
+        Object.freeze({ kind: 'source_unavailable' })
+      ),
+      supportRead
+    });
+    const conflictHarness = await createHarness({
+      replyIntentInboxIds: ['support-inbox'],
+      replyIntentRecord: vi.fn(async (): Promise<CreateOutboundReplyCommandResult> =>
+        Object.freeze({ kind: 'idempotency_conflict' })
+      ),
+      supportRead
+    });
+    const failingHarness = await createHarness({
+      replyIntentInboxIds: ['support-inbox'],
+      replyIntentRecord: vi.fn(async (): Promise<CreateOutboundReplyCommandResult> => {
+        throw new Error('synthetic durable reply failure');
+      }),
+      supportRead
+    });
+    applications.push(
+      idempotentHarness.app,
+      sourceUnavailableHarness.app,
+      conflictHarness.app,
+      failingHarness.app
+    );
+
+    const idempotent = await submitRenderedReplyIntent(idempotentHarness.app);
+    const sourceUnavailable = await submitRenderedReplyIntent(sourceUnavailableHarness.app);
+    const conflict = await submitRenderedReplyIntent(conflictHarness.app);
+    const failing = await submitRenderedReplyIntent(failingHarness.app);
+
+    expect(idempotent.statusCode).toBe(303);
+    expect(idempotent.headers.location).toBe('/operator/outbound-commands?inbox=support-inbox');
+    expect(sourceUnavailable.statusCode).toBe(404);
+    expect(conflict.statusCode).toBe(409);
+    expect(failing.statusCode).toBe(500);
+
+    for (const response of [sourceUnavailable, conflict, failing]) {
+      expect(response.body).toContain('Yêu cầu không thể xử lý an toàn.');
+      expect(response.body).not.toContain('synthetic text must never be echoed');
+      expect(response.body).not.toContain('synthetic durable reply failure');
+    }
+  });
+
+  it('caps reply-intent writes across two sessions for the same principal before the recorder', async () => {
+    const supportRead = vi.fn(async (): Promise<InboundEventPage> => ({
+      events: [canonicalEvent()]
+    }));
+    const harness = await createHarness({
+      replyIntentInboxIds: ['support-inbox'],
+      supportRead
+    });
+    applications.push(harness.app);
+    const firstSessionCookie = await loginAndGetSessionCookie(harness.app);
+    const secondSessionCookie = await loginAndGetSessionCookie(harness.app);
+    const firstForm = replyIntentFormFrom(
+      (
+        await harness.app.inject({
+          headers: { cookie: cookiePair(firstSessionCookie) },
+          method: 'GET',
+          url: '/operator'
+        })
+      ).body
+    );
+    const secondForm = replyIntentFormFrom(
+      (
+        await harness.app.inject({
+          headers: { cookie: cookiePair(secondSessionCookie) },
+          method: 'GET',
+          url: '/operator'
+        })
+      ).body
+    );
+
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const sessionCookie = attempt < 10 ? firstSessionCookie : secondSessionCookie;
+      const form = attempt < 10 ? firstForm : secondForm;
+      const response = await harness.app.inject({
+        headers: {
+          'content-type': 'application/x-www-form-urlencoded',
+          cookie: cookiePair(sessionCookie),
+          origin: PUBLIC_ORIGIN
+        },
+        method: 'POST',
+        payload: replyIntentPayload(form, 'synthetic throttled reply'),
+        url: '/operator/reply-intents'
+      });
+
+      expect(response.statusCode).toBe(303);
+    }
+
+    const limited = await harness.app.inject({
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        cookie: cookiePair(secondSessionCookie),
+        origin: PUBLIC_ORIGIN
+      },
+      method: 'POST',
+      payload: replyIntentPayload(secondForm, 'synthetic throttled reply'),
+      url: '/operator/reply-intents'
+    });
+
+    expect(limited.statusCode).toBe(429);
+    expect(limited.body).toContain('Yêu cầu không thể xử lý an toàn.');
+    expect(harness.replyIntentRecord).toHaveBeenCalledTimes(20);
+  });
 });
 
 const createHarness = async (
   options: Readonly<{
     historyRead?: ReturnType<typeof vi.fn>;
+    replyIntentInboxIds?: readonly string[];
+    replyIntentRecord?: ReplyIntentRecord;
     supportRead?: ReturnType<typeof vi.fn>;
   }> = {}
 ): Promise<
   Readonly<{
     app: Awaited<ReturnType<typeof buildApp>>;
     historyRead: ReturnType<typeof vi.fn>;
+    replyIntentRecord: ReplyIntentRecord;
     store: ReturnType<typeof createSessionStore>;
   }>
 > => {
@@ -396,6 +833,24 @@ const createHarness = async (
   const historyRead =
     options.historyRead ??
     vi.fn(async (): Promise<OutboundReplyCommandHistoryPage> => ({ commands: [] }));
+  const replyIntentRecord =
+    options.replyIntentRecord ??
+    vi.fn<DashboardReplyIntentInbox['recordReplyIntent']>(
+      async (input: DashboardReplyIntentInput): Promise<CreateOutboundReplyCommandResult> => {
+        void input;
+
+        return Object.freeze({
+          command: Object.freeze({
+            createdAt: '2026-08-13T00:00:00.000Z',
+            id: '43',
+            sourceConnectionId: 'telegram-bot-support',
+            sourceProviderEventId: 'synthetic-provider-event-101',
+            state: 'queued' as const
+          }),
+          kind: 'created' as const
+        });
+      }
+    );
   const store = createSessionStore();
   const supportInbox = inbox(
     'support-inbox',
@@ -406,11 +861,25 @@ const createHarness = async (
   const principal: DashboardPrincipal = Object.freeze({
     id: 'support-agent',
     inboxIds: Object.freeze(['support-inbox']),
-    passwordHash
+    passwordHash,
+    replyIntentInboxIds: Object.freeze([...(options.replyIntentInboxIds ?? [])])
+  });
+  const replyIntentInbox: DashboardReplyIntentInbox = Object.freeze({
+    id: supportInbox.id,
+    recordReplyIntent: replyIntentRecord
   });
   const feature: DashboardFeature = Object.freeze({
     findInbox: (principalId: string, inboxId: string): DashboardInbox | undefined =>
       principalId === principal.id && inboxId === supportInbox.id ? supportInbox : undefined,
+    findReplyIntentInbox: (
+      principalId: string,
+      inboxId: string
+    ): DashboardReplyIntentInbox | undefined =>
+      principalId === principal.id &&
+      principal.replyIntentInboxIds.includes(inboxId) &&
+      inboxId === replyIntentInbox.id
+        ? replyIntentInbox
+        : undefined,
     findPrincipal: (principalId: string): DashboardPrincipal | undefined =>
       principalId === principal.id ? principal : undefined,
     listInboxes: (principalId: string): readonly DashboardInbox[] =>
@@ -423,7 +892,12 @@ const createHarness = async (
     sessionStore: store
   });
 
-  return Object.freeze({ app: await buildApp({ dashboard: feature }), historyRead, store });
+  return Object.freeze({
+    app: await buildApp({ dashboard: feature }),
+    historyRead,
+    replyIntentRecord,
+    store
+  });
 };
 
 const inbox = (
@@ -506,19 +980,26 @@ const loginAndGetSessionCookie = async (
   return cookieFrom(response, '__Host-och_dashboard_session');
 };
 
-const canonicalEvent = (overrides: Readonly<{ message?: string }> = {}) =>
+const canonicalEvent = (
+  overrides: Readonly<{
+    conversationId?: string;
+    message?: string;
+    providerEventId?: string;
+    senderId?: string;
+  }> = {}
+) =>
   Object.freeze({
     channel: 'telegram_bot' as const,
     connectionId: 'telegram-bot-support',
     id: 'telegram-bot-support:event:synthetic-101',
     message: Object.freeze({
-      conversationId: 'synthetic-conversation-101',
+      conversationId: overrides.conversationId ?? 'synthetic-conversation-101',
       id: 'synthetic-message-101',
-      senderId: 'synthetic-sender-101',
+      senderId: overrides.senderId ?? 'synthetic-sender-101',
       text: overrides.message ?? 'Synthetic dashboard message'
     }),
     occurredAt: '2026-08-13T00:00:00.000Z',
-    providerEventId: 'synthetic-provider-event-101',
+    providerEventId: overrides.providerEventId ?? 'synthetic-provider-event-101',
     type: 'message.received' as const
   });
 
@@ -574,4 +1055,75 @@ const nextCursorFrom = (html: string): string => {
   }
 
   return match[1];
+};
+
+const UUID_V4_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+interface ReplyIntentForm {
+  readonly clientOperationId: string;
+  readonly csrf: string;
+  readonly inbox: string;
+  readonly sourceConnectionId: string;
+  readonly sourceProviderEventId: string;
+}
+
+const replyIntentFormFrom = (html: string): ReplyIntentForm => {
+  const form = html.match(
+    /<form action="\/operator\/reply-intents" method="post" class="reply-intent-form">([\s\S]*?)<\/form>/
+  )?.[1];
+
+  if (form === undefined) {
+    throw new Error('Missing synthetic reply-intent form.');
+  }
+
+  return Object.freeze({
+    clientOperationId: hiddenInputValue(form, 'clientOperationId'),
+    csrf: hiddenInputValue(form, 'csrf'),
+    inbox: hiddenInputValue(form, 'inbox'),
+    sourceConnectionId: hiddenInputValue(form, 'sourceConnectionId'),
+    sourceProviderEventId: hiddenInputValue(form, 'sourceProviderEventId')
+  });
+};
+
+const hiddenInputValue = (form: string, name: string): string => {
+  const value = form.match(new RegExp(`<input type="hidden" name="${name}" value="([^"]+)">`))?.[1];
+
+  if (value === undefined) {
+    throw new Error(`Missing synthetic ${name} field.`);
+  }
+
+  return value;
+};
+
+const replyIntentPayload = (form: ReplyIntentForm, text: string): string =>
+  new URLSearchParams({
+    clientOperationId: form.clientOperationId,
+    csrf: form.csrf,
+    inbox: form.inbox,
+    sourceConnectionId: form.sourceConnectionId,
+    sourceProviderEventId: form.sourceProviderEventId,
+    text
+  }).toString();
+
+const submitRenderedReplyIntent = async (
+  app: Awaited<ReturnType<typeof buildApp>>
+): Promise<Awaited<ReturnType<Awaited<ReturnType<typeof buildApp>>['inject']>>> => {
+  const sessionCookie = await loginAndGetSessionCookie(app);
+  const page = await app.inject({
+    headers: { cookie: cookiePair(sessionCookie) },
+    method: 'GET',
+    url: '/operator'
+  });
+  const form = replyIntentFormFrom(page.body);
+
+  return app.inject({
+    headers: {
+      'content-type': 'application/x-www-form-urlencoded',
+      cookie: cookiePair(sessionCookie),
+      origin: PUBLIC_ORIGIN
+    },
+    method: 'POST',
+    payload: replyIntentPayload(form, 'synthetic text must never be echoed'),
+    url: '/operator/reply-intents'
+  });
 };

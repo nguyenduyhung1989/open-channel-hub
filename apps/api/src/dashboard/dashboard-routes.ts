@@ -19,15 +19,18 @@ import {
   createDashboardSessionManager,
   type DashboardSessionManager
 } from './dashboard-session-manager.js';
+import { createDashboardReplyIntentThrottle } from './dashboard-reply-intent-throttle.js';
 import { dashboardStyle } from './dashboard-style.js';
 
 const DASHBOARD_LOGIN_CSRF_COOKIE = '__Host-och_dashboard_login_csrf';
 const DASHBOARD_SESSION_COOKIE = '__Host-och_dashboard_session';
 const DEFAULT_PAGE_SIZE = 50;
-const FORM_BODY_LIMIT = 4_096;
+const FORM_BODY_LIMIT = 32 * 1_024;
 const MAX_CURSOR_LENGTH = 512;
 const OPAQUE_TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const IDENTIFIER_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
+const PROVIDER_EVENT_ID_PATTERN = /^[!-~]{1,512}$/;
+const UUID_V4_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const loginQuerySchema = z.object({ error: z.enum(['invalid', 'throttled']).optional() }).strict();
 const operatorQuerySchema = z
   .object({
@@ -43,6 +46,25 @@ const loginFormSchema = z
   })
   .strict();
 const logoutFormSchema = z.object({ csrf: z.string().regex(OPAQUE_TOKEN_PATTERN) }).strict();
+const replyIntentFormSchema = z
+  .object({
+    clientOperationId: z.string().regex(UUID_V4_PATTERN),
+    csrf: z.string().regex(OPAQUE_TOKEN_PATTERN),
+    inbox: z
+      .string()
+      .regex(IDENTIFIER_PATTERN)
+      .refine((value) => value !== '.' && value !== '..'),
+    sourceConnectionId: z
+      .string()
+      .regex(IDENTIFIER_PATTERN)
+      .refine((value) => value !== '.' && value !== '..'),
+    sourceProviderEventId: z.string().regex(PROVIDER_EVENT_ID_PATTERN),
+    text: z
+      .string()
+      .max(2_000)
+      .refine((value) => value.trim().length > 0)
+  })
+  .strict();
 
 const signedCookieOptions = Object.freeze({
   httpOnly: true,
@@ -82,12 +104,29 @@ export const registerDashboardRoutes = async (
 ): Promise<void> => {
   const manager = createDashboardSessionManager(feature.sessionStore, feature.sessionIdPepper);
   const throttle = createDashboardLoginThrottle();
+  const replyIntentThrottle = createDashboardReplyIntentThrottle();
 
   app.addContentTypeParser(
     'application/x-www-form-urlencoded',
     { bodyLimit: FORM_BODY_LIMIT, parseAs: 'string' },
     (_request, body: string, done) => done(null, body)
   );
+
+  // Fastify can reject an oversized form before the route handler reaches
+  // sendDashboardFailure. Keep every operator HTML/form response non-cacheable
+  // even along that parser-error path, while leaving the stylesheet cacheable.
+  app.addHook('onSend', async (request, reply, payload) => {
+    const path = request.raw.url?.split('?', 1)[0];
+
+    if (
+      path !== '/operator/assets/dashboard.css' &&
+      (path === '/operator' || path?.startsWith('/operator/') === true)
+    ) {
+      reply.header('Cache-Control', 'no-store');
+    }
+
+    return payload;
+  });
 
   app.get('/operator/assets/dashboard.css', async (_request, reply) =>
     reply
@@ -174,6 +213,77 @@ export const registerDashboardRoutes = async (
     return redirectDashboard(reply, '/operator/login');
   });
 
+  app.post<{ Body: string }>('/operator/reply-intents', async (request, reply) => {
+    if (!hasExpectedOrigin(request, feature.publicOrigin)) {
+      return sendDashboardFailure(reply.code(403));
+    }
+
+    const form = parseForm(request.body, replyIntentFormSchema);
+
+    if (form === undefined) {
+      return sendDashboardFailure(reply.code(400));
+    }
+
+    let authenticated: AuthenticatedDashboardSession | undefined;
+
+    try {
+      authenticated = await readDashboardSession(request, manager);
+    } catch {
+      return sendDashboardFailure(reply.code(500));
+    }
+
+    if (authenticated === undefined) {
+      clearSessionCookie(reply);
+      return redirectDashboard(reply, '/operator/login?error=invalid');
+    }
+
+    if (
+      !matchesSecret(form.csrf, authenticated.csrfToken) ||
+      !manager.matchesCsrf(authenticated.session, form.csrf)
+    ) {
+      return sendDashboardFailure(reply.code(403));
+    }
+
+    const replyIntentInbox = feature.findReplyIntentInbox(
+      authenticated.session.principalId,
+      form.inbox
+    );
+
+    if (replyIntentInbox === undefined) {
+      return sendDashboardFailure(reply.code(404));
+    }
+
+    if (!replyIntentThrottle.reserve(authenticated.session.principalId)) {
+      return sendDashboardFailure(reply.code(429));
+    }
+
+    try {
+      const result = await replyIntentInbox.recordReplyIntent(
+        Object.freeze({
+          clientOperationId: form.clientOperationId,
+          sourceConnectionId: form.sourceConnectionId,
+          sourceProviderEventId: form.sourceProviderEventId,
+          text: form.text
+        })
+      );
+
+      if (result.kind === 'created' || result.kind === 'idempotent_replay') {
+        return redirectDashboard(
+          reply,
+          `/operator/outbound-commands?inbox=${encodeURIComponent(form.inbox)}`
+        );
+      }
+
+      if (result.kind === 'idempotency_conflict') {
+        return sendDashboardFailure(reply.code(409));
+      }
+
+      return sendDashboardFailure(reply.code(404));
+    } catch {
+      return sendDashboardFailure(reply.code(500));
+    }
+  });
+
   app.get('/operator', async (request, reply) => {
     const context = await resolveDashboardPageRequest(request, reply, manager, feature);
 
@@ -203,6 +313,10 @@ export const registerDashboardRoutes = async (
             ? {}
             : { nextCursor: encodeInboxCursor(page.nextCursor, context.selectedInbox) }),
           principalId: context.authenticated.session.principalId,
+          replyIntentEnabled:
+            feature
+              .findPrincipal(context.authenticated.session.principalId)
+              ?.replyIntentInboxIds.includes(context.selectedInboxId) ?? false,
           selectedInboxId: context.selectedInboxId
         })
       );

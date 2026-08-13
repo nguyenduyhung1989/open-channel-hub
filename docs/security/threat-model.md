@@ -1,4 +1,4 @@
-# Phase 0–4e threat model
+# Phase 0–4f threat model
 
 **Review date:** 2026-08-13
 
@@ -19,17 +19,21 @@ audit, secret scan, diff check, synthetic Compose proof, independent security
 review, and fresh GitHub CI/CodeQL. No live Telegram, Zalo, Meta, public TLS,
 provider send, or production flow has been used.
 
-The verified Phase 4e controls below describe the frozen source boundary only;
-they are not public-TLS, provider-send, or production claims.
+Phase 4f is a candidate server-rendered source-bound reply-intent form with an
+explicit per-principal inbox write subset. It has no final local verification,
+independent security approval, or GitHub CI/CodeQL evidence yet. The verified
+Phase 4e controls below describe the frozen source boundary only; Phase 4f
+candidate controls are documented separately and neither is a public-TLS,
+provider-send, or production claim.
 
 ## Facts before plans
 
-| Present in the source                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Verified or historical evidence                                                                                                                                                                                                                                                                                                                                       | Absent or planned only                                                                                                                                                       |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A small HTTP API with liveness/readiness routes, source offer, official Telegram Bot/Zalo OA/Facebook Page/WhatsApp Business inbound text boundaries, account-scoped canonical readers, optional configured aggregate inbox reader, optional server-rendered read-only operator dashboard, a source-bound reply-intent route, a scoped queued-command history route, and a server-rendered dashboard history page at `/operator/outbound-commands`.                      | Final local checks, independent review, synthetic Compose proof, GitHub CI, and CodeQL passed for Phase 3a `b930d29`, Phase 3b `c933102`, Phase 3c `fd802cb`, Phase 4a `705db0a`, Phase 4b `7672be9`, the combined Phase 4c–4d revision `160414e`, and Phase 4e `465186e`.                                                                                            | Live provider TLS flows, provider dispatch, and production deployment.                                                                                                       |
-| PostgreSQL 18.4 on an internal Compose network; dedicated database/schema; non-superuser application role; forward migration ledger; connection registry; `NOT VALID` event foreign key; parameterized multi-connection feed and queued-command-history readers; optional HMAC-only dashboard-session store; and an immutable source-bound reply-command table.                                                                                                          | The Phase 4b Compose proof verified eight migrations, registry, role boundary, two business phones, one shared Facebook/WhatsApp App callback, and separate multi-account inbox scopes. The Phase 4c–4d proof at `160414e` verified the ninth migration, source-bound idempotency/target derivation, queued-history pagination, scope isolation, and safe projection. | Backups, restores, retention/deletion, password rotation, encryption-at-rest assurance, capacity policy, dispatch/receipt semantics, and production monitoring.              |
-| Runtime multi-connection JSON is parsed only from an absolute secret file. It accepts strict `telegram_bot`, `zalo_oa`, `facebook_page`, and `whatsapp_business` entries, optional `inboxes`, and optional `dashboard` principals with an exact public HTTPS origin and exact-profile Argon2id password hashes.                                                                                                                                                          | Configuration loader tests use synthetic documents and reject malformed/duplicate/unsafe input without leaking content. A Meta App used by both Facebook Page and WhatsApp requires matching credentials and one common declared `/v1/webhooks/meta` callback.                                                                                                        | Managed secret store, rotation procedure, host hardening, and audit logging.                                                                                                 |
-| Provider webhook routes resolve configured accounts internally; account bearers resolve one account; inbox bearers resolve one explicit connection set; dashboard sessions resolve one configured principal and then its configured inboxes. A configured inbox bearer can record a source-bound reply intent and read its queued history; the target remains private and history exposes recorded text only. Zalo checks raw JSON hashing; Meta checks raw Buffer HMAC. | Route tests cover bearer scoping, wrong-secret/unknown-identity equivalence, raw-byte signature mismatch, Page/WABA batch isolation, Meta challenge handling, shared callback dispatch, inbox bearer/cursor scope rejection, canonical-only output, dashboard controls, and source-bound command/history controls with synthetic features.                            | Full user login/organization/RBAC model, distributed rate limit, audit trail, public connection administration, provider dispatch policy, and provider timing/load evidence. |
+| Present in the source                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Verified or historical evidence                                                                                                                                                                                                                                                                                                                                                     | Absent or planned only                                                                                                                                                       |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A small HTTP API with liveness/readiness routes, source offer, official Telegram Bot/Zalo OA/Facebook Page/WhatsApp Business inbound text boundaries, account-scoped canonical readers, optional configured aggregate inbox reader, optional server-rendered operator dashboard, a source-bound reply-intent route, a scoped queued-command history route, a server-rendered dashboard history page at `/operator/outbound-commands`, and a Phase 4f candidate source-bound dashboard reply-intent form.                                                                                                  | Final local checks, independent review, synthetic Compose proof, GitHub CI, and CodeQL passed for Phase 3a `b930d29`, Phase 3b `c933102`, Phase 3c `fd802cb`, Phase 4a `705db0a`, Phase 4b `7672be9`, the combined Phase 4c–4d revision `160414e`, and Phase 4e `465186e`. Phase 4f has no such evidence yet.                                                                       | Live provider TLS flows, provider dispatch, and production deployment.                                                                                                       |
+| PostgreSQL 18.4 on an internal Compose network; dedicated database/schema; non-superuser application role; forward migration ledger; connection registry; `NOT VALID` event foreign key; parameterized multi-connection feed and queued-command-history readers; optional HMAC-only dashboard-session store; and an immutable source-bound reply-command table.                                                                                                                                                                                                                                           | The Phase 4b Compose proof verified eight migrations, registry, role boundary, two business phones, one shared Facebook/WhatsApp App callback, and separate multi-account inbox scopes. The Phase 4c–4d proof at `160414e` verified the ninth migration, source-bound idempotency/target derivation, queued-history pagination, scope isolation, and safe projection.               | Backups, restores, retention/deletion, password rotation, encryption-at-rest assurance, capacity policy, dispatch/receipt semantics, and production monitoring.              |
+| Runtime multi-connection JSON is parsed only from an absolute secret file. It accepts strict `telegram_bot`, `zalo_oa`, `facebook_page`, and `whatsapp_business` entries, optional `inboxes`, and optional `dashboard` principals with an exact public HTTPS origin and exact-profile Argon2id password hashes. The Phase 4f candidate adds optional principal `replyIntentInboxIds` as an explicit subset of readable inboxes.                                                                                                                                                                           | Configuration loader tests use synthetic documents and reject malformed/duplicate/unsafe input without leaking content. A Meta App used by both Facebook Page and WhatsApp requires matching credentials and one common declared `/v1/webhooks/meta` callback. Phase 4f candidate checks remain pending.                                                                            | Managed secret store, rotation procedure, host hardening, and audit logging.                                                                                                 |
+| Provider webhook routes resolve configured accounts internally; account bearers resolve one account; inbox bearers resolve one explicit connection set; dashboard sessions resolve one configured principal and then its configured inboxes. A configured inbox bearer can record a source-bound reply intent and read its queued history; the target remains private and history exposes recorded text only. The Phase 4f candidate requires an explicit principal write subset before a narrow dashboard closure can record the same intent. Zalo checks raw JSON hashing; Meta checks raw Buffer HMAC. | Route tests cover bearer scoping, wrong-secret/unknown-identity equivalence, raw-byte signature mismatch, Page/WABA batch isolation, Meta challenge handling, shared callback dispatch, inbox bearer/cursor scope rejection, canonical-only output, dashboard controls, and source-bound command/history controls with synthetic features. Phase 4f candidate tests remain pending. | Full user login/organization/RBAC model, distributed rate limit, audit trail, public connection administration, provider dispatch policy, and provider timing/load evidence. |
 
 Do not treat a source fact, historical CI result, or synthetic proof as a
 production claim.
@@ -52,7 +56,43 @@ production claim.
 - It adds no dashboard command-creation form, recipient selector, provider
   request, dispatch worker, send, retry, cancellation, command mutation,
   migration, or delivery-state model. The only ordinary write from a page view
-  is the existing dashboard-session touch for its idle timeout.
+  is the existing dashboard-session touch for its idle timeout. The later
+  Phase 4f candidate is a separate boundary, not part of this verified Phase
+  4e control set.
+
+## Phase 4f candidate source boundary
+
+- An optional `dashboard.principals[].replyIntentInboxIds` is a strict unique
+  subset of that principal's configured readable `inboxIds`. Omission becomes
+  an empty immutable set, so an existing dashboard principal remains read-only.
+  The browser cannot grant itself this capability through a URL or form value.
+- An enabled `/operator` inbox renders one same-origin native form for each
+  already persisted inbound event. Text is the only editable input. The server
+  creates and escapes a UUIDv4 operation ID plus the canonical source reference
+  as hidden transport values; those values are revalidated and do not create a
+  caller-selected recipient.
+- `POST /operator/reply-intents` requires an active signed dashboard session,
+  exact configured HTTPS `Origin`, matching anti-forgery value, and a strict
+  non-duplicated form body before it resolves the explicit principal/inbox
+  write closure. The existing Phase 4c command store then checks the durable
+  source event inside the fixed inbox scope and derives the private target.
+- The URL-encoded form parser caps the entire body at 32 KiB before strict
+  validation and recorder access; reply text remains separately bounded to
+  2,000 characters. Operator HTML—including a parser-rejected `413`—remains
+  `Cache-Control: no-store`.
+- A created command or exact idempotent replay uses `303` post/redirect/get to
+  the authenticated queued-history page without a command-result URL signal.
+  The queued-history row is the only browser evidence of a durable record. It
+  does not disclose a bearer, private target, command ID, provider result, or
+  delivery state. The strict history query rejects an added `notice` value.
+  `queued` remains a durable intent only.
+- A bounded local in-process guard allows at most 20 recording attempts per
+  rolling minute per configured principal. It is not a distributed, multi-host,
+  or proxy rate-limit control.
+- The candidate adds no provider client/request, provider credential/OAuth
+  storage, recipient picker, worker, dispatch, retry, attempt, timeout,
+  receipt, delivery/read state, command mutation, migration, table, index,
+  trigger, or Compose service. Its final verification remains pending.
 
 ## Trust zones and data flow
 
@@ -76,7 +116,10 @@ untrusted after they cross the boundary. Possession of an inbox bearer grants
 the bounded ability to record an intent and read recorded text for that fixed
 scope; it does not grant a provider send capability. The Phase 4e source
 uses a dashboard session and a narrow server-side history closure instead of
-moving that bearer or a generic database capability into the browser.
+moving that bearer or a generic database capability into the browser. The
+Phase 4f candidate adds a distinct server-held intent-recording closure only
+after an explicit configured principal/inbox write grant; it still exposes no
+bearer, provider credential, recipient, or generic database capability.
 
 ### Zone C — durable PostgreSQL ledger
 
@@ -99,7 +142,10 @@ sensitive operational data. PostgreSQL is not exposed on a host TCP port; the
 application connects through an internal network as its limited application
 role. The Phase 4e source reuses that history reader and reduces the HTML
 projection further to escaped creation time, text, and source connection ID;
-it adds no table, migration, or command-row mutation.
+it adds no table, migration, or command-row mutation. The Phase 4f candidate
+reuses the existing Phase 4c command transaction after server-side form,
+session, origin, anti-forgery, write-scope, and source checks. It adds no new
+database path, migration, or mutable command state.
 
 The intended path is:
 
@@ -125,6 +171,13 @@ The Phase 4e dashboard-history path is:
 resolve configured principal inbox → scope-bound Phase 4d cursor and history
 reader → escaped no-store HTML projection</code>.
 
+The Phase 4f candidate dashboard-intent path is:
+
+<code>exact origin → strict form parse → signed dashboard session and
+anti-forgery check → resolve explicit principal/inbox write grant → Phase 4c
+source-scope check and private target derivation → immutable queued command →
+303 queued-history view</code>.
+
 Raw provider payloads, runtime credentials, and caller-chosen recipient IDs do
 not cross the storage boundary.
 
@@ -140,13 +193,15 @@ not cross the storage boundary.
   PostgreSQL bootstrap password, application database password, and runtime
   configuration document.
 - Dashboard session integrity, anti-forgery values, exact public origin,
-  read-only principal-to-inbox authorization boundary, and the candidate
-  server-rendered queued-text response.
+  principal-to-readable-inbox and candidate principal-to-write-inbox boundaries,
+  the server-generated operation ID, and the server-rendered queued-text and
+  candidate reply-intent responses.
 - Canonical inbound and outgoing message text, sender/conversation/message
   identifiers, private reply targets, command state/operation identifiers,
   timestamps, registry metadata, the inbox bearer that can read scoped command
   text, authenticated dashboard HTML that renders a smaller queued-text
-  projection, and the PostgreSQL volume that holds them.
+  projection, the candidate form's hidden source transport values, and the
+  PostgreSQL volume that holds them.
 - The Docker host and any backup destination added later.
 
 ## Threats and controls
@@ -207,6 +262,12 @@ not cross the storage boundary.
   text, returns `Cache-Control: no-store`, and omits IDs and private source or
   target data; this is a smaller authenticated view, not a delivery result or
   a substitute for a browser-data handling policy.
+- The Phase 4f candidate's `replyIntentInboxIds` is deployment-secret
+  authorization data. Omission means no dashboard write grant. Browser-hidden
+  source values and the generated operation ID remain untrusted on submission;
+  the server and existing source-bound store must enforce the actual scope and
+  derived target. Its 20-attempt per-principal guard exists only in one process
+  and is not evidence of a public distributed rate limit.
 - A liveness response does not prove database availability; only `/ready`
   checks expected migrations.
 - A green test, synthetic Docker proof, historical CI, or webhook registration
@@ -220,7 +281,9 @@ not cross the storage boundary.
 
 Update this model before a real Telegram, Zalo OA, Facebook Page, or WhatsApp
 Business test, public webhook/TLS exposure, dashboard public deployment,
-Phase 4e history-projection or scope-boundary change,
+Phase 4e history-projection or scope-boundary change, any Phase 4f
+reply-intent authorization, form, source-binding, rate-limit, or projection
+change,
 inbox-scope/password/session-key rotation change, backup or retention work,
 foreign-key validation, new database access path or history projection,
 dispatch/attempt/retry work, full login/RBAC, AI feature, production deployment,

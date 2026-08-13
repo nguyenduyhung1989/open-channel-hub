@@ -1,4 +1,4 @@
-# Public checkpoint: Phase 4a–4e verified
+# Public checkpoint: Phase 4a–4e verified; Phase 4f candidate
 
 **Verified scope:** Phase 4a is a configured, read-only aggregate feed across
 an explicit set of existing official connections. It builds on the Telegram
@@ -32,6 +32,18 @@ returned APPROVE with no high- or medium-severity finding. GitHub checks
 This verifies the frozen source and synthetic local path; it does not prove
 public TLS, a live provider, or production deployment.
 
+**Candidate Phase 4f source scope:** Phase 4f proposes one opt-in,
+source-bound dashboard write. A configured principal remains read-only unless
+its optional `replyIntentInboxIds` allow-list explicitly includes a selected
+readable inbox. For that inbox only, each persisted inbound event can render a
+native reply-intent form whose editable value is text; the server creates the
+operation ID and rechecks session, exact origin, anti-forgery, write scope, and
+durable source before it invokes the existing Phase 4c command store. A
+successful create or exact replay redirects to queued history; `queued` is
+still not sent, delivered, or read. This is candidate scope only: it has no
+final local verification, independent approval, GitHub CI/CodeQL, public TLS,
+live-provider, or production claim.
+
 ## Exact verified history
 
 - GitHub CI and CodeQL succeeded for the Phase 0 commit <code>8b80c3b</code>,
@@ -62,7 +74,7 @@ public TLS, a live provider, or production deployment.
   and `Analyze JavaScript and TypeScript` checks both succeeded.
 - Historical evidence proves only those exact revisions. It does not verify any
   live provider account, provider send, public TLS endpoint, production
-  deployment, or a later change to the verified Phase 4e source.
+  deployment, or the later Phase 4f candidate source.
 
 ## Verified Phase 4a source
 
@@ -233,11 +245,55 @@ outbound capability into the browser:
   command creation/mutation, send/retry/cancel control, worker, provider HTTP
   request, token/OAuth storage, attempt, timeout policy, receipt, or state
   transition. A page view only performs the existing dashboard-session touch.
+  The later Phase 4f candidate is documented separately and is not part of
+  this verified Phase 4e boundary.
 
 Exact commit <code>465186e</code> completed focused dashboard-history tests,
 the relevant local checks, independent security review, and fresh GitHub
 CI/CodeQL evidence. It still does not prove external HTTPS/proxy behavior or a
 production deployment.
+
+## Candidate Phase 4f source
+
+The candidate adds a deliberately smaller dashboard write than the existing
+inbox-bearer API:
+
+- `dashboard.principals[].replyIntentInboxIds` is optional. It is a strict
+  unique subset of the principal's configured readable `inboxIds`; absence
+  freezes to an empty allow-list, preserving read-only behavior. It remains
+  deployment-secret configuration, not a database membership or provider
+  credential.
+- `POST /operator/reply-intents` needs an active signed dashboard session, the
+  exact configured HTTPS `Origin`, a matching anti-forgery value, and one strict
+  single-value form body. It resolves the explicit per-principal inbox write
+  grant before the narrow server-side Phase 4c command closure is called.
+- An enabled `/operator` inbox renders one same-origin native form per already
+  persisted inbound event. Text is the only editable field; source connection,
+  provider event, selected inbox, anti-forgery token, and fresh UUIDv4 client
+  operation ID are escaped hidden inputs. They are revalidated and do not grant
+  a recipient or bypass source-scope enforcement.
+- The URL-encoded form has a fixed 32 KiB whole-body cap before strict parsing;
+  text remains separately limited to 2,000 characters. An oversized form is
+  rejected with `413` before the recorder is called. Operator HTML responses,
+  including that `413`, remain `Cache-Control: no-store`.
+- A new record or exact idempotent replay uses `303` post/redirect/get to
+  `/operator/outbound-commands` without a command-result URL signal. The
+  queued-history row is the only browser evidence of a durable record and does
+  not expose a bearer, command ID, target, provider result, or delivery status.
+  A fabricated `notice` query value is rejected by the strict history query.
+- The candidate has a bounded local guard of 20 recording attempts per rolling
+  minute per configured principal. It is not a distributed/edge rate limit;
+  public deployment still requires verified proxy rate limiting and log
+  redaction.
+- It introduces no provider HTTP/client, token/OAuth storage, recipient picker,
+  worker, dispatch, retry, attempt, timeout/receipt/delivery model, command
+  mutation, migration, table, index, trigger, or Compose change. It reuses the
+  existing Phase 4c immutable `queued` command store and migration `0009`.
+
+This candidate must complete focused behavior/security tests, final local
+checks, independent review, and fresh GitHub CI/CodeQL on one frozen commit
+before the checkpoint can name it verified. Those steps would still not prove
+public TLS, a real provider send, or production deployment.
 
 ## Explicitly not proven or not implemented
 
@@ -256,8 +312,10 @@ production deployment.
 - No dispatch queue/worker, retry, attempt/timeout policy, delivery/read status,
   template, media, OAuth, provider access-token storage, Graph API request,
   Facebook User, Zalo User, or WhatsApp User surface exists. Phase 4c has only
-  an immutable intent ledger, Phase 4d has only its scoped history, and Phase
-  4e only renders that history; none is a delivery engine.
+  an immutable intent ledger, Phase 4d has only its scoped history, Phase 4e
+  renders that history, and the Phase 4f candidate can record the same
+  source-bound intent through an explicit dashboard write grant; none is a
+  delivery engine.
 - A `200` from the local synthetic feed or a green test/GitHub check does not
   prove a TLS endpoint, provider eligibility, live message operation, or a
   production-ready access model.

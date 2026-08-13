@@ -15,7 +15,7 @@ export const dashboardStyle = `
 
 * { box-sizing: border-box; }
 body { background: radial-gradient(circle at top right, #17263a 0, var(--canvas) 42rem); color: var(--ink); margin: 0; min-width: 20rem; }
-button, input, select { font: inherit; }
+button, input, select, textarea { font: inherit; }
 button { background: var(--signal); border: 0; border-radius: .45rem; color: var(--signal-ink); cursor: pointer; font-weight: 750; padding: .72rem 1rem; }
 button:hover, button:focus-visible { outline: .16rem solid #d9fff1; outline-offset: .15rem; }
 .dashboard-shell, .login-shell { margin: 0 auto; max-width: 72rem; padding: 1.25rem; }
@@ -29,7 +29,8 @@ h2 { font-size: clamp(1.25rem, 5vw, 1.75rem); }
 .lede, .scope-bar p { color: var(--muted); line-height: 1.55; }
 .login-form { display: grid; gap: 1rem; margin-top: 1.5rem; }
 label { display: grid; gap: .4rem; font-weight: 700; }
-input, select { background: #08101a; border: 1px solid var(--line); border-radius: .45rem; color: var(--ink); min-height: 2.7rem; padding: .55rem .65rem; }
+input, select, textarea { background: #08101a; border: 1px solid var(--line); border-radius: .45rem; color: var(--ink); min-height: 2.7rem; padding: .55rem .65rem; }
+textarea { resize: vertical; }
 .notice { background: #3c2024; border: 1px solid #8f3c44; border-radius: .45rem; color: var(--danger); padding: .7rem; }
 .dashboard-header, .scope-bar { display: flex; flex-direction: column; gap: 1rem; }
 .dashboard-header { border-bottom: 1px solid var(--line); padding-bottom: 1.25rem; }
@@ -44,6 +45,7 @@ input, select { background: #08101a; border: 1px solid var(--line); border-radiu
 .scope-link[aria-current="page"] { background: var(--signal); border-color: var(--signal); color: var(--signal-ink); }
 .scope-link:hover, .scope-link:focus-visible { outline: .16rem solid #d9fff1; outline-offset: .15rem; }
 .ledger { padding: 1rem; }
+.reply-intent-form { display: grid; gap: 1rem; }
 .ledger-heading { border-bottom: 1px solid var(--line); padding-bottom: .9rem; }
 .ledger-note { color: var(--muted); line-height: 1.5; margin: .65rem 0 0; }
 .event-list, .command-list { display: grid; gap: .75rem; list-style: none; margin: 1rem 0; padding: 0; }

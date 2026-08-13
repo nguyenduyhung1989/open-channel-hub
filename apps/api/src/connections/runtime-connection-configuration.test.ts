@@ -78,13 +78,15 @@ describe('loadRuntimeConnectionConfiguration', () => {
             id: 'support-agent',
             inboxIds: ['sales-inbox', 'support-inbox'],
             passwordHash:
-              '$argon2id$v=19$m=19456,p=1,t=2$c3ludGhldGljLXNhbHQ$c3ludGhldGljLXBhc3N3b3JkLWhhc2gtc3VwcG9ydA'
+              '$argon2id$v=19$m=19456,p=1,t=2$c3ludGhldGljLXNhbHQ$c3ludGhldGljLXBhc3N3b3JkLWhhc2gtc3VwcG9ydA',
+            replyIntentInboxIds: []
           },
           {
             id: 'sales-agent',
             inboxIds: ['sales-inbox'],
             passwordHash:
-              '$argon2id$v=19$m=19456,t=2,p=1$c2FsZXMtc3ludGhldGljLXNhbHQ$c2FsZXMtcGFzc3dvcmQtaGFzaC1mb3ItdGVzdGluZw'
+              '$argon2id$v=19$m=19456,t=2,p=1$c2FsZXMtc3ludGhldGljLXNhbHQ$c2FsZXMtcGFzc3dvcmQtaGFzaC1mb3ItdGVzdGluZw',
+            replyIntentInboxIds: []
           }
         ],
         publicOrigin: 'https://dashboard.example.test',
@@ -117,12 +119,41 @@ describe('loadRuntimeConnectionConfiguration', () => {
     expect(Object.isFrozen(dashboard?.principals)).toBe(true);
     expect(Object.isFrozen(principal)).toBe(true);
     expect(Object.isFrozen(principal?.inboxIds)).toBe(true);
+    expect(Object.isFrozen(principal?.replyIntentInboxIds)).toBe(true);
     expect(() => {
       (dashboard?.sessionCookieSigningKeys as string[]).push('another-signing-key');
     }).toThrow(TypeError);
     expect(() => {
       (principal?.inboxIds as string[]).push('another-inbox');
     }).toThrow(TypeError);
+    expect(() => {
+      (principal?.replyIntentInboxIds as string[]).push('another-inbox');
+    }).toThrow(TypeError);
+  });
+
+  it('loads a canonical dashboard reply-intent allow-list while omitted scopes stay read-only', async () => {
+    const configuration = validDashboardConfiguration();
+    configuration.dashboard.principals[0]!.replyIntentInboxIds = ['support-inbox', 'sales-inbox'];
+    readFileMock.mockResolvedValue(JSON.stringify(configuration));
+
+    const result = await loadRuntimeConnectionConfiguration(CONFIGURATION_PATH);
+
+    expect(result.dashboard?.principals).toEqual([
+      {
+        id: 'support-agent',
+        inboxIds: ['sales-inbox', 'support-inbox'],
+        passwordHash:
+          '$argon2id$v=19$m=19456,p=1,t=2$c3ludGhldGljLXNhbHQ$c3ludGhldGljLXBhc3N3b3JkLWhhc2gtc3VwcG9ydA',
+        replyIntentInboxIds: ['sales-inbox', 'support-inbox']
+      },
+      {
+        id: 'sales-agent',
+        inboxIds: ['sales-inbox'],
+        passwordHash:
+          '$argon2id$v=19$m=19456,t=2,p=1$c2FsZXMtc3ludGhldGljLXNhbHQ$c2FsZXMtcGFzc3dvcmQtaGFzaC1mb3ItdGVzdGluZw',
+        replyIntentInboxIds: []
+      }
+    ]);
   });
 
   it('rejects a dashboard without configured inboxes, inexact dashboard records, and non-public origins', async () => {
@@ -277,6 +308,25 @@ describe('loadRuntimeConnectionConfiguration', () => {
     const unknownInboxScope = validDashboardConfiguration();
     unknownInboxScope.dashboard.principals[0]!.inboxIds = ['not-configured'];
 
+    const malformedReplyIntentInboxScope = validDashboardConfiguration();
+    malformedReplyIntentInboxScope.dashboard.principals[0]!.replyIntentInboxIds = ['..'];
+
+    const nonArrayReplyIntentInboxScope = validDashboardConfiguration();
+    nonArrayReplyIntentInboxScope.dashboard.principals[0]!.replyIntentInboxIds =
+      'sales-inbox' as unknown as string[];
+
+    const duplicateReplyIntentInboxScope = validDashboardConfiguration();
+    duplicateReplyIntentInboxScope.dashboard.principals[0]!.replyIntentInboxIds = [
+      'sales-inbox',
+      'sales-inbox'
+    ];
+
+    const unknownReplyIntentInboxScope = validDashboardConfiguration();
+    unknownReplyIntentInboxScope.dashboard.principals[0]!.replyIntentInboxIds = ['not-configured'];
+
+    const replyIntentOutsideReadScope = validDashboardConfiguration();
+    replyIntentOutsideReadScope.dashboard.principals[1]!.replyIntentInboxIds = ['support-inbox'];
+
     for (const configuration of [
       noPrincipals,
       duplicatePrincipalId,
@@ -291,7 +341,12 @@ describe('loadRuntimeConnectionConfiguration', () => {
       invalidPrincipalKeys,
       emptyInboxScope,
       duplicateInboxScope,
-      unknownInboxScope
+      unknownInboxScope,
+      malformedReplyIntentInboxScope,
+      nonArrayReplyIntentInboxScope,
+      duplicateReplyIntentInboxScope,
+      unknownReplyIntentInboxScope,
+      replyIntentOutsideReadScope
     ]) {
       readFileMock.mockResolvedValueOnce(JSON.stringify(configuration));
       await expectGenericFailure(loadRuntimeConnectionConfiguration(CONFIGURATION_PATH));
@@ -854,6 +909,7 @@ interface MutableRuntimeDashboardPrincipal {
   id: string;
   inboxIds: string[];
   passwordHash: string;
+  replyIntentInboxIds?: string[];
 }
 
 interface MutableRuntimeInbox {

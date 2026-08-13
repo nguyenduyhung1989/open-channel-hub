@@ -6,11 +6,13 @@ connections through one bearer credential. Phase 4a itself did not add an
 outbound message path. Phase 4c now allows that same bearer to record a
 source-bound reply intent and Phase 4d lets it read the same scope's queued
 intent history. The Phase 4e source adds a server-rendered view of that
-history for a configured dashboard principal, but none of these additions adds
-a dashboard reply form, user account, organization, role model, conversation
-summary, search, provider token, or live-provider operation. See the
+history for a configured dashboard principal. The Phase 4f candidate adds a
+separate opt-in source-bound dashboard form, but none of these additions adds a
+user account, organization, role model, conversation summary, search, provider
+token, or live-provider operation. See the
 [operator dashboard guide](operator-dashboard-4b.md) and the
-[Phase 4e guide](operator-dashboard-queued-history-4e.md).
+[Phase 4e guide](operator-dashboard-queued-history-4e.md) and
+[Phase 4f guide](operator-dashboard-reply-intents-4f.md).
 
 The word "inbox" in these phases means a server-selected scope, not a complete
 customer-support product. The PostgreSQL ledger remains the source of the
@@ -199,7 +201,32 @@ not change the Phase 4d inbox-bearer API or make `queued` into a delivery
 result. It is not a public-TLS or production deployment claim. See the dedicated
 [Phase 4e dashboard-history guide](operator-dashboard-queued-history-4e.md).
 
-## What remains outside Phase 4e
+## Phase 4f candidate dashboard write subset
+
+The Phase 4f candidate keeps read scope and write scope distinct. An optional
+`dashboard.principals[].replyIntentInboxIds` array must be a unique subset of
+that same principal's readable `inboxIds`; absence resolves to an empty list.
+The server therefore renders a reply-intent form only for an explicitly enabled
+principal/inbox pair, while the same principal can continue to read any inbox
+already granted by `inboxIds`.
+
+Each form belongs to one rendered durable inbound event. Its editable value is
+reply text; the server provides the source connection ID, source provider-event
+ID, and fresh UUIDv4 operation ID as hidden transport inputs. On submission it
+requires the signed dashboard session, exact configured HTTPS origin,
+anti-forgery token, strict non-duplicated form, explicit write grant, and the
+existing Phase 4c source-bound command store. The browser never receives an
+inbox bearer, provider credential, recipient, or private target.
+
+A created command or exact replay redirects to the existing queued-history
+page and says only that the intent was recorded, not sent. The candidate adds no
+provider request, dispatch, retry, delivery model, command mutation, or schema
+change. Its local in-process guard allows at most 20 record attempts per
+rolling minute per configured dashboard principal; an HTTPS proxy still needs
+its own rate limit and safe log handling. See the
+[Phase 4f reply-intent guide](operator-dashboard-reply-intents-4f.md).
+
+## What remains outside the Phase 4f candidate
 
 - No full user identity, organization, role-based access control, invitation
   flow, audit log, public connection administration, or token rotation
@@ -218,7 +245,7 @@ result. It is not a public-TLS or production deployment claim. See the dedicated
 The repository's disposable Compose smoke test exercises multiple synthetic
 connections in two separate configured inboxes, bearer isolation, cursor-scope
 rejection, canonical-only inbound output, and queued-command history scope/safe
-projection. That verified Phase 4a–4d evidence does not verify the current
-Phase 4e dashboard-history source. It makes no provider network request and
-does not prove a live account, TLS endpoint, delivery, or production
-authorization model.
+projection. That verified Phase 4a–4d evidence does not verify the Phase 4f
+candidate dashboard write path. It makes no provider network request and does
+not prove a live account, TLS endpoint, delivery, or production authorization
+model.

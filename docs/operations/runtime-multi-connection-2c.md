@@ -4,8 +4,9 @@ This guide configures the current alpha's official Telegram Bot, Zalo Official
 Account (OA), Facebook Page, WhatsApp Business, optional inbox entries, and
 optional Phase 4b operator dashboard. The dashboard is a small
 server-rendered local-principal surface, not a full user, organization,
-public-connection, or permission model. It has not been verified with a real
-provider account or public TLS endpoint.
+public-connection, or permission model. The Phase 4f candidate adds an
+explicit opt-in write subset for source-bound reply intents; it has not been
+verified with a real provider account or public TLS endpoint.
 
 ## What is configured
 
@@ -174,7 +175,8 @@ The root document may additionally include `dashboard`, but only when
       {
         "id": "support-agent",
         "passwordHash": "<Argon2id PHC value>",
-        "inboxIds": ["support-inbox"]
+        "inboxIds": ["support-inbox"],
+        "replyIntentInboxIds": ["support-inbox"]
       }
     ]
   }
@@ -189,7 +191,9 @@ is a different printable 32–512-character value. These secrets must not collid
 with each other or any connection/inbox credential. Each of one to one hundred
 principals has a unique safe opaque ID, an Argon2id PHC password hash using the
 exact `m=19456,t=2,p=1` profile, and one to one hundred unique existing inbox
-IDs.
+IDs. Its optional `replyIntentInboxIds` field is a unique subset of those
+already readable inbox IDs. When omitted, it becomes an empty immutable set and
+does not grant dashboard intent recording.
 
 Dashboard configuration creates no browser bearer. It enables only
 server-rendered `/operator` routes with signed `Secure` `HttpOnly`
@@ -199,7 +203,11 @@ must be deployed behind a real TLS proxy. Follow the
 [Phase 4b operator dashboard guide](operator-dashboard-4b.md) for password
 hashing, proxy controls, session rotation, and limits. The Phase 4e source
 adds no configuration field: it uses the same signed session to render one
-assigned inbox's queued history with no browser bearer or outbound action.
+assigned inbox's queued history with no browser bearer or outbound action. The
+Phase 4f candidate adds only `replyIntentInboxIds` and uses it to gate one
+server-rendered source-bound intent form per persisted inbound event; it does
+not add provider configuration, a browser bearer, recipient selection, or a
+provider send. See the [Phase 4f reply-intent guide](operator-dashboard-reply-intents-4f.md).
 
 Do not paste a real document in a terminal command, issue, pull request,
 screenshot, log, or repository file. The samples above contain placeholders,

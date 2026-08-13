@@ -1,10 +1,11 @@
 # Phase 4b operator dashboard
 
-Phase 4b adds an optional, read-only browser dashboard. It renders HTML on the
-server at `/operator`; the browser receives no inbox bearer, provider
-credential, password hash, or JavaScript API client. This document describes
-the implemented boundary, not a claim that a TLS proxy or production deployment
-has been verified.
+Phase 4b adds an optional, read-only-by-default browser dashboard. It renders
+HTML on the server at `/operator`; the browser receives no inbox bearer,
+provider credential, password hash, or JavaScript API client. The separate
+Phase 4f candidate proposes a deliberately narrower opt-in source-bound intent
+form. This document describes the implemented and candidate boundaries, not a
+claim that a TLS proxy or production deployment has been verified.
 
 The dashboard is absent when the `dashboard` object is absent from the runtime
 configuration. The supplied local Compose runner intentionally leaves it
@@ -63,7 +64,8 @@ following is a shape example, not usable configuration:
       {
         "id": "support-agent",
         "passwordHash": "<Argon2id PHC value>",
-        "inboxIds": ["support-inbox"]
+        "inboxIds": ["support-inbox"],
+        "replyIntentInboxIds": ["support-inbox"]
       }
     ]
   }
@@ -86,6 +88,10 @@ The validator requires the following:
   same safe opaque-label alphabet as inbox IDs and cannot be `.` or `..`.
   Every principal has one to one hundred unique inbox IDs that already exist
   in `inboxes`.
+- `replyIntentInboxIds` is optional. If supplied, it has zero to one hundred
+  unique existing inbox IDs, and every value must already appear in the same
+  principal's `inboxIds`. If it is omitted, the principal has no dashboard
+  reply-intent write grant and remains read-only.
 - `passwordHash` is an Argon2id PHC version-19 value using exactly
   `m=19456,t=2,p=1`. The supplied password command creates this required
   profile; hashes with another cost profile are rejected.
@@ -139,6 +145,18 @@ an inbox bearer in the browser. See the
 [queued-command history guide](operator-dashboard-queued-history-4e.md)
 for its narrower projection and explicit no-send boundary.
 
+The Phase 4f candidate adds `POST /operator/reply-intents` only for a
+principal/inbox pair explicitly present in `replyIntentInboxIds`. It renders
+one native form inside each already persisted inbound event card at `/operator`.
+Reply text is the only editable value; the source reference and fresh UUIDv4
+operation ID are server-rendered hidden inputs and are revalidated after the
+form returns. A successful record or exact idempotent replay redirects to the
+queued-history page without a command-result URL signal. The queued-history row
+is the only browser evidence of a durable record. This is not a recipient
+picker, provider send, retry, or delivery control. Follow the dedicated
+[Phase 4f reply-intent guide](operator-dashboard-reply-intents-4f.md) before
+enabling this candidate write grant.
+
 Use the dashboard's **Log out** form when leaving the workstation. It revokes
 the server-side session and clears the cookie. Sessions also expire after 30
 minutes without an authenticated dashboard read and never survive more than
@@ -157,6 +175,13 @@ eight hours from issue time.
   ten-minute in-process block. It deliberately does not record an IP address,
   password, or raw form value. Configure edge rate limiting before exposing
   the login route to untrusted networks.
+- The Phase 4f candidate form additionally requires an active signed session,
+  exact `Origin`, matching anti-forgery value, and strict non-duplicated form
+  body before it resolves the explicit write grant. Its local guard permits at
+  most 20 recording attempts per rolling minute per configured principal. That
+  guard is not shared across processes or hosts; the proxy must still
+  rate-limit `POST /operator/reply-intents` and omit form/cookie/message values
+  from logs.
 - Changing a password hash does not itself revoke an existing session. Rotate
   `sessionIdPepper` and recreate the API when an immediate forced logout is
   required. This invalidates every existing dashboard session, so coordinate
@@ -189,13 +214,13 @@ for a documented operation.
 - No conversation model, read/unread state, assignment, label, search,
   attachment, provider dispatch, provider access-token, OAuth, or live provider
   operation. Phase 4c's API-only source-bound reply-command ledger and Phase
-  4d's API-only queued-history reader have no dashboard reply form. The Phase
-  4e source renders history only; it has no command-creation, recipient,
-  send, retry, or cancellation control. The dashboard remains read-only apart
-  from normal session management such as logout.
+  4d's API-only queued-history reader remain unchanged. The Phase 4e source
+  renders history only. The Phase 4f candidate can record only the existing
+  source-bound `queued` intent through an explicit per-inbox grant; it has no
+  recipient, send, retry, cancellation, or delivery control.
 
 The repository's Compose smoke test deliberately validates only the database
 migration count and existing synthetic API paths over loopback HTTP. Dashboard
-authentication is tested at the route layer with synthetic features; it is not
-forced through HTTP Compose because that would not prove the required HTTPS
-cookie and origin behavior.
+authentication and the Phase 4f candidate form are tested at the route layer
+with synthetic features; they are not forced through HTTP Compose because that
+would not prove the required HTTPS cookie and origin behavior.

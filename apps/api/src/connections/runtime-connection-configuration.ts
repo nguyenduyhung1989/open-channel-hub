@@ -83,6 +83,12 @@ export interface RuntimeDashboardPrincipal {
   readonly id: string;
   readonly inboxIds: readonly string[];
   readonly passwordHash: string;
+  /**
+   * The explicitly configured subset allowed to create durable reply intent.
+   * Omission from the configuration becomes a frozen empty allow-list so every
+   * existing dashboard principal remains read-only by default.
+   */
+  readonly replyIntentInboxIds: readonly string[];
 }
 
 /**
@@ -168,6 +174,7 @@ const DASHBOARD_REQUIRED_KEYS = Object.freeze([
   'principals'
 ]);
 const DASHBOARD_PRINCIPAL_REQUIRED_KEYS = Object.freeze(['id', 'passwordHash', 'inboxIds']);
+const DASHBOARD_PRINCIPAL_OPTIONAL_KEYS = Object.freeze(['replyIntentInboxIds']);
 const CONNECTION_ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
 const PRINTABLE_TOKEN_PATTERN = /^[!-~]+$/;
 const WEBHOOK_SECRET_PATTERN = /^[A-Za-z0-9_-]{32,256}$/;
@@ -634,7 +641,7 @@ const parseDashboardPrincipal = (
   configuredInboxIds: ReadonlySet<string>
 ): RuntimeDashboardPrincipal => {
   if (
-    !hasExactKeys(value, DASHBOARD_PRINCIPAL_REQUIRED_KEYS, []) ||
+    !hasExactKeys(value, DASHBOARD_PRINCIPAL_REQUIRED_KEYS, DASHBOARD_PRINCIPAL_OPTIONAL_KEYS) ||
     !isDashboardPrincipalId(value.id) ||
     !isArgon2idPhcPasswordHash(value.passwordHash) ||
     !Array.isArray(value.inboxIds) ||
@@ -654,11 +661,55 @@ const parseDashboardPrincipal = (
     inboxIds.add(inboxId);
   }
 
+  const replyIntentInboxIds = parseReplyIntentInboxIds({
+    candidate: value.replyIntentInboxIds,
+    configuredInboxIds,
+    readableInboxIds: inboxIds
+  });
+
   return Object.freeze({
     id: value.id,
     inboxIds: Object.freeze([...inboxIds].sort()),
-    passwordHash: value.passwordHash
+    passwordHash: value.passwordHash,
+    replyIntentInboxIds
   });
+};
+
+interface ParseReplyIntentInboxIdsInput {
+  readonly candidate: unknown;
+  readonly configuredInboxIds: ReadonlySet<string>;
+  readonly readableInboxIds: ReadonlySet<string>;
+}
+
+const parseReplyIntentInboxIds = ({
+  candidate,
+  configuredInboxIds,
+  readableInboxIds
+}: ParseReplyIntentInboxIdsInput): readonly string[] => {
+  if (candidate === undefined) {
+    return Object.freeze([]);
+  }
+
+  if (!Array.isArray(candidate) || candidate.length > MAXIMUM_INBOXES) {
+    throw new RuntimeConnectionConfigurationError();
+  }
+
+  const replyIntentInboxIds = new Set<string>();
+
+  for (const inboxId of candidate) {
+    if (
+      !isInboxId(inboxId) ||
+      !configuredInboxIds.has(inboxId) ||
+      !readableInboxIds.has(inboxId) ||
+      replyIntentInboxIds.has(inboxId)
+    ) {
+      throw new RuntimeConnectionConfigurationError();
+    }
+
+    replyIntentInboxIds.add(inboxId);
+  }
+
+  return Object.freeze([...replyIntentInboxIds].sort());
 };
 
 const parseConnection = (value: unknown): RuntimeConnection => {

@@ -15,6 +15,11 @@ Phase 4e source adds a separate server-rendered, read-only history
 view for configured dashboard principals; it does not alter this inbox-bearer
 API or add an outbound browser action. See the
 [Phase 4e dashboard-history guide](operator-dashboard-queued-history-4e.md).
+The separate Phase 4f candidate proposes a constrained dashboard form that
+records through the existing Phase 4c command boundary only after an explicit
+per-principal inbox grant; it does not alter this history API, its cursor, or
+its `queued`-only projection. See the
+[Phase 4f reply-intent guide](operator-dashboard-reply-intents-4f.md).
 
 ## Prerequisites
 
@@ -112,8 +117,10 @@ send attempt, delivery, or read status.
   provider token/OAuth storage, attempt record, timeout policy, retry, receipt,
   delivery/read status, attachment, template, or media support.
 - No command mutation, cancel/send button, or public connection discovery.
-  The Phase 4e source is a separate dashboard history view only; it has no
-  command-creation, recipient, send, retry, cancellation, or delivery control.
+  The Phase 4e source is a separate dashboard history view only. The Phase 4f
+  candidate can record only the existing source-bound command from an explicitly
+  granted event form; it has no recipient, provider send, retry, cancellation,
+  or delivery control.
 - No real Telegram, Zalo OA, Facebook Page, WhatsApp Business, public TLS, or
   production authorization proof.
 

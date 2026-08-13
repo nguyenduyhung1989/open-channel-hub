@@ -2,8 +2,11 @@
 
 Phase 4e is a small server-rendered dashboard page that lets a configured,
 authenticated dashboard principal inspect `queued` reply intents for one of
-that principal's configured inboxes. It does **not** create, send, retry,
-cancel, update, deliver, or mark any message read.
+that principal's configured inboxes. Phase 4e itself does **not** create, send,
+retry, cancel, update, deliver, or mark any message read. The separate Phase
+4f candidate can record the existing source-bound intent from an explicitly
+granted event form; it does not change this history page into a send or
+delivery surface.
 
 `queued` means PostgreSQL has recorded immutable operator intent. It is not a
 provider acceptance, send attempt, delivery, or read status. Exact commit
@@ -33,6 +36,11 @@ or production claim.
 Do not configure an inbox bearer in a browser, a URL, a page source, or a
 browser-side request. The dashboard has its own signed session and obtains the
 read capability only inside the server process.
+
+The Phase 4f candidate adds an optional dashboard-principal
+`replyIntentInboxIds` field, not a Phase 4e history configuration field. It is
+an explicit write subset of already readable inboxes and is documented in the
+[Phase 4f reply-intent guide](operator-dashboard-reply-intents-4f.md).
 
 ## Open the page
 
@@ -105,11 +113,15 @@ command history.
 
 This page has no browser JavaScript or API bearer, no command creation form,
 and no provider network operation. The normal dashboard logout form remains a
-session-management control; it is not an outbound action.
+session-management control; it is not an outbound action. Phase 4f's candidate
+form is a separate `/operator` event-card control, available only after an
+explicit per-principal inbox grant and still bounded to the existing durable
+intent store.
 
 Phase 4e does not change `outbound_commands`, the immutable-row trigger, the
 Phase 4d reader, or the provider boundary. The only ordinary write while
-viewing is the dashboard session's existing idle-timeout touch. A later
-dispatcher needs a separate provider-specific design for capabilities,
-authorization, durable attempts, timeout uncertainty, retries, receipts, and
-delivery state.
+viewing is the dashboard session's existing idle-timeout touch. Phase 4f's
+candidate reuses the existing Phase 4c immutable write path but adds no schema
+or provider behavior. A later dispatcher needs a separate provider-specific
+design for capabilities, authorization, durable attempts, timeout uncertainty,
+retries, receipts, and delivery state.
