@@ -30,10 +30,10 @@ verification.
 
 **Status: the Phase 1a implementation is present, but Phase 1a is not
 complete.** Historical local and GitHub evidence exists for candidate
-<code>7141949</code>. The current Phase 2a work adds storage and has passed its
-own final local verification; fresh GitHub evidence remains pending. No real
-Telegram Bot token, authenticated Bot API request, or test-bot flow has
-occurred.
+<code>7141949</code>. Phase 2a GitHub CI and CodeQL succeeded at
+<code>f106bb8</code>. The current Phase 2b work adds a canonical event-read
+path and still needs verification for its own commit. No real Telegram Bot
+token, authenticated Bot API request, or test-bot flow has occurred.
 
 ### 1a — HTTP boundary and local operation
 
@@ -62,8 +62,8 @@ or complete deduplication/rate-limit/operational assurance.
 
 ### 2a — scoped PostgreSQL inbound-event ledger
 
-**Status: implementation, final local checks, and a local synthetic Docker
-proof are present; fresh GitHub evidence is pending.**
+**Status: implementation, final local checks, a local synthetic Docker proof,
+and GitHub CI/CodeQL evidence at <code>f106bb8</code> are present.**
 
 - [x] A pinned PostgreSQL 18.4 Compose service on an internal data network,
       with no database host port.
@@ -82,10 +82,29 @@ proof are present; fresh GitHub evidence is pending.**
 - [x] Final local candidate checks: formatting, lint, type checking, 63 tests,
       build, low-threshold dependency audit, Compose configuration, synthetic
       Docker verification, and independent audit.
-- [ ] Fresh GitHub CI/CodeQL for the actual Phase 2a commit.
+- [x] GitHub CI and CodeQL succeeded for the actual Phase 2a commit
+      <code>f106bb8</code>.
 - [ ] A retention/deletion policy, backup automation, restore drill,
       access/audit model, encryption-at-rest decision, and capacity limits before
       real customer data is operated.
+
+### 2b — operator event read path
+
+**Status: implementation is present; final local and GitHub verification for
+its eventual commit remain required.**
+
+- [x] <code>GET /v1/telegram-bot/inbound-events</code> requires the local
+      operator token, never accepts a caller-selected connection ID, and returns
+      only canonical events for the configured Telegram connection.
+- [x] The PostgreSQL ledger has a forward-only stable sequence and a
+      connection-scoped index for keyset pagination.
+- [x] Opaque cursors hold a stable snapshot ceiling, so a page traversal does
+      not skip or duplicate events when new events arrive later.
+- [x] Ledger appends serialize sequence allocation and commit before readers
+      establish a snapshot. This preserves the stable-pagination invariant.
+- [ ] Final local candidate checks, synthetic Compose verification of the read
+      path, independent review, and fresh GitHub CI/CodeQL for the exact Phase
+      2b commit.
 
 ### Later Phase 2 work
 

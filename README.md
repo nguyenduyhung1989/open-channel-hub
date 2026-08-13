@@ -2,13 +2,13 @@
 
 > A self-hosted, official-first multichannel messaging hub.
 
-**Status: Phase 2a alpha.** The repository now contains a durable PostgreSQL
-inbound-event ledger and a local synthetic Docker proof for it. Final local
-candidate verification has passed; fresh GitHub checks for the eventual commit
-remain pending. Phase 1a also remains incomplete until an owner-authorized
-Telegram test bot works through public TLS. The earlier Phase 1a GitHub CI and
-CodeQL evidence at commit <code>7141949</code> is historical evidence for that
-commit, not a release.
+**Status: Phase 2b alpha.** The repository now contains a durable PostgreSQL
+inbound-event ledger and an operator-only API for reading canonical events from
+the configured Telegram connection. GitHub CI and CodeQL succeeded for the
+Phase 2a commit <code>f106bb8</code>. The current Phase 2b candidate still
+needs final local and GitHub verification for its own commit. Phase 1a remains
+incomplete until an owner-authorized Telegram test bot works through public
+TLS.
 
 The official Telegram Bot HTTP transport is wired for a deliberately narrow
 text send/receive slice. A local operator uses <code>OPERATOR_API_TOKEN</code>;
@@ -21,6 +21,12 @@ returns. The storage scope is intentionally small: database
 for the event, not the raw provider payload. A primary key on
 <code>(connection_id, provider_event_id)</code> makes a repeated provider
 delivery a no-op for the same configured connection.
+
+Phase 2b adds <code>GET /v1/telegram-bot/inbound-events</code>. It requires the
+local <code>OPERATOR_API_TOKEN</code>, always scopes reads to the one Telegram
+connection configured by the process, and returns only canonical event fields.
+It uses an opaque cursor over a stable reverse-chronological snapshot, so newer
+events do not shift or duplicate an operator's already-started page traversal.
 
 Compose runs a pinned PostgreSQL 18.4 image on an internal data network, starts
 an idempotent migration service before the API, and does not publish a database
@@ -50,6 +56,9 @@ CAPTCHA bypass, fingerprint spoofing, session theft, or bulk-spam capabilities.
 - A PostgreSQL adapter behind a domain-owned inbound-event port. It writes
   canonical incoming text events with parameterized SQL and conflict-safe
   idempotency; raw Telegram payloads are deliberately not stored.
+- An operator-authenticated, connection-scoped inbound-event read API with
+  bounded keyset pagination and opaque cursors. It returns canonical events,
+  not database rows or raw Telegram payloads.
 - An isolated PostgreSQL database and schema, a non-superuser application role,
   immutable migration ledger, and readiness that refuses traffic when the
   expected migration is unavailable.
@@ -62,9 +71,9 @@ CAPTCHA bypass, fingerprint spoofing, session theft, or bulk-spam capabilities.
 
 The following remain plans or explicitly incomplete operational work:
 
-- A user-visible inbox, event query API, conversation model, attachment
-  storage, search, retention/deletion policy, backups, restore drills, or
-  encryption-at-rest assurance.
+- A user-visible inbox, conversation model, attachment storage, search,
+  retention/deletion policy, backups, restore drills, or encryption-at-rest
+  assurance.
 - Redis, a queue, durable outbound delivery, retries, and an outbox.
 - A web dashboard, user accounts, role-based access control, multiple
   organizations, and webhook administration.
@@ -165,6 +174,22 @@ proxy in front of Compose, keep the operator API on loopback, and follow the
 [Phase 1a Telegram Bot operations guide](docs/operations/telegram-bot-1a.md)
 only after an authorized test is agreed. Starting Compose does not provide TLS
 or register a webhook automatically.
+
+## Read canonical inbound events
+
+When Telegram and PostgreSQL are enabled, a local operator can call
+<code>GET /v1/telegram-bot/inbound-events</code> with the same bearer token used
+for the outbound operator API. The route accepts an optional
+<code>limit</code> from 1 to 100 (default 50) and an optional opaque
+<code>cursor</code> returned by the preceding page. It does not accept a
+connection ID: the process always reads only its configured Telegram
+connection.
+
+The response contains <code>events</code> and, when another page exists,
+<code>nextCursor</code>. Treat the cursor as opaque. It is a stable snapshot
+position, not an authorization mechanism; bearer authentication and the fixed
+connection scope remain mandatory. This API is not a dashboard, user login,
+role-based access control, search service, or a raw-provider-payload archive.
 
 ## Corresponding-source offer
 

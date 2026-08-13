@@ -5,6 +5,8 @@ import {
 import type { CanonicalEvent, ProviderCommand, ProviderReceipt } from '@open-channel-hub/contracts';
 import {
   SendMessage,
+  type InboundEventListInput,
+  type InboundEventPage,
   type OutboundMessagePort,
   type SendMessageResult
 } from '@open-channel-hub/domain';
@@ -15,6 +17,7 @@ import type { TelegramBotFeature } from './telegram-bot-feature.js';
 export interface CreateTelegramBotFeatureOptions {
   readonly fetchImpl?: typeof fetch;
   readonly now?: () => Date;
+  readonly readInboundEvents: (input: InboundEventListInput) => Promise<InboundEventPage>;
   readonly receiveEvents: (events: readonly CanonicalEvent[]) => Promise<void>;
 }
 
@@ -47,6 +50,7 @@ export const createTelegramBotFeature = async (
     connectionId: environment.connectionId,
     normalize: (rawEvent: unknown): readonly CanonicalEvent[] => connector.normalize(rawEvent),
     operatorApiToken: environment.operatorApiToken,
+    readInboundEvents: options.readInboundEvents,
     receiveEvents: options.receiveEvents,
     sendMessage: async (input: unknown): Promise<SendMessageResult> => sendMessage.execute(input),
     webhookSecret: environment.webhookSecret

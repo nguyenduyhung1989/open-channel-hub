@@ -1,4 +1,5 @@
 import type { EnabledTelegramBotEnvironment } from '../config/environment.js';
+import type { InboundEventPage } from '@open-channel-hub/domain';
 import { describe, expect, it, vi } from 'vitest';
 
 import { buildApp } from '../app.js';
@@ -20,9 +21,11 @@ describe('createTelegramBotFeature', () => {
         new Response(JSON.stringify({ ok: true, result: { message_id: 301 } }), { status: 200 })
       );
     const receiveEvents = vi.fn(async (): Promise<void> => undefined);
+    const readInboundEvents = vi.fn(async (): Promise<InboundEventPage> => ({ events: [] }));
     const feature = await createTelegramBotFeature(ENVIRONMENT, {
       fetchImpl,
       now: () => new Date('2026-08-12T00:00:00.000Z'),
+      readInboundEvents,
       receiveEvents
     });
 
@@ -53,7 +56,16 @@ describe('createTelegramBotFeature', () => {
     });
     await feature.receiveEvents(events);
 
+    await feature.readInboundEvents({
+      connectionId: 'telegram-bot-default',
+      pageSize: 50
+    });
+
     expect(receiveEvents).toHaveBeenCalledWith(events);
+    expect(readInboundEvents).toHaveBeenCalledWith({
+      connectionId: 'telegram-bot-default',
+      pageSize: 50
+    });
   });
 
   it('completes a synthetic authenticated HTTP send through every Phase 1a layer', async () => {
@@ -65,6 +77,7 @@ describe('createTelegramBotFeature', () => {
     const feature = await createTelegramBotFeature(ENVIRONMENT, {
       fetchImpl,
       now: () => new Date('2026-08-12T00:00:00.000Z'),
+      readInboundEvents: async (): Promise<InboundEventPage> => ({ events: [] }),
       receiveEvents: async (): Promise<void> => undefined
     });
     const app = await buildApp({ telegramBot: feature });

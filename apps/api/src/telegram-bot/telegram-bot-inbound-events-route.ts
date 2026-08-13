@@ -1,0 +1,133 @@
+import type { CanonicalEvent } from '@open-channel-hub/contracts';
+import type { InboundEventPageCursor } from '@open-channel-hub/domain';
+import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
+
+import { apiFailure, apiSuccess } from '../http/api-response.js';
+import { matchesBearerToken } from '../http/secret-match.js';
+import type { TelegramBotFeature } from './telegram-bot-feature.js';
+
+const DEFAULT_PAGE_SIZE = 50;
+const MAX_CURSOR_LENGTH = 512;
+const MAX_POSTGRES_BIGINT = '9223372036854775807';
+const sequenceSchema = z.string().regex(/^[1-9][0-9]{0,18}$/);
+const pageCursorSchema = z
+  .object({
+    beforeSequence: sequenceSchema,
+    snapshotMaxSequence: sequenceSchema
+  })
+  .strict();
+const querySchema = z
+  .object({
+    cursor: z.string().min(1).max(MAX_CURSOR_LENGTH).optional(),
+    limit: z
+      .string()
+      .regex(/^(?:[1-9][0-9]?|100)$/)
+      .optional()
+  })
+  .strict();
+
+/**
+ * Lists canonical events for the one Telegram connection configured by this
+ * process. The opaque cursor prevents callers from selecting another account
+ * or constructing storage queries directly.
+ */
+export const registerTelegramBotInboundEventsRoute = async (
+  app: FastifyInstance,
+  feature: TelegramBotFeature
+): Promise<void> => {
+  app.get('/v1/telegram-bot/inbound-events', async (request, reply) => {
+    if (!matchesBearerToken(request.headers.authorization, feature.operatorApiToken)) {
+      return reply
+        .code(401)
+        .send(apiFailure('unauthorized', 'The operator credential is invalid.'));
+    }
+
+    const query = querySchema.safeParse(request.query);
+
+    if (!query.success) {
+      return reply.code(400).send(apiFailure('validation_error', 'The request is invalid.'));
+    }
+
+    const cursor = decodeCursor(query.data.cursor);
+
+    if (cursor === null) {
+      return reply.code(400).send(apiFailure('validation_error', 'The request is invalid.'));
+    }
+
+    const page = await feature.readInboundEvents({
+      connectionId: feature.connectionId,
+      ...(cursor === undefined ? {} : { cursor }),
+      pageSize: query.data.limit === undefined ? DEFAULT_PAGE_SIZE : Number(query.data.limit)
+    });
+
+    return reply.code(200).send(
+      apiSuccess({
+        events: page.events.map(toPublicCanonicalEvent),
+        ...(page.nextCursor === undefined ? {} : { nextCursor: encodeCursor(page.nextCursor) })
+      })
+    );
+  });
+};
+
+const decodeCursor = (value: string | undefined): InboundEventPageCursor | null | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (!/^[A-Za-z0-9_-]+$/.test(value)) {
+    return null;
+  }
+
+  try {
+    const encoded = Buffer.from(value, 'base64url');
+
+    if (encoded.toString('base64url') !== value) {
+      return null;
+    }
+
+    const parsed = pageCursorSchema.safeParse(JSON.parse(encoded.toString('utf8')));
+
+    return parsed.success && isValidCursor(parsed.data) ? parsed.data : null;
+  } catch {
+    return null;
+  }
+};
+
+const encodeCursor = (cursor: InboundEventPageCursor): string => {
+  const parsed = pageCursorSchema.safeParse(cursor);
+
+  if (!parsed.success || !isValidCursor(parsed.data)) {
+    throw new Error('The inbound-event reader returned an invalid cursor.');
+  }
+
+  return Buffer.from(JSON.stringify(parsed.data), 'utf8').toString('base64url');
+};
+
+const isValidCursor = (cursor: InboundEventPageCursor): boolean =>
+  isPositivePostgresBigInt(cursor.beforeSequence) &&
+  isPositivePostgresBigInt(cursor.snapshotMaxSequence) &&
+  compareDecimalStrings(cursor.beforeSequence, cursor.snapshotMaxSequence) <= 0;
+
+const isPositivePostgresBigInt = (value: string): boolean =>
+  value.length < MAX_POSTGRES_BIGINT.length ||
+  (value.length === MAX_POSTGRES_BIGINT.length && value <= MAX_POSTGRES_BIGINT);
+
+const compareDecimalStrings = (left: string, right: string): number =>
+  left.length === right.length ? left.localeCompare(right) : left.length - right.length;
+
+const toPublicCanonicalEvent = (event: CanonicalEvent): CanonicalEvent =>
+  Object.freeze({
+    channel: event.channel,
+    connectionId: event.connectionId,
+    id: event.id,
+    message: Object.freeze({
+      conversationId: event.message.conversationId,
+      id: event.message.id,
+      senderId: event.message.senderId,
+      text: event.message.text
+    }),
+    occurredAt: event.occurredAt,
+    providerEventId: event.providerEventId,
+    type: event.type
+  });

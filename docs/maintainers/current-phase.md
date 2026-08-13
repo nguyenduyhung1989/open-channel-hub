@@ -1,11 +1,11 @@
-# Public checkpoint: Phase 2a
+# Public checkpoint: Phase 2b
 
-**Updated:** 2026-08-12
+**Updated:** 2026-08-13
 
-**Objective:** add the smallest durable PostgreSQL vertical slice: a dedicated
-database/schema, a non-superuser application role, forward migrations, and
-idempotent persistence of canonical inbound Telegram text events. This
-checkpoint does not authorize a real Telegram call or a production deployment.
+**Objective:** close the smallest useful Telegram read loop: durable canonical
+inbound events can be listed by the authenticated local operator without raw
+provider payloads, arbitrary connection selection, a dashboard, or a real
+Telegram call. This checkpoint does not authorize a production deployment.
 
 ## Historical evidence that remains true
 
@@ -13,14 +13,15 @@ checkpoint does not authorize a real Telegram call or a production deployment.
 - GitHub Private Vulnerability Reporting, secret scanning, Dependabot alerts,
   and automatic security fixes are enabled.
 - GitHub CI and CodeQL succeeded for the Phase 1a candidate at
-  <code>7141949</code>. The earlier final local Phase 1a evidence also applies
-  to that candidate.
+  <code>7141949</code> and for the Phase 2a storage candidate at
+  <code>f106bb8</code>. The earlier final local Phase 1a evidence applies only
+  to its own candidate.
 - The <code>0.1.0</code> release tag has not been created; that is a separate
   owner decision.
 - Branch protection is intentionally open pending an owner decision. Do not
   describe it as an existing safeguard.
 
-Historical checks are not evidence for the current uncommitted Phase 2a
+Historical checks are not evidence for the current uncommitted Phase 2b
 candidate. In particular, the older read-only runtime check does not describe
 the current Compose secret-mount limitation.
 
@@ -41,6 +42,17 @@ the current Compose secret-mount limitation.
   canonical text-event fields using parameterized SQL. It excludes raw provider
   payloads and treats a repeated
   <code>(connection_id, provider_event_id)</code> as a conflict-safe no-op.
+- The domain also owns an inbound-event reader. The PostgreSQL adapter uses a
+  forward-only <code>ledger_id</code>, a connection-scoped index, and
+  parameterized keyset queries. The first page fixes a snapshot ceiling; every
+  continuation cursor remains below that same ceiling.
+- <code>GET /v1/telegram-bot/inbound-events</code> requires the operator bearer
+  token before parsing its query, accepts a bounded opaque cursor and page
+  limit, and always supplies the configured Telegram connection ID to the
+  reader. It returns canonical event fields only.
+- Ledger appends acquire a transaction-scoped advisory lock before identity
+  allocation and commit. That serialization makes the read-snapshot invariant
+  hold even when incoming events arrive concurrently.
 - Compose receives two different database passwords as Docker secrets:
   <code>POSTGRES_PASSWORD</code> for bootstrap and
   <code>DATABASE_PASSWORD</code> for the application role. The API receives
@@ -57,7 +69,7 @@ the current Compose secret-mount limitation.
   <code>api.telegram.org</code> returned <code>200</code>; no real Telegram
   Bot token, API method request, webhook registration, or message was used.
 
-## Final local verification
+## Historical Phase 2a verification
 
 - <code>npm run check</code> passed: formatting, lint, type checking, ten test
   files with 63 tests, coverage, and the production build.
@@ -72,14 +84,25 @@ the current Compose secret-mount limitation.
   internal data network and the edge network. An independent audit found no
   Critical, High, or Medium actionable finding.
 
+## Current Phase 2b candidate
+
+- The candidate adds the event-reader port, PostgreSQL migration
+  <code>0002_inbound_event_ledger_sequence</code>, the fixed-connection
+  operator read route, and an expanded synthetic Compose smoke script.
+- The CI workflow source now calls that disposable Compose smoke script after
+  the runtime image build. It has not yet run on GitHub for this uncommitted
+  candidate.
+- Final local checks and an independent review must still be completed for the
+  exact Phase 2b commit before any release claim.
+
 ## Not yet verified or implemented
 
-- No fresh GitHub CI or CodeQL result exists for the eventual Phase 2a commit.
+- No fresh GitHub CI or CodeQL result exists for the eventual Phase 2b commit.
 - No owner-authorized Telegram Bot test through a public TLS endpoint has
   occurred. Phase 1a is therefore still not complete.
-- There is no user inbox, event-query API, attachment persistence, Redis,
-  queue/outbox, outbound retry, user/organization model, RBAC, TLS proxy,
-  rate limit, or production observability.
+- There is no user inbox, attachment persistence, Redis, queue/outbox, outbound
+  retry, user/organization model, RBAC, TLS proxy, rate limit, or production
+  observability.
 - There is no retention/deletion policy, backup schedule, encrypted backup,
   restore procedure, recovery drill, encryption-at-rest assurance, or password
   rotation procedure.
@@ -102,8 +125,9 @@ the current Compose secret-mount limitation.
 
 ## Exact next verification
 
-1. After an authorized push, GitHub CI and CodeQL must be read for the exact
-   resulting commit before any release claim.
+1. Finish the Phase 2b local checks, synthetic Compose proof, and independent
+   review; then read GitHub CI and CodeQL for its exact authorized push before
+   any release claim.
 2. Only with owner authorization, use a test bot and public TLS URL to verify
    one real Telegram flow without printing a token, header, payload, or
    persisted message.

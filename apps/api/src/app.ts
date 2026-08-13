@@ -10,6 +10,7 @@ import {
   sourceOfferLinkHeader
 } from './source/source-offer.js';
 import type { TelegramBotFeature } from './telegram-bot/telegram-bot-feature.js';
+import { registerTelegramBotInboundEventsRoute } from './telegram-bot/telegram-bot-inbound-events-route.js';
 import { registerTelegramBotMessageRoute } from './telegram-bot/telegram-bot-message-route.js';
 import { registerTelegramBotWebhookRoute } from './telegram-bot/telegram-bot-webhook-route.js';
 
@@ -71,6 +72,7 @@ export const buildApp = async (options: BuildAppOptions = {}): Promise<FastifyIn
   await registerSourceOfferRoute(app, sourceOfferUrl);
 
   if (options.telegramBot !== undefined) {
+    await registerTelegramBotInboundEventsRoute(app, options.telegramBot);
     await registerTelegramBotMessageRoute(app, options.telegramBot);
     await registerTelegramBotWebhookRoute(app, options.telegramBot);
   }

@@ -1,0 +1,292 @@
+import { CHANNELS, type CanonicalEvent, type Channel } from '@open-channel-hub/contracts';
+import type {
+  InboundEventListInput,
+  InboundEventPage,
+  InboundEventPageCursor,
+  InboundEventReader
+} from '@open-channel-hub/domain';
+
+import { PostgresStorageError } from './postgres-error.js';
+import { POSTGRES_SCHEMA } from './postgres-migrations.js';
+import type { SqlPool } from './sql.js';
+
+const MAXIMUM_PAGE_SIZE = 100;
+const MAX_POSTGRES_BIGINT = '9223372036854775807';
+
+const SNAPSHOT_MAX_SEQUENCE_SQL = `
+SELECT MAX(ledger_id)::text AS snapshot_max_sequence
+FROM ${POSTGRES_SCHEMA}.inbound_events
+WHERE connection_id = $1
+`;
+
+const FIRST_PAGE_SQL = `
+SELECT
+  ledger_id::text AS ledger_id,
+  connection_id,
+  provider_event_id,
+  canonical_event_id,
+  channel,
+  event_type,
+  to_char(occurred_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS occurred_at,
+  conversation_id,
+  message_id,
+  sender_id,
+  message_text
+FROM ${POSTGRES_SCHEMA}.inbound_events
+WHERE connection_id = $1
+  AND ledger_id <= $2::bigint
+ORDER BY ledger_id DESC
+LIMIT $3
+`;
+
+const CONTINUATION_PAGE_SQL = `
+SELECT
+  ledger_id::text AS ledger_id,
+  connection_id,
+  provider_event_id,
+  canonical_event_id,
+  channel,
+  event_type,
+  to_char(occurred_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS occurred_at,
+  conversation_id,
+  message_id,
+  sender_id,
+  message_text
+FROM ${POSTGRES_SCHEMA}.inbound_events
+WHERE connection_id = $1
+  AND ledger_id <= $2::bigint
+  AND ledger_id < $3::bigint
+ORDER BY ledger_id DESC
+LIMIT $4
+`;
+
+interface ValidatedListInput {
+  readonly connectionId: string;
+  readonly pageSize: number;
+  readonly cursor?: InboundEventPageCursor;
+}
+
+interface ParsedLedgerRow {
+  readonly event: CanonicalEvent;
+  readonly sequence: string;
+}
+
+/**
+ * Parameterized PostgreSQL reader for the domain-owned inbound-event boundary.
+ * It returns only the canonical fields needed by callers, never a database row
+ * or raw provider payload.
+ */
+export class PostgresInboundEventReader implements InboundEventReader {
+  public constructor(private readonly pool: SqlPool) {}
+
+  public async list(input: InboundEventListInput): Promise<InboundEventPage> {
+    try {
+      const validated = validateInput(input);
+      const snapshotMaxSequence =
+        validated.cursor === undefined
+          ? await this.findSnapshotMaxSequence(validated.connectionId)
+          : validated.cursor.snapshotMaxSequence;
+
+      if (snapshotMaxSequence === undefined) {
+        return Object.freeze({ events: Object.freeze([]) });
+      }
+
+      const result =
+        validated.cursor === undefined
+          ? await this.pool.query(FIRST_PAGE_SQL, [
+              validated.connectionId,
+              snapshotMaxSequence,
+              validated.pageSize + 1
+            ])
+          : await this.pool.query(CONTINUATION_PAGE_SQL, [
+              validated.connectionId,
+              snapshotMaxSequence,
+              validated.cursor.beforeSequence,
+              validated.pageSize + 1
+            ]);
+
+      if (result.rows.length > validated.pageSize + 1) {
+        throw new PostgresStorageError();
+      }
+
+      const hasNextPage = result.rows.length > validated.pageSize;
+      const selectedRows = result.rows.slice(0, validated.pageSize);
+      const parsedRows = selectedRows.map((row) =>
+        parseLedgerRow(row, validated.connectionId, snapshotMaxSequence, validated.cursor)
+      );
+      assertDescendingSequences(parsedRows);
+      const events = Object.freeze(parsedRows.map((row) => row.event));
+
+      if (!hasNextPage) {
+        return Object.freeze({ events });
+      }
+
+      const lastRow = parsedRows.at(-1);
+
+      if (lastRow === undefined) {
+        throw new PostgresStorageError();
+      }
+
+      return Object.freeze({
+        events,
+        nextCursor: Object.freeze({
+          beforeSequence: lastRow.sequence,
+          snapshotMaxSequence
+        })
+      });
+    } catch (error) {
+      if (error instanceof PostgresStorageError) {
+        throw error;
+      }
+
+      throw new PostgresStorageError();
+    }
+  }
+
+  private async findSnapshotMaxSequence(connectionId: string): Promise<string | undefined> {
+    const result = await this.pool.query(SNAPSHOT_MAX_SEQUENCE_SQL, [connectionId]);
+
+    if (result.rows.length !== 1) {
+      throw new PostgresStorageError();
+    }
+
+    const value = result.rows[0]?.snapshot_max_sequence;
+
+    if (value === null) {
+      return undefined;
+    }
+
+    if (!isPositivePostgresBigIntString(value)) {
+      throw new PostgresStorageError();
+    }
+
+    return value;
+  }
+}
+
+const validateInput = (input: InboundEventListInput): ValidatedListInput => {
+  if (!isRecord(input) || !isNonBlankString(input.connectionId) || !isPageSize(input.pageSize)) {
+    throw new PostgresStorageError();
+  }
+
+  if (input.cursor === undefined) {
+    return Object.freeze({ connectionId: input.connectionId, pageSize: input.pageSize });
+  }
+
+  if (!isValidCursor(input.cursor)) {
+    throw new PostgresStorageError();
+  }
+
+  return Object.freeze({
+    connectionId: input.connectionId,
+    pageSize: input.pageSize,
+    cursor: Object.freeze({
+      beforeSequence: input.cursor.beforeSequence,
+      snapshotMaxSequence: input.cursor.snapshotMaxSequence
+    })
+  });
+};
+
+const isValidCursor = (cursor: unknown): cursor is InboundEventPageCursor =>
+  isRecord(cursor) &&
+  isPositivePostgresBigIntString(cursor.beforeSequence) &&
+  isPositivePostgresBigIntString(cursor.snapshotMaxSequence) &&
+  compareDecimalStrings(cursor.beforeSequence, cursor.snapshotMaxSequence) <= 0;
+
+const parseLedgerRow = (
+  row: Readonly<Record<string, unknown>>,
+  expectedConnectionId: string,
+  snapshotMaxSequence: string,
+  cursor: InboundEventPageCursor | undefined
+): ParsedLedgerRow => {
+  const sequence = row.ledger_id;
+  const connectionId = row.connection_id;
+  const providerEventId = row.provider_event_id;
+  const id = row.canonical_event_id;
+  const channel = row.channel;
+  const eventType = row.event_type;
+  const occurredAt = row.occurred_at;
+  const conversationId = row.conversation_id;
+  const messageId = row.message_id;
+  const senderId = row.sender_id;
+  const text = row.message_text;
+
+  if (
+    !isPositivePostgresBigIntString(sequence) ||
+    !isNonBlankString(connectionId) ||
+    connectionId !== expectedConnectionId ||
+    !isNonBlankString(providerEventId) ||
+    !isNonBlankString(id) ||
+    !isChannel(channel) ||
+    eventType !== 'message.received' ||
+    !isOccurredAt(occurredAt) ||
+    !isNonBlankString(conversationId) ||
+    !isNonBlankString(messageId) ||
+    !isNonBlankString(senderId) ||
+    typeof text !== 'string' ||
+    compareDecimalStrings(sequence, snapshotMaxSequence) > 0 ||
+    (cursor !== undefined && compareDecimalStrings(sequence, cursor.beforeSequence) >= 0)
+  ) {
+    throw new PostgresStorageError();
+  }
+
+  return Object.freeze({
+    sequence,
+    event: Object.freeze({
+      id,
+      providerEventId,
+      type: 'message.received',
+      connectionId,
+      channel,
+      occurredAt,
+      message: Object.freeze({
+        id: messageId,
+        senderId,
+        conversationId,
+        text
+      })
+    })
+  });
+};
+
+const assertDescendingSequences = (rows: readonly ParsedLedgerRow[]): void => {
+  for (let index = 1; index < rows.length; index += 1) {
+    const previous = rows[index - 1];
+    const current = rows[index];
+
+    if (
+      previous === undefined ||
+      current === undefined ||
+      compareDecimalStrings(previous.sequence, current.sequence) <= 0
+    ) {
+      throw new PostgresStorageError();
+    }
+  }
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+const isNonBlankString = (value: unknown): value is string =>
+  typeof value === 'string' && value.trim().length > 0;
+
+const isPageSize = (value: unknown): value is number =>
+  typeof value === 'number' &&
+  Number.isSafeInteger(value) &&
+  value >= 1 &&
+  value <= MAXIMUM_PAGE_SIZE;
+
+const isPositivePostgresBigIntString = (value: unknown): value is string =>
+  typeof value === 'string' &&
+  /^[1-9][0-9]{0,18}$/.test(value) &&
+  (value.length < MAX_POSTGRES_BIGINT.length ||
+    (value.length === MAX_POSTGRES_BIGINT.length && value <= MAX_POSTGRES_BIGINT));
+
+const isChannel = (value: unknown): value is Channel =>
+  typeof value === 'string' && (CHANNELS as readonly string[]).includes(value);
+
+const isOccurredAt = (value: unknown): value is string =>
+  typeof value === 'string' && value.length > 0 && !Number.isNaN(Date.parse(value));
+
+const compareDecimalStrings = (left: string, right: string): number =>
+  left.length === right.length ? left.localeCompare(right) : left.length - right.length;

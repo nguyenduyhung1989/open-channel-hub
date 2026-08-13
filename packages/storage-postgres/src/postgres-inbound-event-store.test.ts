@@ -29,9 +29,13 @@ describe('PostgresInboundEventStore', () => {
 
     await store.append([EVENT]);
 
-    expect(pool.client.queries).toHaveLength(3);
+    expect(pool.client.queries).toHaveLength(4);
     expect(pool.client.queries[0]).toEqual({ sql: 'BEGIN', values: [] });
-    expect(pool.client.queries[1]).toMatchObject({
+    expect(pool.client.queries[1]).toEqual({
+      sql: 'SELECT pg_advisory_xact_lock($1)',
+      values: [1_864_659_702]
+    });
+    expect(pool.client.queries[2]).toMatchObject({
       sql: expect.stringContaining('INSERT INTO open_channel_hub.inbound_events'),
       values: [
         'telegram-bot-default',
@@ -46,11 +50,11 @@ describe('PostgresInboundEventStore', () => {
         "Synthetic text with quote ' and SQL-looking punctuation; --"
       ]
     });
-    expect(pool.client.queries[1]?.sql).toContain('$10');
-    expect(pool.client.queries[1]?.sql).toContain(
+    expect(pool.client.queries[2]?.sql).toContain('$10');
+    expect(pool.client.queries[2]?.sql).toContain(
       'ON CONFLICT (connection_id, provider_event_id) DO NOTHING'
     );
-    expect(pool.client.queries[2]).toEqual({ sql: 'COMMIT', values: [] });
+    expect(pool.client.queries[3]).toEqual({ sql: 'COMMIT', values: [] });
     expect(pool.client.released).toBe(true);
   });
 
@@ -65,6 +69,7 @@ describe('PostgresInboundEventStore', () => {
 
     expect(pool.client.queries.map((query) => query.sql)).toEqual([
       'BEGIN',
+      'SELECT pg_advisory_xact_lock($1)',
       expect.stringContaining('INSERT INTO open_channel_hub.inbound_events'),
       'ROLLBACK'
     ]);

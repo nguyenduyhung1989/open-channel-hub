@@ -11,6 +11,7 @@ it does not mean a feature is complete.
 | [0003](0003-node-24-and-npm-workspaces.md)            | accepted | Node.js 24.18.1 and npm workspaces                             |
 | [0004](0004-agpl-and-future-commercial-options.md)    | accepted | AGPL-3.0-or-later and future commercial options                |
 | [0005](0005-postgresql-inbound-event-ledger.md)       | accepted | Dedicated PostgreSQL schema and canonical inbound-event ledger |
+| [0006](0006-stable-inbound-event-pagination.md)       | accepted | Stable, connection-scoped inbound-event pagination             |
 
 Template for a new ADR:
 

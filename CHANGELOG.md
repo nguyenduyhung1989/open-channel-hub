@@ -28,15 +28,25 @@ follows [Semantic Versioning](https://semver.org/).
   payloads.
 - A local synthetic Docker proof that an idempotent migration can run twice and
   duplicate fake webhook delivery produces one durable ledger row.
+- Phase 2b: an operator-authenticated
+  <code>GET /v1/telegram-bot/inbound-events</code> route that returns canonical
+  events only for the configured Telegram connection.
+- Phase 2b: stable, opaque cursor pagination backed by a forward-only ledger
+  sequence and a connection-scoped PostgreSQL index.
+- A disposable Compose smoke test in CI source that verifies migration,
+  duplicate webhook idempotency, and the operator inbound-event read path using
+  synthetic values only.
 
 ### Changed
 
 - The current documentation now distinguishes historical Phase 1a verification
-  at <code>7141949</code> from completed local verification and still-pending
-  GitHub evidence for the Phase 2a candidate.
+  at <code>7141949</code>, completed Phase 2a GitHub CI/CodeQL at
+  <code>f106bb8</code>, and verification still required for the Phase 2b
+  candidate.
 - An accepted inbound Telegram text event now becomes durable when the
-  PostgreSQL configuration is present; this does not add an inbox, read API,
-  live Telegram proof, backup, or retention policy.
+  PostgreSQL configuration is present; a local operator can now list canonical
+  inbound events, but this still does not add an inbox, live Telegram proof,
+  backup, or retention policy.
 - The runtime has <code>/ready</code> for dependency readiness in addition to
   process liveness at <code>/health</code>.
 
@@ -55,6 +65,9 @@ follows [Semantic Versioning](https://semver.org/).
   requests, and tests. A database volume can contain canonical message text, so
   <code>docker compose down --volumes</code> is destructive and must not be
   used as a routine shutdown.
+- The read API validates bounded opaque cursors before storage access, fixes
+  reads to the configured connection, and does not expose raw provider
+  payloads.
 
 There has been no official release. A version is dated here only when its
 release tag is created after final checks.

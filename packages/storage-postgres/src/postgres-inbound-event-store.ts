@@ -5,6 +5,14 @@ import { PostgresStorageError } from './postgres-error.js';
 import { POSTGRES_SCHEMA } from './postgres-migrations.js';
 import type { SqlClient, SqlPool } from './sql.js';
 
+/**
+ * Serializes identity allocation and commit for the ledger. Without this lock,
+ * PostgreSQL sequences can hand a later transaction a larger identity before
+ * an earlier transaction commits, which would make a stable read snapshot able
+ * to skip the earlier row.
+ */
+const INBOUND_EVENT_APPEND_LOCK_KEY = 1_864_659_702;
+
 const INSERT_INBOUND_EVENT_SQL = `
 INSERT INTO ${POSTGRES_SCHEMA}.inbound_events (
   connection_id,
@@ -42,6 +50,7 @@ export class PostgresInboundEventStore implements InboundEventStore {
       client = await this.pool.connect();
       await client.query('BEGIN');
       transactionStarted = true;
+      await client.query('SELECT pg_advisory_xact_lock($1)', [INBOUND_EVENT_APPEND_LOCK_KEY]);
 
       for (const event of events) {
         await client.query(INSERT_INBOUND_EVENT_SQL, valuesFor(event));

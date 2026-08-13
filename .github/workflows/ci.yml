@@ -49,3 +49,6 @@ jobs:
 
       - name: Build runtime container
         run: docker build --target runtime --tag open-channel-hub:ci .
+
+      - name: Verify PostgreSQL Compose stack
+        run: bash scripts/verify-compose-postgres.sh

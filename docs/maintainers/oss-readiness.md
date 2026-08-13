@@ -14,11 +14,14 @@ organization has accepted the project.
 - A small verifiable slice rather than a claim to support every platform.
 - Historical Phase 1a evidence: local candidate checks and GitHub CI/CodeQL at
   <code>7141949</code>. Live Telegram verification remains outstanding.
-- Phase 2a source now contains a dedicated PostgreSQL schema, migration ledger,
+- Phase 2a contains a dedicated PostgreSQL schema, migration ledger,
   non-superuser role, canonical inbound-event storage, and a synthetic Docker
-  proof of migration/idempotency. Final local candidate verification passed;
-  fresh GitHub checks, live Telegram proof, and production operation remain
-  unclaimed.
+  proof of migration/idempotency. GitHub CI and CodeQL succeeded at
+  <code>f106bb8</code>.
+- The current Phase 2b candidate adds a fixed-connection, operator-authenticated
+  canonical event-read API, stable cursor pagination, and a Compose smoke test
+  in CI source. Its own final local and GitHub evidence, live Telegram proof,
+  and production operation remain unclaimed.
 
 ## Verified GitHub evidence
 
@@ -28,6 +31,8 @@ organization has accepted the project.
 - GitHub CI and CodeQL succeeded for the Phase 1a candidate at
   <code>7141949</code>. A later release tag still needs its own owner decision
   and verification.
+- GitHub CI and CodeQL succeeded for the Phase 2a storage candidate at
+  <code>f106bb8</code>. This does not verify the later Phase 2b candidate.
 - GitHub Private Vulnerability Reporting, secret scanning, Dependabot alerts,
   and automatic security fixes are enabled.
 - Branch protection is intentionally open for an owner decision. Do not
@@ -38,7 +43,7 @@ organization has accepted the project.
 - Keep <code>main</code> green; address dependency and CodeQL alerts; update
   the runtime and Actions through verified stable releases.
 - Keep the final local evidence with the candidate and read fresh GitHub checks
-  for the actual Phase 2a commit before making release claims.
+  for the actual Phase 2b commit before making release claims.
 - Maintain migrations as immutable, forward-only repository artifacts. Never
   manually alter a deployed database and then describe it as a repository
   migration.

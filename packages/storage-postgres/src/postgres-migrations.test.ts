@@ -19,8 +19,18 @@ describe('PostgreSQL migrations', () => {
     expect(sql).toContain('CREATE TABLE IF NOT EXISTS open_channel_hub.schema_migrations');
     expect(sql).toContain('CREATE TABLE open_channel_hub.inbound_events');
     expect(sql).toContain('PRIMARY KEY (connection_id, provider_event_id)');
+    expect(sql).toContain('ADD COLUMN ledger_id bigint GENERATED ALWAYS AS IDENTITY');
+    expect(sql).toContain('SET ledger_id = DEFAULT');
+    expect(sql).toContain('ALTER COLUMN ledger_id SET NOT NULL');
+    expect(sql).toContain('CREATE UNIQUE INDEX inbound_events_ledger_id_unique');
+    expect(sql).toContain('CREATE INDEX inbound_events_connection_ledger_id_desc');
     expect(sql).toContain('INSERT INTO open_channel_hub.schema_migrations');
     expect(sql).not.toContain('public.');
+    expect(
+      pool.queries
+        .filter((query) => query.sql.includes('INSERT INTO open_channel_hub.schema_migrations'))
+        .map((query) => query.values[0])
+    ).toEqual(['0001_inbound_event_ledger', '0002_inbound_event_ledger_sequence']);
     expect(pool.releaseCount).toBe(1);
   });
 
@@ -38,6 +48,7 @@ describe('PostgreSQL migrations', () => {
       .join('\n');
 
     expect(secondRunSql).not.toContain('CREATE TABLE open_channel_hub.inbound_events');
+    expect(secondRunSql).not.toContain('ADD COLUMN ledger_id bigint GENERATED ALWAYS AS IDENTITY');
     expect(secondRunSql).not.toContain('INSERT INTO open_channel_hub.schema_migrations');
     expect(pool.releaseCount).toBe(2);
   });

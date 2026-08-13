@@ -1,10 +1,11 @@
 import { readFile } from 'node:fs/promises';
 
 import { Pool } from 'pg';
-import type { InboundEventStore } from '@open-channel-hub/domain';
+import type { InboundEventReader, InboundEventStore } from '@open-channel-hub/domain';
 
 import { PostgresStorageError } from './postgres-error.js';
 import { PostgresInboundEventStore } from './postgres-inbound-event-store.js';
+import { PostgresInboundEventReader } from './postgres-inbound-event-reader.js';
 import { assertPostgresSchemaCurrent, migratePostgresSchema } from './postgres-migrations.js';
 import type { SqlClient, SqlPool, SqlQueryResult } from './sql.js';
 
@@ -17,6 +18,7 @@ export interface PostgresDatabaseOptions {
 }
 
 export interface PostgresDatabase {
+  readonly inboundEventReader: InboundEventReader;
   readonly inboundEventStore: InboundEventStore;
   checkReadiness(): Promise<void>;
   close(): Promise<void>;
@@ -50,9 +52,11 @@ export const createPostgresDatabase = async (
   });
 
   const sqlPool = toSqlPool(pool);
+  const inboundEventReader = new PostgresInboundEventReader(sqlPool);
   const inboundEventStore = new PostgresInboundEventStore(sqlPool);
 
   return Object.freeze({
+    inboundEventReader,
     inboundEventStore,
     checkReadiness: async (): Promise<void> => {
       try {

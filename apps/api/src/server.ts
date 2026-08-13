@@ -17,13 +17,15 @@ try {
   let telegramBot: Awaited<ReturnType<typeof createTelegramBotFeature>> | undefined;
 
   if (environment.telegramBot.enabled) {
+    const inboundEventReader = postgres?.inboundEventReader;
     const inboundEventStore = postgres?.inboundEventStore;
 
-    if (inboundEventStore === undefined) {
+    if (inboundEventReader === undefined || inboundEventStore === undefined) {
       throw new EnvironmentConfigurationError();
     }
 
     telegramBot = await createTelegramBotFeature(environment.telegramBot, {
+      readInboundEvents: async (input) => inboundEventReader.list(input),
       receiveEvents: async (events) => {
         await inboundEventStore.append(events);
       }

@@ -40,11 +40,50 @@ CREATE TABLE ${POSTGRES_SCHEMA}.inbound_events (
 `
 ]);
 
+/**
+ * This migration is forward-only. Existing Phase 2a rows receive identity
+ * values once; their historical ordering was never exposed, while all future
+ * writes receive a stable ledger position used for keyset pagination.
+ */
+const INBOUND_EVENT_LEDGER_SEQUENCE_ID = '0002_inbound_event_ledger_sequence';
+
+const INBOUND_EVENT_LEDGER_SEQUENCE_STATEMENTS = Object.freeze([
+  `
+ALTER TABLE ${POSTGRES_SCHEMA}.inbound_events
+  ADD COLUMN ledger_id bigint GENERATED ALWAYS AS IDENTITY
+`,
+  `
+UPDATE ${POSTGRES_SCHEMA}.inbound_events
+SET ledger_id = DEFAULT
+WHERE ledger_id IS NULL
+`,
+  `
+ALTER TABLE ${POSTGRES_SCHEMA}.inbound_events
+  ALTER COLUMN ledger_id SET NOT NULL
+`,
+  `
+CREATE UNIQUE INDEX inbound_events_ledger_id_unique
+  ON ${POSTGRES_SCHEMA}.inbound_events (ledger_id)
+`,
+  `
+CREATE INDEX inbound_events_connection_ledger_id_desc
+  ON ${POSTGRES_SCHEMA}.inbound_events (connection_id, ledger_id DESC)
+`
+]);
+
 const MIGRATIONS = Object.freeze([
   Object.freeze({
     id: INBOUND_EVENT_LEDGER_ID,
     checksum: checksumFor(INBOUND_EVENT_LEDGER_ID, INBOUND_EVENT_LEDGER_STATEMENTS),
     statements: INBOUND_EVENT_LEDGER_STATEMENTS
+  }),
+  Object.freeze({
+    id: INBOUND_EVENT_LEDGER_SEQUENCE_ID,
+    checksum: checksumFor(
+      INBOUND_EVENT_LEDGER_SEQUENCE_ID,
+      INBOUND_EVENT_LEDGER_SEQUENCE_STATEMENTS
+    ),
+    statements: INBOUND_EVENT_LEDGER_SEQUENCE_STATEMENTS
   })
 ]);
 
