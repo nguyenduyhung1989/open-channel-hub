@@ -1,15 +1,15 @@
-# Phase 2c runtime multi-connection configuration
+# Runtime multi-connection configuration
 
-This guide configures the current alpha's official Telegram Bot accounts. It
-does not create a dashboard, user login, organization, public connection API,
-or permission model. It has not been verified with a real Telegram Bot or a
-public TLS endpoint.
+This guide configures the current alpha's official Telegram Bot and Zalo
+Official Account (OA) entries. It does not create a dashboard, user login,
+organization, public connection API, or permission model. It has not been
+verified with a real provider account or public TLS endpoint.
 
 ## What is configured
 
-One secret JSON document can configure one to one hundred Telegram Bot
-connections. It contains credentials, so treat the entire document as a secret
-even though the connection IDs are opaque internal labels.
+One secret JSON document can configure one to one hundred Telegram Bot and Zalo
+OA connections. It contains credentials, so treat the entire document as a
+secret even though the connection IDs are opaque internal labels.
 
 The strict document shape is:
 
@@ -37,8 +37,32 @@ letters, digits, <code>.</code>, <code>_</code>, <code>:</code>, and
 because it becomes part of a dynamic webhook path. All IDs and all
 Bot/operator/webhook credential values must be unique across the document.
 
+The same version-1 document also accepts a Zalo OA entry:
+
+```json
+{
+  "id": "zalo-oa-support",
+  "type": "zalo_oa",
+  "appId": "...",
+  "oaId": "...",
+  "oaSecretKey": "...",
+  "operatorApiToken": "...",
+  "webhookUrl": "https://your-public-host/v1/webhooks/zalo-oa"
+}
+```
+
+For a Zalo OA entry, `appId` and `oaId` are decimal identifiers and an optional
+`webhookUrl` must be the exact public HTTPS path
+`/v1/webhooks/zalo-oa`, without user info, query, or fragment. The `(appId,
+oaId)` pair and every operator token must be unique. Each `oaSecretKey` must
+not collide with a Telegram or operator credential, but Zalo OA entries may use
+the same or different OA secrets; the configuration deliberately makes no
+undocumented secret-sharing claim. See the
+[Phase 3a Zalo OA guide](zalo-oa-3a.md) for the raw-signature and live-test
+boundary.
+
 Do not paste a real document in a terminal command, issue, pull request,
-screenshot, log, or repository file. The sample above contains placeholders,
+screenshot, log, or repository file. The samples above contain placeholders,
 not usable credentials.
 
 ## Choose exactly one configuration mode
@@ -113,11 +137,13 @@ token, webhook secret, or webhook URL. The temporary
 
 ## Routes and account isolation
 
-| Purpose                  | Multi-connection route                                    | How the account is selected                                                                                                              |
-| ------------------------ | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Telegram webhook ingress | <code>POST /v1/webhooks/telegram-bot/:connectionId</code> | The path resolves a configured connection, then its webhook secret must match. Unknown ID and wrong secret both return <code>401</code>. |
-| Send text                | <code>POST /v1/telegram-bot/messages</code>               | The unique <code>Authorization: Bearer</code> value maps to exactly one configured connection.                                           |
-| Read canonical events    | <code>GET /v1/telegram-bot/inbound-events</code>          | The same bearer token maps to exactly one configured connection. Cursor continuation is bound to that connection.                        |
+| Purpose                  | Multi-connection route                                    | How the account is selected                                                                                                                                                                    |
+| ------------------------ | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Telegram webhook ingress | <code>POST /v1/webhooks/telegram-bot/:connectionId</code> | The path resolves a configured connection, then its webhook secret must match. Unknown ID and wrong secret both return <code>401</code>.                                                       |
+| Send text                | <code>POST /v1/telegram-bot/messages</code>               | The unique <code>Authorization: Bearer</code> value maps to exactly one configured connection.                                                                                                 |
+| Read canonical events    | <code>GET /v1/telegram-bot/inbound-events</code>          | The same bearer token maps to exactly one configured connection. Cursor continuation is bound to that connection.                                                                              |
+| Zalo OA webhook ingress  | <code>POST /v1/webhooks/zalo-oa</code>                    | The exact signed JSON identifies the configured <code>(appId, oaId)</code>; the route then checks that entry's OA secret. Unknown identity and invalid signature both return <code>401</code>. |
+| Read Zalo OA events      | <code>GET /v1/zalo-oa/inbound-events</code>               | The unique <code>Authorization: Bearer</code> value maps to exactly one configured OA. Cursor continuation is bound to that connection.                                                        |
 
 The caller cannot select a connection ID on either operator route. A cursor
 from one account is rejected when presented with another account's bearer
@@ -136,6 +162,16 @@ metadata plus the opaque connection ID to
 <code>open_channel_hub.connection_registry</code>. It does not store Bot
 names, phone numbers, provider account IDs, tokens, webhook secrets, the JSON
 document, or raw provider payloads.
+
+For Zalo OA only, migration
+<code>0005_connection_registry_provider_identity</code> adds a required,
+domain-separated SHA-256 fingerprint of the configured
+<code>(appId, oaId)</code> pair. It is not the raw pair or a credential. It
+binds a Zalo connection ID to that pair after registration: an existing Zalo ID
+cannot be restarted with a different fingerprint, and a first Zalo binding is
+refused if pre-registry history already uses that ID. This configuration does
+not contain an equivalent non-secret Telegram provider-account identifier, so
+Telegram registry entries retain their existing connector/channel/tier binding.
 
 Migration <code>0004_inbound_events_connection_registry_fk</code> is a
 PostgreSQL foreign key marked <code>NOT VALID</code>. New event writes must
@@ -169,12 +205,14 @@ account isolation, durable storage, or production readiness.
 
 ## Safe local proof
 
-The repository's disposable Compose smoke test uses two synthetic Bot
-connections. It migrates the four immutable schema entries twice, verifies both
-registry rows, posts the same fake provider event to both dynamic webhook paths,
-checks duplicate idempotency within one connection, checks bearer-scoped reads,
-and rejects a cursor from one connection for the other. It makes no Telegram
-network request and uses no real credential or message.
+The repository's disposable Compose smoke test uses two synthetic Telegram Bot
+connections and two synthetic Zalo OA connections. It migrates the five
+immutable schema entries twice, verifies registry rows and Zalo fingerprint
+presence without printing it, checks Telegram dynamic
+webhook behavior, proves Zalo's raw-byte signature boundary, checks duplicate
+idempotency within every connection, verifies bearer-scoped reads, and rejects
+cross-account cursors. It makes no provider network request and uses no real
+credential or message.
 
 Before a real account is used, still complete TLS/proxy, rate limiting,
 monitoring, backup/restore, retention/deletion, secret rotation, access/audit,

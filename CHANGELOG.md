@@ -48,14 +48,32 @@ follows [Semantic Versioning](https://semver.org/).
 - Phase 2c: a two-connection synthetic Compose smoke-test source that checks
   registry rows, same-provider-ID isolation, duplicate idempotency, scoped
   operator reads, cross-connection cursor rejection, and secret-file mode.
+- Phase 3a: an official Zalo OA receive-only connector package that supports
+  canonical `user_send_text` normalization and rejects every provider command.
+- Phase 3a: a fixed `POST /v1/webhooks/zalo-oa` boundary that verifies
+  `X-ZEvent-Signature` against exact raw UTF-8 JSON, resolves the configured
+  `(appId, oaId)` internally, and makes a canonical text event durable before
+  acknowledging it.
+- Phase 3a: a token-bound `GET /v1/zalo-oa/inbound-events` route with
+  canonical-only fields and account-bound opaque cursors.
+- Phase 3a: a forward-only PostgreSQL registry migration that binds each Zalo
+  OA connection ID to a non-secret SHA-256 fingerprint of its configured
+  `(appId, oaId)` pair, preventing silent rebinding after durable history
+  exists.
+- A synthetic Compose smoke-test source with two Zalo OA configurations. It
+  checks raw-byte signature rejection, durable append before `200`, duplicate
+  idempotency, provider-ID isolation, bearer/cursor isolation, registry
+  metadata, secret-file mode, and PostgreSQL role safety without provider
+  network access.
 
 ### Changed
 
 - The documentation now distinguishes historical Phase 1a verification at
   <code>7141949</code>, completed Phase 2a GitHub CI/CodeQL at
   <code>f106bb8</code>, completed Phase 2b GitHub CI/CodeQL at exact commit
-  <code>4d5a9c9</code>, and verification still required for the current Phase
-  2c candidate.
+  <code>4d5a9c9</code>, completed Phase 2c GitHub CI/CodeQL at exact commit
+  <code>8352b51</code>, and verification still required for the current Phase
+  3a candidate.
 - An accepted inbound Telegram text event now becomes durable when the
   PostgreSQL configuration is present; a local operator can now list canonical
   inbound events, but this still does not add an inbox, live Telegram proof,
@@ -66,6 +84,9 @@ follows [Semantic Versioning](https://semver.org/).
   configuration-backed multi-connection path. Operator bearer tokens select
   one configured account inside the process; HTTP callers do not select an
   account identifier.
+- The version-1 runtime document now also supports `zalo_oa` entries. It does
+  not assume that OA entries sharing an App ID must share an OA secret; each
+  configured `(appId, oaId)` pair resolves its own secret at webhook time.
 
 ### Security
 
@@ -90,6 +111,10 @@ follows [Semantic Versioning](https://semver.org/).
   <code>$</code> characters. The encoded value is not encryption, remains
   secret, and is mounted only for the API as <code>10001:10001 0400</code>. It
   is never stored in PostgreSQL, committed, or exposed through an API.
+- Zalo OA webhook signatures are compared only after resolving the configured
+  `(appId, oaId)` pair and are calculated from the original UTF-8 JSON bytes.
+  Unknown identity and invalid signature receive the same `401` response; raw
+  provider payloads and OA secrets never enter the database.
 - The <code>main</code> branch now blocks force pushes and deletion, including
   for administrators. Required checks and pull-request reviews remain
   intentionally unset for the owner-controlled direct-push workflow.

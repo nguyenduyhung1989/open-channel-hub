@@ -2,7 +2,7 @@
 
 **Status:** the durable inbound-event ledger, connection registry, and
 synthetic Docker proof source are implemented. This is not a production
-deployment, a backup/restore solution, or a real Telegram verification.
+deployment, a backup/restore solution, or a real provider verification.
 
 ## What this stack creates
 
@@ -19,11 +19,11 @@ The supplied Compose stack creates three services:
 The database and schema are both named <code>open_channel_hub</code>. The
 application schema contains:
 
-| Object                           | Purpose                                                                                                  |
-| -------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| <code>schema_migrations</code>   | Immutable record of forward schema migrations applied by this binary.                                    |
-| <code>connection_registry</code> | Opaque connection ID plus immutable connector ID, channel, tier, and registration timestamp.             |
-| <code>inbound_events</code>      | Canonical inbound text-event ledger. Its primary key is <code>(connection_id, provider_event_id)</code>. |
+| Object                           | Purpose                                                                                                                                                             |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| <code>schema_migrations</code>   | Immutable record of forward schema migrations applied by this binary.                                                                                               |
+| <code>connection_registry</code> | Opaque connection ID, immutable connector metadata, registration timestamp, and a non-secret Zalo OA provider-identity fingerprint when that channel is configured. |
+| <code>inbound_events</code>      | Canonical inbound text-event ledger. Its primary key is <code>(connection_id, provider_event_id)</code>.                                                            |
 
 The ledger stores a canonical event ID, channel/type/timestamps, conversation
 and sender/message identifiers, and message text. It intentionally does **not**
@@ -35,9 +35,15 @@ A second migrator waits instead of racing the ledger. A known migration is
 recorded only after its DDL succeeds. Future production changes must add a new
 forward migration; do not edit or delete an applied migration.
 
-The Phase 2c registry migration intentionally stores no Bot token, operator
-token, webhook secret, provider account name, phone number, or JSON
-configuration. The subsequent foreign key from
+The Phase 2c registry migration intentionally stores no Bot/OA token, operator
+token, webhook secret/signature material, raw provider account name/ID, phone
+number, or JSON configuration. Phase 3a's additive <code>0005</code> migration
+stores a domain-separated SHA-256 fingerprint of each Zalo OA
+<code>(appId, oaId)</code> pair. This opaque value is not a credential or raw
+provider identifier; it prevents the durable Zalo connection label from being
+silently rebound to a different pair. Telegram entries remain without a
+provider-identity fingerprint because this configuration does not hold an
+equivalent non-secret Bot account identity. The subsequent foreign key from
 <code>inbound_events.connection_id</code> to the registry is marked
 <code>NOT VALID</code>: PostgreSQL enforces new rows, while older Phase 2a
 history can be reconciled and explicitly validated later. Do not manually
@@ -65,13 +71,14 @@ environment variable.
 
 If multi-connection mode is enabled, <code>CONNECTIONS_CONFIG_BASE64</code> is
 a third Compose secret source. It is the unpadded base64url encoding of a JSON
-document that contains inline Telegram credentials. The encoded value is
+document that contains inline Telegram Bot and/or Zalo OA credentials. The encoded value is
 mounted only for the API as <code>runtime_connections_base64</code>; it is not
 sent to the API as an environment value and never belongs in PostgreSQL.
 Base64url prevents Compose from expanding credential <code>$</code> characters;
 it is not encryption. The precise configuration, compatibility, and route rules
 are in the
-[Phase 2c multi-connection guide](runtime-multi-connection-2c.md).
+[runtime multi-connection guide](runtime-multi-connection-2c.md) and the
+[Phase 3a Zalo OA guide](zalo-oa-3a.md).
 
 Do **not** assume that editing <code>.env</code> rotates an existing database
 password. The role-creation script runs only while a new PostgreSQL volume is
@@ -107,10 +114,12 @@ docker compose exec postgres psql --username=postgres --dbname=open_channel_hub 
 
 The verified Phase 2b local proof used only synthetic values. It ran the
 migration twice, delivered the same fake webhook twice, observed two
-<code>204</code> responses, and verified exactly one ledger row. The current
-Phase 2c smoke-test source extends that proof to two registered connections,
-but its final candidate verification is separate. Neither path calls Telegram
-or uses a real credential or message.
+<code>204</code> responses, and verified exactly one ledger row. The verified
+Phase 2c proof extended this to two registered Telegram connections. The current
+Phase 3a smoke-test source further adds two synthetic Zalo OA connections,
+raw-byte signature checks, and non-secret registry fingerprint checks, but its
+final candidate verification is separate. No proof path calls a provider or
+uses a real credential or message.
 
 ## Container and network boundary
 
@@ -153,6 +162,7 @@ a routine reset, and do not run it against any data you need to keep.
 - No database audit trail, user/account authorization model, rate limit, or
   capacity policy.
 - No encryption-at-rest claim for the Docker volume or host disk.
-- No public TLS/proxy, real Telegram confirmation, or production monitoring.
+- No public TLS/proxy, real Telegram or Zalo OA confirmation, or production
+  monitoring.
 
 These gaps are intentionally left visible in the roadmap and threat model.

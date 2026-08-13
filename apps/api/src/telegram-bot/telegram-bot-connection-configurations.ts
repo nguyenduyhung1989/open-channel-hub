@@ -1,7 +1,9 @@
-import type { TelegramBotEnvironment } from '../config/environment.js';
+import type { ConnectorRuntimeEnvironment } from '../config/environment.js';
 import {
   loadBase64UrlRuntimeConnectionConfiguration,
-  loadRuntimeConnectionConfiguration
+  loadRuntimeConnectionConfiguration,
+  type RuntimeConnection,
+  type RuntimeTelegramBotConnection
 } from '../connections/runtime-connection-configuration.js';
 
 import type { TelegramBotConnectionConfiguration } from './create-telegram-bot-feature.js';
@@ -12,7 +14,7 @@ import type { TelegramBotConnectionConfiguration } from './create-telegram-bot-f
  * It only reads local configuration and never contacts Telegram.
  */
 export const loadTelegramBotConnectionConfigurations = async (
-  environment: TelegramBotEnvironment
+  environment: ConnectorRuntimeEnvironment
 ): Promise<readonly TelegramBotConnectionConfiguration[]> => {
   if (!environment.enabled) {
     return Object.freeze([]);
@@ -34,8 +36,19 @@ export const loadTelegramBotConnectionConfigurations = async (
     ? loadBase64UrlRuntimeConnectionConfiguration(environment.configurationFile)
     : loadRuntimeConnectionConfiguration(environment.configurationFile));
 
-  return Object.freeze(
-    configuration.connections.map((connection) =>
+  return toTelegramBotConnectionConfigurations(configuration.connections);
+};
+
+/**
+ * Splits Telegram Bot accounts from one already-loaded runtime snapshot. The
+ * composition root uses this instead of reading the same secret file again
+ * when another official connector shares the document.
+ */
+export const toTelegramBotConnectionConfigurations = (
+  connections: readonly RuntimeConnection[]
+): readonly TelegramBotConnectionConfiguration[] =>
+  Object.freeze(
+    connections.filter(isRuntimeTelegramBotConnection).map((connection) =>
       Object.freeze({
         botToken: connection.botToken,
         connectionId: connection.id,
@@ -45,4 +58,7 @@ export const loadTelegramBotConnectionConfigurations = async (
       })
     )
   );
-};
+
+const isRuntimeTelegramBotConnection = (
+  connection: RuntimeConnection
+): connection is RuntimeTelegramBotConnection => connection.type === 'telegram_bot';

@@ -17,7 +17,7 @@ describe('parseEnvironment', () => {
       NODE_ENV: 'development',
       PORT: 3000,
       sourceOfferUrl: 'https://github.com/nguyenduyhung1989/open-channel-hub',
-      telegramBot: { enabled: false }
+      connectorRuntime: { enabled: false }
     });
   });
 
@@ -34,7 +34,7 @@ describe('parseEnvironment', () => {
       NODE_ENV: 'development',
       PORT: 3010,
       sourceOfferUrl: 'https://github.com/nguyenduyhung1989/open-channel-hub',
-      telegramBot: { enabled: false }
+      connectorRuntime: { enabled: false }
     });
   });
 
@@ -71,7 +71,7 @@ describe('parseEnvironment', () => {
         user: 'open_channel_hub'
       },
       sourceOfferUrl: 'https://github.com/nguyenduyhung1989/open-channel-hub',
-      telegramBot: {
+      connectorRuntime: {
         botToken: 'synthetic-bot-token',
         connectionId: 'telegram.bot:primary',
         enabled: true,
@@ -92,7 +92,7 @@ describe('parseEnvironment', () => {
           TELEGRAM_BOT_TOKEN: 'synthetic-bot-token',
           TELEGRAM_CONNECTION_ID: connectionId,
           TELEGRAM_WEBHOOK_SECRET: 'synthetic_webhook_secret_0123456789'
-        }).telegramBot
+        }).connectorRuntime
       ).toMatchObject({ connectionId, enabled: true });
     }
   });
@@ -137,7 +137,7 @@ describe('parseEnvironment', () => {
       parseEnvironment({
         ...POSTGRES_ENVIRONMENT,
         CONNECTIONS_CONFIG_FILE: '/run/secrets/runtime_connections'
-      }).telegramBot
+      }).connectorRuntime
     ).toEqual({
       configurationEncoding: 'json',
       configurationFile: '/run/secrets/runtime_connections',
@@ -181,7 +181,7 @@ describe('parseEnvironment', () => {
       parseEnvironment({
         ...POSTGRES_ENVIRONMENT,
         CONNECTIONS_CONFIG_BASE64_FILE: '/run/secrets/runtime_connections_base64'
-      }).telegramBot
+      }).connectorRuntime
     ).toEqual({
       configurationEncoding: 'base64url',
       configurationFile: '/run/secrets/runtime_connections_base64',
@@ -222,12 +222,12 @@ describe('parseEnvironment', () => {
       TELEGRAM_WEBHOOK_SECRET: 'synthetic_webhook_secret_0123456789'
     };
 
-    expect(parseEnvironment(configuration).telegramBot).toMatchObject({ enabled: true });
+    expect(parseEnvironment(configuration).connectorRuntime).toMatchObject({ enabled: true });
     expect(
       parseEnvironment({
         ...configuration,
         TELEGRAM_WEBHOOK_URL: '   '
-      }).telegramBot
+      }).connectorRuntime
     ).toMatchObject({ enabled: true });
   });
 

@@ -2,6 +2,7 @@ import type { CanonicalEvent } from '@open-channel-hub/contracts';
 import type { InboundEventStore } from '@open-channel-hub/domain';
 
 import { PostgresStorageError } from './postgres-error.js';
+import { INBOUND_EVENT_APPEND_LOCK_KEY } from './postgres-lock-keys.js';
 import { POSTGRES_SCHEMA } from './postgres-migrations.js';
 import type { SqlClient, SqlPool } from './sql.js';
 
@@ -11,8 +12,6 @@ import type { SqlClient, SqlPool } from './sql.js';
  * an earlier transaction commits, which would make a stable read snapshot able
  * to skip the earlier row.
  */
-const INBOUND_EVENT_APPEND_LOCK_KEY = 1_864_659_702;
-
 const INSERT_INBOUND_EVENT_SQL = `
 INSERT INTO ${POSTGRES_SCHEMA}.inbound_events (
   connection_id,

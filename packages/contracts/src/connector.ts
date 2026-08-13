@@ -33,6 +33,11 @@ export interface ConnectionRegistration {
   readonly id: string;
   readonly connectorId: string;
   readonly channel: Channel;
+  /**
+   * Optional opaque SHA-256 binding for a provider account identity. It is
+   * non-secret metadata, never the provider identifier or credential itself.
+   */
+  readonly providerIdentityFingerprint?: string;
   readonly tier: ConnectorTier;
 }
 

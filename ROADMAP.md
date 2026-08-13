@@ -34,9 +34,10 @@ verification.
 complete.** Historical local and GitHub evidence exists for candidate
 <code>7141949</code>. Phase 2a GitHub CI and CodeQL succeeded at
 <code>f106bb8</code>, and the exact Phase 2b commit <code>4d5a9c9</code> also
-has both checks green. The current Phase 2c multi-connection candidate still
-needs its own verification. No real Telegram Bot token, authenticated Bot API
-request, or test-bot flow has occurred.
+has both checks green. The exact Phase 2c multi-connection commit
+<code>8352b51</code> also has both checks green. The current Phase 3a Zalo OA
+candidate needs its own verification. No real Telegram Bot token,
+authenticated Bot API request, or test-bot flow has occurred.
 
 ### 1a — HTTP boundary and local operation
 
@@ -113,8 +114,8 @@ independent review, and GitHub CI/CodeQL evidence are present for exact commit
 ### 2c — runtime multi-connection foundation
 
 **Status: implementation, final local verification, a synthetic Compose proof,
-and independent review are complete; fresh GitHub verification remains required
-for its eventual Phase 2c commit.**
+independent review, and GitHub CI/CodeQL evidence are complete for exact commit
+<code>8352b51</code>.**
 
 - [x] A strict, secret-backed runtime configuration document for one or more
       official Telegram Bot connections, with no startup provider call.
@@ -130,7 +131,8 @@ for its eventual Phase 2c commit.**
       cross-connection cursor rejection.
 - [x] Final local candidate checks, independent review, and a synthetic
       Compose verification using two configured accounts.
-- [ ] Fresh GitHub CI/CodeQL for the exact Phase 2c commit.
+- [x] Fresh GitHub CI/CodeQL for the exact Phase 2c commit
+      <code>8352b51</code>.
 
 ### Later Phase 2 work
 
@@ -141,8 +143,41 @@ for its eventual Phase 2c commit.**
 
 ## Phase 3 — administration experience and next official connectors
 
+### 3a — official Zalo OA signed inbound text
+
+**Status: source implementation complete; final local candidate verification,
+synthetic Docker proof, independent review, and fresh GitHub CI/CodeQL remain
+required for its exact commit.**
+
+- [x] An official receive-only Zalo OA connector package that exposes only
+      `message.receive.text` and rejects every outbound command.
+- [x] A fixed `POST /v1/webhooks/zalo-oa` route that verifies
+      `X-ZEvent-Signature` over the exact raw UTF-8 JSON, resolves a configured
+      `(appId, oaId)` server side, and returns `200` only after a canonical text
+      event is durable.
+- [x] A strict runtime-document entry for `zalo_oa`, with opaque connection ID,
+      `appId`, `oaId`, `oaSecretKey`, operator bearer, and optional fixed public
+      webhook URL. It does not impose an undocumented secret-sharing rule on OA
+      entries that happen to use the same App ID.
+- [x] A bearer-scoped `GET /v1/zalo-oa/inbound-events` route with canonical-only
+      fields, bounded pagination, and account-bound opaque cursors.
+- [x] A forward-only registry migration that binds each Zalo connection ID to a
+      non-secret SHA-256 fingerprint of its configured `(appId, oaId)` pair. It
+      prevents an ID with durable Zalo history from being silently rebound; it
+      does not assert an equivalent Telegram provider-account identity.
+- [x] No OAuth, access-token storage/refresh, provider HTTP client, outbound
+      messages, attachments, Zalo User, automatic webhook registration, or live
+      provider request.
+- [ ] Final local candidate checks, synthetic Compose verification, and
+      independent review.
+- [ ] Fresh GitHub CI/CodeQL for the exact Phase 3a commit.
+- [ ] Owner-authorized public TLS and real signed Zalo OA webhook proof without
+      exposing a secret, header, or customer message.
+
+### Later Phase 3 work
+
 - A dashboard, accounts/organizations, and tested authorization.
-- Evaluation of Facebook Page, Zalo OA, and WhatsApp against current official
+- Evaluation of Facebook Page and WhatsApp against current official
   documentation and policy at implementation time.
 - A capability matrix, health state, and separate contract tests for each
   connector.

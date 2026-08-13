@@ -62,6 +62,14 @@ describe('loadTelegramBotConnectionConfigurations', () => {
             operatorApiToken: 'synthetic_operator_token_sales_01234567890',
             type: 'telegram_bot' as const,
             webhookSecret: 'synthetic_webhook_secret_sales_012345678901'
+          }),
+          Object.freeze({
+            appId: '1234567890123456789',
+            id: 'zalo-oa-support',
+            oaId: '9876543210987654321',
+            oaSecretKey: 'synthetic-zalo-oa-secret',
+            operatorApiToken: 'synthetic_zalo_operator_support_012345678901234567',
+            type: 'zalo_oa' as const
           })
         ])
       })

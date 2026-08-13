@@ -129,6 +129,33 @@ ALTER TABLE ${POSTGRES_SCHEMA}.inbound_events
 `
 ]);
 
+/**
+ * A Zalo OA registration binds its opaque connection id to a non-secret
+ * fingerprint of the provider App/OA pair. Historical Phase 2 rows have no
+ * Zalo OA registration, so this additive constraint does not alter them.
+ */
+const CONNECTION_REGISTRY_PROVIDER_IDENTITY_ID = '0005_connection_registry_provider_identity';
+
+const CONNECTION_REGISTRY_PROVIDER_IDENTITY_STATEMENTS = Object.freeze([
+  `
+ALTER TABLE ${POSTGRES_SCHEMA}.connection_registry
+  ADD COLUMN provider_identity_fingerprint text
+`,
+  `
+ALTER TABLE ${POSTGRES_SCHEMA}.connection_registry
+  ADD CONSTRAINT connection_registry_provider_identity_fingerprint_format CHECK (
+    provider_identity_fingerprint IS NULL
+    OR provider_identity_fingerprint ~ '^[a-f0-9]{64}$'
+  )
+`,
+  `
+ALTER TABLE ${POSTGRES_SCHEMA}.connection_registry
+  ADD CONSTRAINT connection_registry_zalo_oa_provider_identity_required CHECK (
+    channel <> 'zalo_oa' OR provider_identity_fingerprint IS NOT NULL
+  )
+`
+]);
+
 const MIGRATIONS = Object.freeze([
   Object.freeze({
     id: INBOUND_EVENT_LEDGER_ID,
@@ -155,6 +182,14 @@ const MIGRATIONS = Object.freeze([
       INBOUND_EVENTS_CONNECTION_REGISTRY_FOREIGN_KEY_STATEMENTS
     ),
     statements: INBOUND_EVENTS_CONNECTION_REGISTRY_FOREIGN_KEY_STATEMENTS
+  }),
+  Object.freeze({
+    id: CONNECTION_REGISTRY_PROVIDER_IDENTITY_ID,
+    checksum: checksumFor(
+      CONNECTION_REGISTRY_PROVIDER_IDENTITY_ID,
+      CONNECTION_REGISTRY_PROVIDER_IDENTITY_STATEMENTS
+    ),
+    statements: CONNECTION_REGISTRY_PROVIDER_IDENTITY_STATEMENTS
   })
 ]);
 

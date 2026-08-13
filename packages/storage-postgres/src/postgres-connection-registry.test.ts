@@ -19,6 +19,14 @@ const REGISTRATION_B: ConnectionRegistration = Object.freeze({
   tier: 'OFFICIAL'
 });
 
+const ZALO_OA_REGISTRATION: ConnectionRegistration = Object.freeze({
+  channel: 'zalo_oa',
+  connectorId: 'zalo-oa',
+  id: 'zalo-oa-support',
+  providerIdentityFingerprint: '4e3cf2b346086a44fa154f4a6a33da25d514105622d5cacb1d1ddced7b440be9',
+  tier: 'OFFICIAL'
+});
+
 describe('PostgresConnectionRegistry', () => {
   it('registers matching metadata idempotently through parameterized transactions', async () => {
     const pool = createRegistryPool();
@@ -31,20 +39,22 @@ describe('PostgresConnectionRegistry', () => {
     expect(pool.client.queries.map((query) => query.sql)).toEqual([
       'BEGIN',
       'SELECT pg_advisory_xact_lock($1)',
+      'SELECT pg_advisory_xact_lock($1)',
       expect.stringContaining('INSERT INTO open_channel_hub.connection_registry'),
       expect.stringContaining('INSERT INTO open_channel_hub.connection_registry'),
       'COMMIT',
       'BEGIN',
       'SELECT pg_advisory_xact_lock($1)',
+      'SELECT pg_advisory_xact_lock($1)',
       expect.stringContaining('INSERT INTO open_channel_hub.connection_registry'),
       'COMMIT'
     ]);
-    const insertQuery = pool.client.queries[2];
+    const insertQuery = pool.client.queries[3];
     expect(insertQuery).toMatchObject({
-      values: ['telegram-bot-support-a', 'telegram-bot', 'telegram_bot', 'OFFICIAL']
+      values: ['telegram-bot-support-a', 'telegram-bot', 'telegram_bot', null, 'OFFICIAL']
     });
     expect(insertQuery?.sql).toContain('$1');
-    expect(insertQuery?.sql).toContain('$4');
+    expect(insertQuery?.sql).toContain('$5');
     expect(insertQuery?.sql).not.toContain('telegram-bot-support-a');
     expect(pool.client.released).toBe(true);
   });
@@ -68,6 +78,31 @@ describe('PostgresConnectionRegistry', () => {
     expect(pool.records).toEqual([REGISTRATION_A]);
     expect(pool.client.queries.map((query) => query.sql)).toContain('ROLLBACK');
     expect(pool.client.released).toBe(true);
+  });
+
+  it('rejects rebinding a Zalo OA connection id to a different opaque provider identity', async () => {
+    const pool = createRegistryPool([ZALO_OA_REGISTRATION]);
+    const registry = new PostgresConnectionRegistry(pool);
+    const rebound = Object.freeze({
+      ...ZALO_OA_REGISTRATION,
+      providerIdentityFingerprint:
+        '6fb4d468bae3102075d0ad82e4b6b7e115b2332a4ff8d0d0c826d90d2a5b55f0'
+    });
+
+    await expect(registry.ensureRegistered([rebound])).rejects.toBeInstanceOf(PostgresStorageError);
+    expect(pool.records).toEqual([ZALO_OA_REGISTRATION]);
+    expect(pool.client.queries.map((query) => query.sql)).toContain('ROLLBACK');
+  });
+
+  it('rejects first binding a Zalo OA id that has pre-registry inbound history', async () => {
+    const pool = createRegistryPool({ historicalConnectionIds: [ZALO_OA_REGISTRATION.id] });
+    const registry = new PostgresConnectionRegistry(pool);
+
+    await expect(registry.ensureRegistered([ZALO_OA_REGISTRATION])).rejects.toBeInstanceOf(
+      PostgresStorageError
+    );
+    expect(pool.records).toEqual([]);
+    expect(pool.client.queries.map((query) => query.sql)).toContain('ROLLBACK');
   });
 
   it('treats an empty registration list as a safe no-op', async () => {
@@ -126,6 +161,7 @@ describe('PostgresConnectionRegistry', () => {
     expect(pool.client.queries.map((query) => query.sql)).toEqual([
       'BEGIN',
       'SELECT pg_advisory_xact_lock($1)',
+      'SELECT pg_advisory_xact_lock($1)',
       expect.stringContaining('INSERT INTO open_channel_hub.connection_registry'),
       'ROLLBACK'
     ]);
@@ -150,6 +186,7 @@ interface RegistryPool extends SqlPool {
 
 interface RegistryPoolOptions {
   readonly failOnInsert?: boolean;
+  readonly historicalConnectionIds?: readonly string[];
 }
 
 const createRegistryPool = (
@@ -197,12 +234,14 @@ const createRegistryPool = (
           throw new Error('Synthetic PostgreSQL detail that must not leave the storage adapter.');
         }
 
-        const [id, connectorId, channel, tier] = values;
+        const [id, connectorId, channel, providerIdentityFingerprint, tier] = values;
         if (
           transactionRecords === undefined ||
           typeof id !== 'string' ||
           typeof connectorId !== 'string' ||
           typeof channel !== 'string' ||
+          (providerIdentityFingerprint !== null &&
+            typeof providerIdentityFingerprint !== 'string') ||
           typeof tier !== 'string'
         ) {
           throw new Error('Synthetic registry query has invalid values.');
@@ -213,6 +252,7 @@ const createRegistryPool = (
           if (
             existing.connectorId !== connectorId ||
             existing.channel !== channel ||
+            (existing.providerIdentityFingerprint ?? null) !== providerIdentityFingerprint ||
             existing.tier !== tier
           ) {
             return Object.freeze({ rows: [] });
@@ -221,11 +261,19 @@ const createRegistryPool = (
           return Object.freeze({ rows: [toRow(existing)] });
         }
 
+        if (
+          providerIdentityFingerprint !== null &&
+          options.historicalConnectionIds?.includes(id) === true
+        ) {
+          return Object.freeze({ rows: [] });
+        }
+
         const record: ConnectionRegistration = Object.freeze({
           id,
           connectorId,
           channel: channel as ConnectionRegistration['channel'],
-          tier: tier as ConnectionRegistration['tier']
+          tier: tier as ConnectionRegistration['tier'],
+          ...(providerIdentityFingerprint === null ? {} : { providerIdentityFingerprint })
         });
         transactionRecords.set(id, record);
 
@@ -258,5 +306,6 @@ const toRow = (registration: ConnectionRegistration): Readonly<Record<string, un
     connection_id: registration.id,
     connector_id: registration.connectorId,
     channel: registration.channel,
+    provider_identity_fingerprint: registration.providerIdentityFingerprint ?? null,
     tier: registration.tier
   });

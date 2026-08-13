@@ -8,27 +8,44 @@ import {
 import type { ConnectionRegistry } from '@open-channel-hub/domain';
 
 import { PostgresStorageError } from './postgres-error.js';
+import {
+  CONNECTION_REGISTRY_LOCK_KEY,
+  INBOUND_EVENT_APPEND_LOCK_KEY
+} from './postgres-lock-keys.js';
 import { POSTGRES_SCHEMA } from './postgres-migrations.js';
 import type { SqlClient, SqlPool } from './sql.js';
 
 const MAXIMUM_CONNECTION_REGISTRATIONS = 100;
-const CONNECTION_REGISTRY_LOCK_KEY = 1_864_659_703;
 const IDENTIFIER_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
+const PROVIDER_IDENTITY_FINGERPRINT_PATTERN = /^[a-f0-9]{64}$/;
 
 const UPSERT_CONNECTION_REGISTRATION_SQL = `
 INSERT INTO ${POSTGRES_SCHEMA}.connection_registry AS existing (
   connection_id,
   connector_id,
   channel,
+  provider_identity_fingerprint,
   tier
 )
-VALUES ($1, $2, $3, $4)
+SELECT $1, $2, $3, $4::text, $5
+WHERE $4::text IS NULL
+  OR NOT EXISTS (
+    SELECT 1
+    FROM ${POSTGRES_SCHEMA}.inbound_events AS history
+    WHERE history.connection_id = $1
+      AND NOT EXISTS (
+        SELECT 1
+        FROM ${POSTGRES_SCHEMA}.connection_registry AS registered
+        WHERE registered.connection_id = $1
+      )
+  )
 ON CONFLICT (connection_id) DO UPDATE
 SET connection_id = EXCLUDED.connection_id
 WHERE existing.connector_id = EXCLUDED.connector_id
   AND existing.channel = EXCLUDED.channel
+  AND existing.provider_identity_fingerprint IS NOT DISTINCT FROM EXCLUDED.provider_identity_fingerprint
   AND existing.tier = EXCLUDED.tier
-RETURNING connection_id, connector_id, channel, tier
+RETURNING connection_id, connector_id, channel, provider_identity_fingerprint, tier
 `;
 
 /**
@@ -55,6 +72,7 @@ export class PostgresConnectionRegistry implements ConnectionRegistry {
       await client.query('BEGIN');
       transactionStarted = true;
       await client.query('SELECT pg_advisory_xact_lock($1)', [CONNECTION_REGISTRY_LOCK_KEY]);
+      await client.query('SELECT pg_advisory_xact_lock($1)', [INBOUND_EVENT_APPEND_LOCK_KEY]);
 
       for (const registration of registrations) {
         const result = await client.query(
@@ -102,7 +120,10 @@ const validateRegistrations = (value: unknown): readonly ConnectionRegistration[
       id: candidate.id,
       connectorId: candidate.connectorId,
       channel: candidate.channel,
-      tier: candidate.tier
+      tier: candidate.tier,
+      ...(candidate.providerIdentityFingerprint === undefined
+        ? {}
+        : { providerIdentityFingerprint: candidate.providerIdentityFingerprint })
     });
   });
 
@@ -114,7 +135,12 @@ const isConnectionRegistration = (value: unknown): value is ConnectionRegistrati
   isIdentifier(value.id) &&
   isIdentifier(value.connectorId) &&
   isChannel(value.channel) &&
-  isConnectorTier(value.tier);
+  isConnectorTier(value.tier) &&
+  (value.providerIdentityFingerprint === undefined ||
+    isProviderIdentityFingerprint(value.providerIdentityFingerprint)) &&
+  (value.channel !== 'zalo_oa' ||
+    (value.providerIdentityFingerprint !== undefined &&
+      isProviderIdentityFingerprint(value.providerIdentityFingerprint)));
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
@@ -128,11 +154,15 @@ const isChannel = (value: unknown): value is Channel =>
 const isConnectorTier = (value: unknown): value is ConnectorTier =>
   typeof value === 'string' && (CONNECTOR_TIERS as readonly string[]).includes(value);
 
+const isProviderIdentityFingerprint = (value: unknown): value is string =>
+  typeof value === 'string' && PROVIDER_IDENTITY_FINGERPRINT_PATTERN.test(value);
+
 const valuesFor = (registration: ConnectionRegistration): readonly unknown[] =>
   Object.freeze([
     registration.id,
     registration.connectorId,
     registration.channel,
+    registration.providerIdentityFingerprint ?? null,
     registration.tier
   ]);
 
@@ -150,6 +180,7 @@ const hasMatchingRegistration = (
     row?.connection_id === registration.id &&
     row.connector_id === registration.connectorId &&
     row.channel === registration.channel &&
+    row.provider_identity_fingerprint === (registration.providerIdentityFingerprint ?? null) &&
     row.tier === registration.tier
   );
 };

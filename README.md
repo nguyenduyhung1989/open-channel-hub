@@ -2,14 +2,14 @@
 
 > A self-hosted, official-first multichannel messaging hub.
 
-**Status: Phase 2c alpha.** The repository contains a durable PostgreSQL
-inbound-event ledger, an operator-only canonical-event API, and the first
-runtime configuration foundation for more than one official Telegram Bot
-account. GitHub CI and CodeQL succeeded for the exact Phase 2b commit
-<code>4d5a9c9</code>. The current Phase 2c source passed its final local
-verification and synthetic Compose proof; its exact commit still needs fresh
-GitHub CI and CodeQL. Phase 1a remains incomplete until an
-owner-authorized Telegram test bot works through public TLS.
+**Status: Phase 3a alpha.** The repository contains a durable PostgreSQL
+inbound-event ledger, account-scoped operator read APIs, secret-backed runtime
+configuration for several official accounts, and a narrow official Zalo
+Official Account (OA) signed inbound-text boundary. GitHub CI and CodeQL
+succeeded for the exact Phase 2c commit <code>8352b51</code>. The current
+Phase 3a source still needs its own final local and GitHub verification. Phase
+1a remains incomplete until an owner-authorized Telegram test bot works through
+public TLS; Phase 3a similarly has no owner-authorized real Zalo OA proof.
 
 The official Telegram Bot HTTP transport is wired for a deliberately narrow
 text send/receive slice. Legacy mode uses <code>OPERATOR_API_TOKEN</code>;
@@ -29,12 +29,29 @@ events do not shift or duplicate an operator's already-started page traversal.
 
 Phase 2c adds a secret-backed runtime configuration document and a durable
 connection registry. In multi-connection mode, each unique operator bearer
-token selects one configured Telegram Bot account inside the process; neither
-operator route accepts a caller-selected connection ID. Dynamic webhook ingress
-uses <code>POST /v1/webhooks/telegram-bot/:connectionId</code>, and the route
-checks the resolved account's separate Telegram webhook secret. The registry
-stores only opaque connection ID, connector ID, channel, and tier, never tokens,
+token selects one configured account inside the process; no operator route
+accepts a caller-selected connection ID. Telegram uses the dynamic ingress
+<code>POST /v1/webhooks/telegram-bot/:connectionId</code> and checks the
+resolved account's separate Telegram webhook secret. The registry stores only
+opaque connection ID and connector metadata for every connection, never tokens,
 phone numbers, provider account names, or raw provider payloads.
+
+Phase 3a adds official Zalo OA inbound text only. Its fixed
+<code>POST /v1/webhooks/zalo-oa</code> route resolves the configured
+<code>(appId, oaId)</code> from the signed provider payload, verifies
+<code>X-ZEvent-Signature</code> against the exact raw JSON bytes, then returns
+<code>200</code> only after the canonical event is durable. A unique operator
+bearer exposes only that OA's canonical events at
+<code>GET /v1/zalo-oa/inbound-events</code>. There is no OAuth, access-token
+storage, outbound Zalo message, attachment, Zalo User, live provider call, or
+automatic webhook registration.
+
+For Zalo OA only, the registry also stores a domain-separated SHA-256
+fingerprint of the configured <code>(appId, oaId)</code> pair. It is not the
+plain provider identity or a credential; it prevents an opaque Zalo connection
+ID with durable history from silently being reused for a different OA. Telegram
+does not yet have an equivalent non-secret provider-account identity in this
+configuration, so its registry binding remains connector/channel/tier only.
 
 Multi-connection IDs are opaque safe route labels; <code>.</code> and
 <code>..</code> are rejected because webhook ingress places the ID in a dynamic
@@ -64,8 +81,9 @@ CAPTCHA bypass, fingerprint spoofing, session theft, or bulk-spam capabilities.
 - Data contracts, connector ports, and capability checks for the Telegram Bot
   slice.
 - A temporary legacy one-Bot environment mode and a mutually exclusive,
-  secret-backed multi-connection mode for official Telegram Bot accounts. The
-  latter maps each unique operator token to exactly one configured account.
+  secret-backed multi-connection mode for official Telegram Bot and Zalo OA
+  accounts. The latter maps each unique operator token to exactly one
+  configured account.
 - Dynamic multi-connection webhook ingress that resolves the account server
   side, uses a separate webhook secret, and gives unknown account IDs and wrong
   secrets the same <code>401</code> response.
@@ -74,7 +92,9 @@ CAPTCHA bypass, fingerprint spoofing, session theft, or bulk-spam capabilities.
   idempotency; raw Telegram payloads are deliberately not stored.
 - An operator-authenticated, connection-scoped inbound-event read API with
   bounded keyset pagination and opaque cursors. It returns canonical events,
-  not database rows or raw Telegram payloads.
+  not database rows or raw provider payloads.
+- A narrow official Zalo OA receive-only boundary: a fixed signed raw-JSON
+  webhook for text messages and a separate bearer-scoped canonical-event reader.
 - An isolated PostgreSQL database and schema, a non-superuser application role,
   immutable migration ledger, a runtime connection registry, and readiness that
   refuses traffic when the expected migration is unavailable.
@@ -94,8 +114,9 @@ The following remain plans or explicitly incomplete operational work:
 - A web dashboard, user accounts, role-based access control, multiple
   organizations, webhook administration, public connection management, or a
   connection listing API.
-- A real Telegram Bot/TLS verification, Facebook Page, Facebook User, Zalo OA,
-  Zalo User, and WhatsApp.
+- A real Telegram Bot/TLS verification, real Zalo OA/TLS verification, Zalo OA
+  OAuth/access tokens/outbound messages/attachments, Facebook Page, Facebook
+  User, Zalo User, and WhatsApp.
 
 See [ROADMAP.md](ROADMAP.md) for the criteria before each phase can be called
 complete.
@@ -150,9 +171,10 @@ Before the first start, copy <code>.env.example</code> to
    <code>DATABASE_PASSWORD</code> belongs to the non-superuser
    <code>open_channel_hub</code> application role.
 3. Either keep Telegram disabled, use the temporary legacy one-Bot variables,
-   or configure the multi-connection secret document. Do not mix the two
-   Telegram configuration modes. See the
-   [Phase 2c multi-connection guide](docs/operations/runtime-multi-connection-2c.md).
+   or configure the shared multi-connection secret document. Do not mix the
+   legacy Telegram variables with the shared document. See the
+   [Phase 2c multi-connection guide](docs/operations/runtime-multi-connection-2c.md)
+   and [Phase 3a Zalo OA guide](docs/operations/zalo-oa-3a.md).
 
 ```bash
 docker compose up --build
@@ -194,22 +216,24 @@ Do **not** casually run <code>docker compose down --volumes</code>. It deletes
 the named PostgreSQL volume and therefore every stored inbound event. Backups
 and restore drills are not implemented yet.
 
-Telegram can call a webhook only through a public HTTPS URL. Put a TLS reverse
-proxy in front of Compose, keep the operator API on loopback, and follow the
-[Phase 2c multi-connection guide](docs/operations/runtime-multi-connection-2c.md)
-or [Phase 1a legacy guide](docs/operations/telegram-bot-1a.md) only after an
+Telegram and Zalo OA require public HTTPS webhooks. Put a TLS reverse proxy in
+front of Compose, keep the operator API on loopback, and follow the
+[Phase 2c multi-connection guide](docs/operations/runtime-multi-connection-2c.md),
+[Phase 3a Zalo OA guide](docs/operations/zalo-oa-3a.md), or
+[Phase 1a legacy guide](docs/operations/telegram-bot-1a.md) only after an
 authorized test is agreed. Starting Compose does not provide TLS or register a
 webhook automatically.
 
 ## Read canonical inbound events
 
-When Telegram and PostgreSQL are enabled, a local operator can call
-<code>GET /v1/telegram-bot/inbound-events</code> with the bearer token assigned
-to one configured account. The route accepts an optional <code>limit</code>
-from 1 to 100 (default 50) and an optional opaque <code>cursor</code> returned
-by the preceding page. It does not accept a connection ID: in legacy mode it
-reads the one configured Bot, and in multi-connection mode the bearer token
-selects exactly one account server side.
+When a configured connector and PostgreSQL are enabled, a local operator can
+call <code>GET /v1/telegram-bot/inbound-events</code> for Telegram or
+<code>GET /v1/zalo-oa/inbound-events</code> for Zalo OA with the bearer token
+assigned to one configured account. Each route accepts an optional
+<code>limit</code> from 1 to 100 (default 50) and an optional opaque
+<code>cursor</code> returned by the preceding page. Neither accepts a connection
+ID: in legacy Telegram mode it reads the one configured Bot, and in the shared
+multi-connection mode the bearer token selects exactly one account server side.
 
 The response contains <code>events</code> and, when another page exists,
 <code>nextCursor</code>. Treat the cursor as opaque. It is a stable snapshot

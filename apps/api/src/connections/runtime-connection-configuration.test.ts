@@ -166,6 +166,61 @@ describe('loadRuntimeConnectionConfiguration', () => {
       await expectGenericFailure(loadRuntimeConnectionConfiguration(CONFIGURATION_PATH));
     }
   });
+
+  it('accepts several OA accounts for one Zalo App with independently configured OA secrets', async () => {
+    const configuration = validZaloOaConfiguration();
+    configuration.connections[1]!.oaSecretKey = 'synthetic-zalo-sales-oa-secret';
+    readFileMock.mockResolvedValue(JSON.stringify(configuration));
+
+    await expect(loadRuntimeConnectionConfiguration(CONFIGURATION_PATH)).resolves.toEqual({
+      connections: configuration.connections
+    });
+  });
+
+  it('rejects ambiguous Zalo App/OA mappings and cross-platform credential reuse', async () => {
+    const duplicatePair = validZaloOaConfiguration();
+    duplicatePair.connections[1]!.oaId = duplicatePair.connections[0]!.oaId;
+
+    const crossPlatformCredential = validConfiguration();
+    crossPlatformCredential.connections.push({
+      ...validZaloOaConnection(),
+      oaSecretKey: crossPlatformCredential.connections[0]!.botToken
+    } as unknown as MutableRuntimeTelegramBotConnection);
+
+    for (const configuration of [duplicatePair, crossPlatformCredential]) {
+      readFileMock.mockResolvedValueOnce(JSON.stringify(configuration));
+      await expectGenericFailure(loadRuntimeConnectionConfiguration(CONFIGURATION_PATH));
+    }
+  });
+
+  it('rejects malformed Zalo identifiers and a webhook URL outside its fixed App-level path', async () => {
+    const invalidIdentifiers = [
+      { appId: 'app-123' },
+      { oaId: 'oa-456' },
+      { id: '.' },
+      { oaSecretKey: '' }
+    ];
+
+    for (const override of invalidIdentifiers) {
+      const configuration = validZaloOaConfiguration();
+      Object.assign(configuration.connections[0]!, override);
+      readFileMock.mockResolvedValueOnce(JSON.stringify(configuration));
+
+      await expectGenericFailure(loadRuntimeConnectionConfiguration(CONFIGURATION_PATH));
+    }
+
+    for (const webhookUrl of [
+      'https://example.test/v1/webhooks/zalo-oa?credential=synthetic',
+      'https://example.test/v1/webhooks/zalo-oa/another-oa',
+      'https://localhost/v1/webhooks/zalo-oa'
+    ]) {
+      const configuration = validZaloOaConfiguration();
+      configuration.connections[0]!.webhookUrl = webhookUrl;
+      readFileMock.mockResolvedValueOnce(JSON.stringify(configuration));
+
+      await expectGenericFailure(loadRuntimeConnectionConfiguration(CONFIGURATION_PATH));
+    }
+  });
 });
 
 const validConfiguration = (): MutableRuntimeConnectionConfiguration => ({
@@ -201,6 +256,46 @@ interface MutableRuntimeTelegramBotConnection {
   botToken: string;
   operatorApiToken: string;
   webhookSecret: string;
+  webhookUrl?: string;
+}
+
+const validZaloOaConfiguration = (): MutableRuntimeZaloOaConfiguration => ({
+  version: 1,
+  connections: [
+    validZaloOaConnection(),
+    validZaloOaConnection({
+      id: 'zalo-oa-sales',
+      oaId: '9876543210987654322',
+      operatorApiToken: 'synthetic_zalo_operator_sales_0123456789012345678'
+    })
+  ]
+});
+
+const validZaloOaConnection = (
+  overrides: Readonly<Partial<MutableRuntimeZaloOaConnection>> = {}
+): MutableRuntimeZaloOaConnection => ({
+  appId: '1234567890123456789',
+  id: 'zalo-oa-support',
+  oaId: '9876543210987654321',
+  oaSecretKey: 'synthetic-zalo-oa-secret',
+  operatorApiToken: 'synthetic_zalo_operator_support_012345678901234567',
+  type: 'zalo_oa',
+  webhookUrl: 'https://example.test/v1/webhooks/zalo-oa',
+  ...overrides
+});
+
+interface MutableRuntimeZaloOaConfiguration {
+  version: number;
+  connections: MutableRuntimeZaloOaConnection[];
+}
+
+interface MutableRuntimeZaloOaConnection {
+  appId: string;
+  id: string;
+  oaId: string;
+  oaSecretKey: string;
+  operatorApiToken: string;
+  type: string;
   webhookUrl?: string;
 }
 

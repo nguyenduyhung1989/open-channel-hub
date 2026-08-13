@@ -14,12 +14,17 @@ import { createTelegramBotFeatureCatalog } from './telegram-bot/telegram-bot-fea
 import { registerTelegramBotInboundEventsRoute } from './telegram-bot/telegram-bot-inbound-events-route.js';
 import { registerTelegramBotMessageRoute } from './telegram-bot/telegram-bot-message-route.js';
 import { registerTelegramBotWebhookRoute } from './telegram-bot/telegram-bot-webhook-route.js';
+import type { ZaloOaFeature } from './zalo-oa/zalo-oa-feature.js';
+import { createZaloOaFeatureCatalog } from './zalo-oa/zalo-oa-feature-catalog.js';
+import { registerZaloOaInboundEventsRoute } from './zalo-oa/zalo-oa-inbound-events-route.js';
+import { registerZaloOaWebhookRoute } from './zalo-oa/zalo-oa-webhook-route.js';
 
 export interface BuildAppOptions {
   readonly readiness?: ReadinessCheck;
   readonly sourceOfferUrl?: string;
   readonly telegramBot?: TelegramBotFeature;
   readonly telegramBots?: readonly TelegramBotFeature[];
+  readonly zaloOas?: readonly ZaloOaFeature[];
 }
 
 export const buildApp = async (options: BuildAppOptions = {}): Promise<FastifyInstance> => {
@@ -97,6 +102,13 @@ export const buildApp = async (options: BuildAppOptions = {}): Promise<FastifyIn
         ? {}
         : { legacyConnectionId: options.telegramBot.connectionId })
     });
+  }
+
+  if (options.zaloOas !== undefined) {
+    const catalog = createZaloOaFeatureCatalog(options.zaloOas);
+
+    await registerZaloOaInboundEventsRoute(app, catalog);
+    await registerZaloOaWebhookRoute(app, catalog);
   }
 
   return app;

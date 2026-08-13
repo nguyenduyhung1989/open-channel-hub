@@ -25,13 +25,16 @@ Multi-connection mode reads one local JSON document from the absolute path in
 <code>CONNECTIONS_CONFIG_FILE</code>, or decodes one unpadded base64url JSON
 document from the absolute path in <code>CONNECTIONS_CONFIG_BASE64_FILE</code>.
 The two inputs are mutually exclusive. The document has a strict versioned
-shape and currently supports only <code>telegram_bot</code> entries. Each entry
-has an opaque connection ID, a Telegram Bot token, an operator bearer token, a
-webhook secret, and an optional public webhook URL.
+shape and supports <code>telegram_bot</code> and <code>zalo_oa</code> entries.
+A Telegram entry has an opaque connection ID, a Bot token, an operator bearer
+token, a webhook secret, and an optional public webhook URL. A Zalo OA entry
+has an opaque connection ID, <code>appId</code>, <code>oaId</code>,
+<code>oaSecretKey</code>, an operator bearer, and an optional fixed App-level
+webhook URL.
 
 The document is a secret because it contains inline credentials. It is never
-committed, logged, exposed through an API, or stored in PostgreSQL. Direct
-direct or other non-Compose runtimes can use the Git- and Docker-ignored
+committed, logged, exposed through an API, or stored in PostgreSQL. Direct or
+other non-Compose runtimes can use the Git- and Docker-ignored
 <code>runtime-connections.local.json</code> convention or a mounted secret at
 an absolute path through <code>CONNECTIONS_CONFIG_FILE</code>. Compose instead
 receives a one-line unpadded base64url
@@ -43,9 +46,12 @@ only <code>CONNECTIONS_CONFIG_BASE64_FILE</code> and decodes the secret locally.
 Base64url prevents Compose from treating a credential's <code>$</code> as an
 environment interpolation marker; it is an encoding boundary, not encryption.
 
-The loader rejects unknown fields, duplicate connection IDs, duplicate values
-across all Bot/operator/webhook credentials, invalid paths, malformed JSON,
-invalid public webhook URLs, and every provider/network operation at load time.
+The loader rejects unknown fields, duplicate connection IDs, duplicate
+Telegram/operator credential-role values, duplicate Zalo
+<code>(appId, oaId)</code> pairs, invalid paths, malformed JSON, invalid public
+webhook URLs, and every provider/network operation at load time. It
+intentionally makes no undocumented claim that Zalo OA entries sharing an App
+ID must share an OA secret.
 Although old one-Bot environment labels are retained for compatibility, the
 multi-connection document rejects the path-component IDs <code>.</code> and
 <code>..</code>. Its public error deliberately omits file paths, JSON contents,
@@ -60,6 +66,7 @@ Migration <code>0003_connection_registry</code> creates
 - connector ID;
 - channel;
 - connector tier; and
+- an optional non-secret provider-identity fingerprint; and
 - registration timestamp.
 
 Before the API accepts provider traffic, startup derives those values from each
@@ -75,7 +82,18 @@ before the registry. A later explicit migration may validate the constraint
 only after historical identity records are deliberately reconciled; this change
 does not hide a data backfill in schema migration code.
 
-### Tokens select an account; callers never select one
+Migration <code>0005_connection_registry_provider_identity</code> adds an
+optional fingerprint column, then requires a domain-separated SHA-256
+fingerprint for every <code>zalo_oa</code> registration. The fingerprint derives
+from its configured <code>(appId, oaId)</code> pair and retains neither the raw
+pair nor a secret. A restart with the same pair is safe; a changed fingerprint
+for an existing Zalo connection ID fails registration. The first Zalo binding is
+also refused when older pre-registry inbound history already uses that ID, so
+the new source never silently claims that old rows belonged to a newly chosen
+OA. Telegram remains without an equivalent provider-identity fingerprint because
+this configuration does not contain a comparable non-secret Bot account ID.
+
+### Credentials select an account; callers never select one
 
 Multi-connection webhook ingress is
 <code>POST /v1/webhooks/telegram-bot/:connectionId</code>. The route resolves
@@ -89,6 +107,16 @@ connection ID in a route, query, or header. A unique bearer token resolves one
 configured feature inside the process, and the route supplies that feature's
 connection ID to the domain operation. Inbound-event cursors bind the resolved
 connection ID, so a cursor from one account is rejected for another account.
+
+Zalo OA webhook ingress is the fixed
+<code>POST /v1/webhooks/zalo-oa</code> path. It reads the signed payload's
+<code>app_id</code> and <code>recipient.id</code> to resolve one configured
+<code>(appId, oaId)</code> pair, then verifies <code>X-ZEvent-Signature</code>
+over the original raw JSON bytes with that entry's <code>oaSecretKey</code>. The
+caller still never supplies the internal connection ID. This Phase 3a
+inbound-only boundary does not create an OAuth workflow, store an Official
+Account access token, send a provider request, or register a webhook
+automatically.
 
 ### Temporary legacy compatibility
 
@@ -131,11 +159,15 @@ not a second configuration layer.
 
 ## Consequences
 
-- One runtime can hold multiple official Telegram Bot accounts without giving
-  an HTTP caller a way to choose somebody else's account.
+- One runtime can hold multiple official Telegram Bot and Zalo OA accounts
+  without giving an HTTP caller a way to choose somebody else's account.
 - The database can reject future event rows whose connection was never
   registered, while old Phase 2a rows remain available for an explicit future
   reconciliation decision.
+- A Zalo OA connection ID with durable history cannot be silently repointed to
+  another App/OA pair. The database records only a domain-separated hash, not
+  the pair itself or a credential; this narrower binding does not currently
+  apply to Telegram.
 - Connection IDs are durable internal identifiers. Operators must not reuse an
   existing ID for a different connector, channel, or tier.
 - This is configuration plumbing, not a multi-tenant SaaS. It adds no user

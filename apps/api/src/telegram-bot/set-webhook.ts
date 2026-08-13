@@ -5,7 +5,7 @@ import { loadTelegramBotConnectionConfigurations } from './telegram-bot-connecti
 
 try {
   const environment = parseEnvironment(process.env);
-  const connections = await loadTelegramBotConnectionConfigurations(environment.telegramBot);
+  const connections = await loadTelegramBotConnectionConfigurations(environment.connectorRuntime);
   const webhookConnections = connections.filter(
     (connection): connection is typeof connection & Readonly<{ webhookUrl: string }> =>
       connection.webhookUrl !== undefined

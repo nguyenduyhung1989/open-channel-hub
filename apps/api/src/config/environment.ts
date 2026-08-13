@@ -28,11 +28,11 @@ const environmentSchema = z.object({
   TELEGRAM_WEBHOOK_URL: z.string().optional()
 });
 
-export interface DisabledTelegramBotEnvironment {
+export interface DisabledConnectorRuntimeEnvironment {
   readonly enabled: false;
 }
 
-export interface EnabledTelegramBotEnvironment {
+export interface EnabledLegacyTelegramBotEnvironment {
   readonly enabled: true;
   readonly botToken: string;
   readonly connectionId: string;
@@ -41,17 +41,23 @@ export interface EnabledTelegramBotEnvironment {
   readonly webhookUrl?: string;
 }
 
-/** A secret-backed JSON file that can configure more than one Telegram Bot connection. */
-export interface RuntimeConfiguredTelegramBotsEnvironment {
+/** A secret-backed JSON file that can configure official connector accounts. */
+export interface RuntimeConfiguredConnectionsEnvironment {
   readonly configurationEncoding: 'base64url' | 'json';
   readonly configurationFile: string;
   readonly enabled: true;
 }
 
-export type TelegramBotEnvironment =
-  | DisabledTelegramBotEnvironment
-  | EnabledTelegramBotEnvironment
-  | RuntimeConfiguredTelegramBotsEnvironment;
+export type ConnectorRuntimeEnvironment =
+  | DisabledConnectorRuntimeEnvironment
+  | EnabledLegacyTelegramBotEnvironment
+  | RuntimeConfiguredConnectionsEnvironment;
+
+/** @deprecated Use ConnectorRuntimeEnvironment. Retained for private legacy wiring tests. */
+export type TelegramBotEnvironment = ConnectorRuntimeEnvironment;
+
+/** @deprecated Use EnabledLegacyTelegramBotEnvironment. */
+export type EnabledTelegramBotEnvironment = EnabledLegacyTelegramBotEnvironment;
 
 export interface PostgresEnvironment {
   readonly database: 'open_channel_hub';
@@ -67,7 +73,7 @@ export interface AppEnvironment {
   readonly PORT: number;
   readonly postgres?: PostgresEnvironment;
   readonly sourceOfferUrl: string;
-  readonly telegramBot: TelegramBotEnvironment;
+  readonly connectorRuntime: ConnectorRuntimeEnvironment;
 }
 
 export class EnvironmentConfigurationError extends Error {
@@ -119,7 +125,7 @@ export const parseEnvironment = (environment: NodeJS.ProcessEnv): AppEnvironment
       PORT: configuration.PORT,
       postgres,
       sourceOfferUrl: resolvedSourceOfferUrl,
-      telegramBot: Object.freeze({
+      connectorRuntime: Object.freeze({
         configurationEncoding: base64ConfigurationFile === undefined ? 'json' : 'base64url',
         configurationFile: configuredConnectionFile,
         enabled: true
@@ -134,7 +140,7 @@ export const parseEnvironment = (environment: NodeJS.ProcessEnv): AppEnvironment
       PORT: configuration.PORT,
       ...(postgres === undefined ? {} : { postgres }),
       sourceOfferUrl: resolvedSourceOfferUrl,
-      telegramBot: Object.freeze({ enabled: false })
+      connectorRuntime: Object.freeze({ enabled: false })
     });
   }
 
@@ -167,7 +173,7 @@ export const parseEnvironment = (environment: NodeJS.ProcessEnv): AppEnvironment
     PORT: configuration.PORT,
     ...(postgres === undefined ? {} : { postgres }),
     sourceOfferUrl: resolvedSourceOfferUrl,
-    telegramBot: Object.freeze({
+    connectorRuntime: Object.freeze({
       botToken,
       connectionId: configuration.TELEGRAM_CONNECTION_ID,
       enabled: true,

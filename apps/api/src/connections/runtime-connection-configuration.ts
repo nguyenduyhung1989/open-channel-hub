@@ -10,8 +10,25 @@ export interface RuntimeTelegramBotConnection {
   readonly webhookUrl?: string;
 }
 
+/**
+ * Zalo OA inbound credentials are deliberately separate from OAuth and access
+ * tokens. Phase 3a verifies signed inbound webhooks only; it does not send
+ * messages or refresh provider credentials.
+ */
+export interface RuntimeZaloOaConnection {
+  readonly appId: string;
+  readonly id: string;
+  readonly oaId: string;
+  readonly oaSecretKey: string;
+  readonly operatorApiToken: string;
+  readonly type: 'zalo_oa';
+  readonly webhookUrl?: string;
+}
+
+export type RuntimeConnection = RuntimeTelegramBotConnection | RuntimeZaloOaConnection;
+
 export interface RuntimeConnectionConfiguration {
-  readonly connections: readonly RuntimeTelegramBotConnection[];
+  readonly connections: readonly RuntimeConnection[];
 }
 
 /**
@@ -30,17 +47,27 @@ const MAXIMUM_CONFIGURATION_SOURCE_LENGTH = 262_144;
 const MAXIMUM_BASE64URL_CONFIGURATION_SOURCE_LENGTH = 349_526;
 const MAXIMUM_CONNECTIONS = 100;
 const ROOT_KEYS = Object.freeze(['version', 'connections']);
-const CONNECTION_REQUIRED_KEYS = Object.freeze([
+const TELEGRAM_BOT_CONNECTION_REQUIRED_KEYS = Object.freeze([
   'id',
   'type',
   'botToken',
   'operatorApiToken',
   'webhookSecret'
 ]);
-const CONNECTION_OPTIONAL_KEYS = Object.freeze(['webhookUrl']);
+const TELEGRAM_BOT_CONNECTION_OPTIONAL_KEYS = Object.freeze(['webhookUrl']);
+const ZALO_OA_CONNECTION_REQUIRED_KEYS = Object.freeze([
+  'id',
+  'type',
+  'appId',
+  'oaId',
+  'oaSecretKey',
+  'operatorApiToken'
+]);
+const ZALO_OA_CONNECTION_OPTIONAL_KEYS = Object.freeze(['webhookUrl']);
 const CONNECTION_ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
 const PRINTABLE_TOKEN_PATTERN = /^[!-~]+$/;
 const WEBHOOK_SECRET_PATTERN = /^[A-Za-z0-9_-]{32,256}$/;
+const ZALO_IDENTIFIER_PATTERN = /^[0-9]{1,32}$/;
 const PRIVATE_HOSTNAME_SUFFIXES = Object.freeze(['.localhost', '.local', '.internal']);
 
 /**
@@ -125,9 +152,12 @@ const parseRuntimeConnectionConfiguration = (value: unknown): RuntimeConnectionC
   }
 
   const identifiers = new Set<string>();
-  const secrets = new Set<string>();
+  const operatorTokens = new Set<string>();
+  const exclusiveCredentials = new Set<string>();
+  const zaloOaSecrets = new Set<string>();
+  const zaloOaPairs = new Set<string>();
   const connections = value.connections.map((candidate) => {
-    const connection = parseTelegramBotConnection(candidate);
+    const connection = parseConnection(candidate);
 
     if (identifiers.has(connection.id)) {
       throw new RuntimeConnectionConfigurationError();
@@ -135,16 +165,34 @@ const parseRuntimeConnectionConfiguration = (value: unknown): RuntimeConnectionC
 
     identifiers.add(connection.id);
 
-    for (const secret of [
-      connection.botToken,
-      connection.operatorApiToken,
-      connection.webhookSecret
-    ]) {
-      if (secrets.has(secret)) {
+    if (
+      operatorTokens.has(connection.operatorApiToken) ||
+      exclusiveCredentials.has(connection.operatorApiToken) ||
+      zaloOaSecrets.has(connection.operatorApiToken)
+    ) {
+      throw new RuntimeConnectionConfigurationError();
+    }
+
+    operatorTokens.add(connection.operatorApiToken);
+    exclusiveCredentials.add(connection.operatorApiToken);
+
+    if (connection.type === 'telegram_bot') {
+      for (const credential of [connection.botToken, connection.webhookSecret]) {
+        if (exclusiveCredentials.has(credential) || zaloOaSecrets.has(credential)) {
+          throw new RuntimeConnectionConfigurationError();
+        }
+
+        exclusiveCredentials.add(credential);
+      }
+    } else {
+      const pairKey = `${connection.appId}\u0000${connection.oaId}`;
+
+      if (exclusiveCredentials.has(connection.oaSecretKey) || zaloOaPairs.has(pairKey)) {
         throw new RuntimeConnectionConfigurationError();
       }
 
-      secrets.add(secret);
+      zaloOaSecrets.add(connection.oaSecretKey);
+      zaloOaPairs.add(pairKey);
     }
 
     return connection;
@@ -153,9 +201,29 @@ const parseRuntimeConnectionConfiguration = (value: unknown): RuntimeConnectionC
   return Object.freeze({ connections: Object.freeze(connections) });
 };
 
+const parseConnection = (value: unknown): RuntimeConnection => {
+  if (!isRecord(value)) {
+    throw new RuntimeConnectionConfigurationError();
+  }
+
+  if (value.type === 'telegram_bot') {
+    return parseTelegramBotConnection(value);
+  }
+
+  if (value.type === 'zalo_oa') {
+    return parseZaloOaConnection(value);
+  }
+
+  throw new RuntimeConnectionConfigurationError();
+};
+
 const parseTelegramBotConnection = (value: unknown): RuntimeTelegramBotConnection => {
   if (
-    !hasExactKeys(value, CONNECTION_REQUIRED_KEYS, CONNECTION_OPTIONAL_KEYS) ||
+    !hasExactKeys(
+      value,
+      TELEGRAM_BOT_CONNECTION_REQUIRED_KEYS,
+      TELEGRAM_BOT_CONNECTION_OPTIONAL_KEYS
+    ) ||
     !isConnectionId(value.id) ||
     value.type !== 'telegram_bot' ||
     !isPrintableToken(value.botToken, 1) ||
@@ -184,6 +252,39 @@ const parseTelegramBotConnection = (value: unknown): RuntimeTelegramBotConnectio
   };
 
   return Object.freeze(connection);
+};
+
+const parseZaloOaConnection = (value: unknown): RuntimeZaloOaConnection => {
+  if (
+    !hasExactKeys(value, ZALO_OA_CONNECTION_REQUIRED_KEYS, ZALO_OA_CONNECTION_OPTIONAL_KEYS) ||
+    !isConnectionId(value.id) ||
+    value.type !== 'zalo_oa' ||
+    !isZaloIdentifier(value.appId) ||
+    !isZaloIdentifier(value.oaId) ||
+    !isPrintableToken(value.oaSecretKey, 1) ||
+    !isPrintableToken(value.operatorApiToken, 32)
+  ) {
+    throw new RuntimeConnectionConfigurationError();
+  }
+
+  const webhookUrl = value.webhookUrl;
+
+  if (
+    webhookUrl !== undefined &&
+    (!isString(webhookUrl) || !isValidPublicZaloOaWebhookUrl(webhookUrl))
+  ) {
+    throw new RuntimeConnectionConfigurationError();
+  }
+
+  return Object.freeze({
+    appId: value.appId,
+    id: value.id,
+    oaId: value.oaId,
+    oaSecretKey: value.oaSecretKey,
+    operatorApiToken: value.operatorApiToken,
+    type: 'zalo_oa',
+    ...(webhookUrl === undefined ? {} : { webhookUrl })
+  });
 };
 
 const isValidFilePath = (value: unknown): value is string =>
@@ -223,6 +324,9 @@ const isPrintableToken = (value: unknown, minimumLength: number): value is strin
 const isWebhookSecret = (value: unknown): value is string =>
   isString(value) && WEBHOOK_SECRET_PATTERN.test(value);
 
+const isZaloIdentifier = (value: unknown): value is string =>
+  isString(value) && ZALO_IDENTIFIER_PATTERN.test(value);
+
 const isValidPublicWebhookUrl = (value: string, connectionId: string): boolean => {
   try {
     const url = new URL(value);
@@ -234,6 +338,24 @@ const isValidPublicWebhookUrl = (value: string, connectionId: string): boolean =
       url.search === '' &&
       url.hash === '' &&
       url.pathname === `/v1/webhooks/telegram-bot/${connectionId}` &&
+      isPublicHostname(url.hostname)
+    );
+  } catch {
+    return false;
+  }
+};
+
+const isValidPublicZaloOaWebhookUrl = (value: string): boolean => {
+  try {
+    const url = new URL(value);
+
+    return (
+      url.protocol === 'https:' &&
+      url.username === '' &&
+      url.password === '' &&
+      url.search === '' &&
+      url.hash === '' &&
+      url.pathname === '/v1/webhooks/zalo-oa' &&
       isPublicHostname(url.hostname)
     );
   } catch {

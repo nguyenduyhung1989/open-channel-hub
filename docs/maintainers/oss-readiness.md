@@ -21,10 +21,14 @@ organization has accepted the project.
 - Phase 2b added a token-gated canonical event reader, stable pagination, and
   its synthetic Compose proof. GitHub CI and CodeQL succeeded for exact commit
   <code>4d5a9c9</code>.
-- The current Phase 2c source adds secret-backed multi-connection configuration,
-  token-bound account selection, dynamic webhook ingress, and a durable
-  connection registry. Its final local verification and synthetic Compose proof
-  passed; GitHub checks remain pending for its exact commit.
+- Phase 2c added secret-backed multi-connection configuration, token-bound
+  account selection, dynamic webhook ingress, and a durable connection registry.
+  Its final local verification, synthetic Compose proof, GitHub CI, and CodeQL
+  succeeded for exact commit <code>8352b51</code>.
+- The current Phase 3a source adds a deliberately receive-only official Zalo OA
+  boundary: a fixed raw-JSON signed webhook and bearer-scoped canonical-event
+  reader. Its final local verification, synthetic Compose proof, independent
+  review, and GitHub checks remain required for the exact candidate commit.
 
 ## Verified GitHub evidence
 
@@ -33,7 +37,8 @@ organization has accepted the project.
   release commit or tag.
 - GitHub CI and CodeQL succeeded for the Phase 1a candidate at
   <code>7141949</code>, the Phase 2a candidate at <code>f106bb8</code>, and
-  the Phase 2b candidate at <code>4d5a9c9</code>.
+  the Phase 2b candidate at <code>4d5a9c9</code>, and the Phase 2c candidate
+  at <code>8352b51</code>.
 - GitHub Private Vulnerability Reporting, secret scanning, Dependabot alerts,
   and automatic security fixes are enabled.
 - The <code>main</code> branch blocks force pushes and deletion, including by
@@ -53,7 +58,9 @@ organization has accepted the project.
   migration.
 - Treat the runtime multi-connection document as a secret. Never commit it,
   publish it through a ticket/log/screenshot, store it in PostgreSQL, or mix it
-  with legacy Bot credentials in one process.
+  with legacy Telegram Bot credentials in one process. It can contain Telegram
+  Bot and Zalo OA credentials, but Phase 3a does not store or transmit Zalo's
+  provider access token.
 - Treat canonical message text and identifiers as sensitive data. Build and
   test backup/restore, retention/deletion, secret rotation, access controls,
   and operational observability before operating real customer data.
