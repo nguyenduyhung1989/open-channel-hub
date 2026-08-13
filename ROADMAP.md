@@ -371,9 +371,8 @@ the combined Phase 4c–4d revision at exact commit <code>160414e</code>.**
 
 ### 4e — server-rendered queued reply-command history
 
-**Status: implementation candidate. Final local verification, independent
-security review, and fresh GitHub CI/CodeQL evidence are required before this
-source can be called verified. It is not a public-TLS or production claim.**
+**Status: source verified at exact commit <code>465186e</code>. This is not a
+public-TLS or production claim.**
 
 - [x] `GET /operator/outbound-commands` uses the existing signed dashboard
       session and touches it before query parsing, cursor decoding, or history
@@ -394,10 +393,12 @@ source can be called verified. It is not a public-TLS or production claim.**
       reply form, recipient selector, send/retry/cancel control, worker,
       provider HTTP request, provider credential/OAuth storage, attempt,
       timeout policy, receipt, or delivery/read transition is added.
-- [ ] Freeze the candidate, run focused dashboard-history checks and the
-      relevant local gates, complete independent security review, then record
-      fresh exact GitHub CI/CodeQL evidence before describing Phase 4e as
-      verified.
+- [x] Exact commit <code>465186e</code> passed formatting, lint, strict type
+      checking, 53 test files / 351 tests, build, low-threshold dependency
+      audit, secret scan, diff check, synthetic Compose proof, independent
+      security review, and fresh GitHub CI/CodeQL. The Compose proof is
+      synthetic and loopback-only; it does not prove external HTTPS cookies or
+      a production deployment.
 
 ### Later Phase 4 work
 

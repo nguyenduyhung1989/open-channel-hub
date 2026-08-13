@@ -1,14 +1,20 @@
-# Phase 4e dashboard queued-command history (candidate)
+# Phase 4e dashboard queued-command history
 
-Phase 4e is a candidate for a small server-rendered dashboard page that lets a
-configured, authenticated dashboard principal inspect `queued` reply intents
-for one of that principal's configured inboxes. It does **not** create, send,
-retry, cancel, update, deliver, or mark any message read.
+Phase 4e is a small server-rendered dashboard page that lets a configured,
+authenticated dashboard principal inspect `queued` reply intents for one of
+that principal's configured inboxes. It does **not** create, send, retry,
+cancel, update, deliver, or mark any message read.
 
 `queued` means PostgreSQL has recorded immutable operator intent. It is not a
-provider acceptance, send attempt, delivery, or read status. This candidate has
-not yet completed final local verification, independent review, or fresh
-GitHub CI/CodeQL evidence; it is not a public-TLS or production claim.
+provider acceptance, send attempt, delivery, or read status. Exact commit
+<code>465186e</code> passed formatting, lint, strict type checking, 53 test
+files / 351 tests, build, low-threshold dependency audit, secret scan, diff
+check, synthetic Compose proof, and an independent security audit that returned
+APPROVE with no high- or medium-severity finding. GitHub's
+<code>Verify Node 24.18.1</code> and CodeQL's
+<code>Analyze JavaScript and TypeScript</code> both succeeded for that exact
+commit. This is source verification only; it is not a public-TLS, live-provider,
+or production claim.
 
 ## Prerequisites
 

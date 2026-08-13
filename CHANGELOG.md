@@ -148,11 +148,11 @@ follows [Semantic Versioning](https://semver.org/).
   text, `queued`, and creation time only. It exposes no reply target, source
   message/channel, client operation ID, raw provider data, credential, or
   future attempt/delivery field, and adds no database migration or dispatch.
-- Phase 4e candidate: `GET /operator/outbound-commands`, a server-rendered
+- Phase 4e: `GET /operator/outbound-commands`, a server-rendered
   queued-command history page for an already authenticated dashboard principal.
   It selects only that principal's configured inbox, uses the existing
   scope-bound Phase 4d cursor, and fixes the page size at 50.
-- Phase 4e candidate: an intentionally smaller browser projection of queued
+- Phase 4e: an intentionally smaller browser projection of queued
   history. It escapes and renders only creation time, recorded text, source
   connection ID, and a recorded-not-sent label; it exposes no browser bearer,
   command/provider-event ID, private target/source metadata, client operation
@@ -207,9 +207,13 @@ follows [Semantic Versioning](https://semver.org/).
   scope, safe projection, cursor continuation, and cursor rejection. It does
   not attempt a browser login whose `Secure` cookies and exact origin require
   TLS.
-- Phase 4e remains explicitly a candidate. It has no final local verification,
-  independent review, fresh GitHub CI/CodeQL evidence, public-TLS proof, or
-  production deployment claim.
+- Exact commit <code>465186e</code> completed Phase 4e local verification:
+  formatting, lint, strict type checking, 53 test files / 351 tests, build,
+  low-threshold dependency audit, secret scan, diff check, and synthetic
+  Compose proof. An independent security review approved it with no remaining
+  high- or medium-severity finding, and GitHub CI plus CodeQL succeeded for
+  that exact commit. This remains no public-TLS, live-provider, or production
+  deployment claim.
 
 ### Security
 
@@ -267,7 +271,7 @@ follows [Semantic Versioning](https://semver.org/).
   recorded text only with safe command metadata. Its separate cursor binds the
   inbox/scope/snapshot; private target/source fields, client operation IDs,
   credentials, dispatch behavior, and delivery semantics remain absent.
-- The Phase 4e dashboard-history candidate authenticates and touches the
+- The Phase 4e dashboard-history source authenticates and touches the
   signed browser session before query/cursor processing, then resolves only a
   configured principal's inbox. It makes no provider request and adds no
   dashboard write, command mutation, or browser bearer capability.

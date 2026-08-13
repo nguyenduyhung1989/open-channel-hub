@@ -2,7 +2,7 @@
 
 > A self-hosted, official-first multichannel messaging hub.
 
-**Status: Phase 4e alpha candidate.** The repository contains a durable
+**Status: Phase 4e alpha source verified.** The repository contains a durable
 PostgreSQL inbound-event ledger, account-scoped operator read APIs, a
 configured multi-connection inbox API, an optional server-rendered read-only
 operator dashboard, a durable source-bound reply-command ledger, a scoped
@@ -17,9 +17,11 @@ commit <code>7672be9</code>. It still does not prove a TLS proxy or production
 browser deployment. Phases 4c–4d passed the same local verification,
 independent review, synthetic Docker proof, and GitHub CI/CodeQL for exact
 commit <code>160414e</code>; they still record and list intent only, never send
-a provider message. The Phase 4e dashboard-history source is a candidate:
-final local verification, independent review, and fresh GitHub CI/CodeQL
-evidence are pending. Phase 1a remains
+a provider message. The Phase 4e dashboard-history source passed final local
+verification, independent security review, a synthetic Docker proof, and
+GitHub CI/CodeQL for exact commit <code>465186e</code>. That proves the frozen
+source and synthetic local path only; it does not prove an external TLS proxy
+or production browser deployment. Phase 1a remains
 incomplete until an owner-authorized Telegram test bot works through public
 TLS; Phases 3a, 3b, and 3c likewise have no owner-authorized real provider
 proof.
@@ -142,7 +144,7 @@ ID plus configured connection set. No migration is added: the ninth
 <code>0009_outbound_reply_commands</code> migration remains unchanged. This is
 a history of durable intent, not delivery status or provider activity.
 
-The Phase 4e candidate adds
+Phase 4e adds
 <code>GET /operator/outbound-commands</code> to the existing server-rendered
 dashboard. After the dashboard authenticates its configured local principal,
 it can render only that principal's configured inbox history through a
@@ -152,7 +154,11 @@ sent label. It exposes no browser bearer, command/source IDs, private target or
 source metadata, client operation ID, or delivery data; it adds no outbound
 command form, command mutation, migration, worker, provider call, retry, or
 send action. The existing logout form remains session management only.
-This candidate is not yet verified or deployed.
+Exact commit <code>465186e</code> passed formatting, lint, strict type
+checking, 53 test files / 351 tests, build, low-threshold dependency audit,
+secret scan, diff check, a synthetic Compose proof, independent security
+review, and GitHub CI/CodeQL. This is source verification only, not a
+public-TLS or production deployment claim.
 
 Multi-connection IDs are opaque safe route labels; <code>.</code> and
 <code>..</code> are rejected because webhook ingress places the ID in a dynamic
@@ -193,7 +199,7 @@ CAPTCHA bypass, fingerprint spoofing, session theft, or bulk-spam capabilities.
 - An optional server-rendered, no-JavaScript, read-only operator dashboard.
   It uses local configured password principals and browser session cookies;
   it never exposes an inbox bearer or provider credential to the browser. The
-  Phase 4e candidate adds a principal-scoped queued-command history page, not
+  Phase 4e adds a principal-scoped queued-command history page, not
   an outbound action.
 - Dynamic multi-connection webhook ingress that resolves the account server
   side, uses a separate webhook secret, and gives unknown account IDs and wrong
@@ -231,7 +237,7 @@ The following remain plans or explicitly incomplete operational work:
   to provide those capabilities.
 - Redis, a dispatch queue/worker, provider delivery, retries, attempts,
   delivery/read status, and a provider-specific outbox policy. Phase 4c–4d
-  store and list immutable reply intent only; the Phase 4e candidate only
+  store and list immutable reply intent only; Phase 4e only
   renders that history through the dashboard.
 - User accounts, role-based access control, multiple
   organizations, webhook administration, public connection management, or a
@@ -422,8 +428,8 @@ one or two unique cookie-signing keys, a separate session HMAC pepper, and one
 or more configured principals scoped to existing inboxes. Password values are
 stored only as exact-profile Argon2id PHC hashes.
 
-Its read-only HTML pages are `/operator/login` and `/operator`; the Phase 4e
-candidate also adds `/operator/outbound-commands` for queued command history.
+Its read-only HTML pages are `/operator/login` and `/operator`; Phase 4e also
+adds `/operator/outbound-commands` for queued command history.
 The CSS is same-origin at `/operator/assets/dashboard.css`. Login and logout
 require the configured browser origin and anti-forgery tokens. Sessions expire
 after 30 minutes idle or eight hours absolute. The supplied Compose smoke
@@ -435,7 +441,7 @@ before configuring a proxy, password hash, or session-key rotation. It records
 the current limits: no self-service accounts, role model, audit trail,
 production TLS proof, cross-instance rate-limit proof, or outbound action. The
 [Phase 4e dashboard queued-command history guide](docs/operations/operator-dashboard-queued-history-4e.md)
-records the candidate's separate no-send/history boundary.
+records the verified source's separate no-send/history boundary.
 
 ## Corresponding-source offer
 

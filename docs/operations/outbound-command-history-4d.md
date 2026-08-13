@@ -10,11 +10,11 @@ Compose proof, independent review, and GitHub CI/CodeQL for the combined Phase
 4c–4d revision. This is not evidence of a live provider send, public TLS, or
 production operation.
 
-At the verified Phase 4d revision, the history route was API-only. The current
-Phase 4e source candidate adds a separate server-rendered, read-only history
+At the verified Phase 4d revision, the history route was API-only. The verified
+Phase 4e source adds a separate server-rendered, read-only history
 view for configured dashboard principals; it does not alter this inbox-bearer
 API or add an outbound browser action. See the
-[Phase 4e dashboard-history candidate guide](operator-dashboard-queued-history-4e.md).
+[Phase 4e dashboard-history guide](operator-dashboard-queued-history-4e.md).
 
 ## Prerequisites
 
@@ -112,7 +112,7 @@ send attempt, delivery, or read status.
   provider token/OAuth storage, attempt record, timeout policy, retry, receipt,
   delivery/read status, attachment, template, or media support.
 - No command mutation, cancel/send button, or public connection discovery.
-  The Phase 4e candidate is a separate dashboard history view only; it has no
+  The Phase 4e source is a separate dashboard history view only; it has no
   command-creation, recipient, send, retry, cancellation, or delivery control.
 - No real Telegram, Zalo OA, Facebook Page, WhatsApp Business, public TLS, or
   production authorization proof.

@@ -1,4 +1,4 @@
-# Public checkpoint: Phase 4a–4d verified; Phase 4e candidate
+# Public checkpoint: Phase 4a–4e verified
 
 **Verified scope:** Phase 4a is a configured, read-only aggregate feed across
 an explicit set of existing official connections. It builds on the Telegram
@@ -19,12 +19,18 @@ reply or history surface. Exact commit <code>160414e</code> passed final local
 verification, a synthetic Compose proof, independent security review, and
 GitHub CI/CodeQL.
 
-**Current candidate scope:** Phase 4e adds one server-rendered dashboard page
+**Verified Phase 4e source scope:** Phase 4e adds one server-rendered dashboard page
 for an authenticated configured principal to inspect the Phase 4d queued
 history of one already assigned inbox. It has no browser bearer, command form,
-provider operation, command mutation, migration, or delivery semantics. Its
-final local verification, independent review, and fresh GitHub CI/CodeQL
-evidence are pending.
+provider operation, command mutation, migration, or delivery semantics. Exact
+commit <code>465186e</code> passed formatting, lint, strict type checking, 53
+test files / 351 tests, build, low-threshold dependency audit, secret scan,
+diff check, a synthetic Compose proof, and an independent security audit that
+returned APPROVE with no high- or medium-severity finding. GitHub checks
+<code>Verify Node 24.18.1</code> and CodeQL's
+<code>Analyze JavaScript and TypeScript</code> succeeded for that exact commit.
+This verifies the frozen source and synthetic local path; it does not prove
+public TLS, a live provider, or production deployment.
 
 ## Exact verified history
 
@@ -50,9 +56,13 @@ evidence are pending.
   history passed final local checks, independent security review, a synthetic
   Compose proof, and fresh GitHub CI/CodeQL for exact commit
   <code>160414e</code>.
+- Phase 4e's server-rendered queued-command history passed final local checks,
+  independent security review, a synthetic Compose proof, and fresh GitHub
+  CI/CodeQL for exact commit <code>465186e</code>; its `Verify Node 24.18.1`
+  and `Analyze JavaScript and TypeScript` checks both succeeded.
 - Historical evidence proves only those exact revisions. It does not verify any
   live provider account, provider send, public TLS endpoint, production
-  deployment, or the current Phase 4e candidate.
+  deployment, or a later change to the verified Phase 4e source.
 
 ## Verified Phase 4a source
 
@@ -189,7 +199,7 @@ The verified source adds one narrow write capability to a configured inbox beare
   state mutation, provider HTTP call, dispatch worker, retry, attempt, timeout,
   receipt, delivery/read tracking, provider token/OAuth storage, or browser
   send UI. The route is a read-only view of durable intent, not a delivery
-  engine. The current Phase 4e candidate is documented separately below.
+  engine. The verified Phase 4e dashboard view is documented separately below.
 
 Exact commit <code>160414e</code> passed formatting, lint, strict type
 checking, 53 test files / 349 tests, build, low-threshold dependency audit,
@@ -197,9 +207,9 @@ secret scan, the synthetic Compose proof, independent security review, and
 GitHub CI/CodeQL. This is source verification only; it is not a provider-send,
 public-TLS, or production claim.
 
-## Current Phase 4e candidate
+## Verified Phase 4e source
 
-The candidate adds a narrow browser view without moving an inbox bearer or
+The source adds a narrow browser view without moving an inbox bearer or
 outbound capability into the browser:
 
 - `GET /operator/outbound-commands` appears only with the optional dashboard.
@@ -224,10 +234,10 @@ outbound capability into the browser:
   request, token/OAuth storage, attempt, timeout policy, receipt, or state
   transition. A page view only performs the existing dashboard-session touch.
 
-The candidate must not be described as verified until the exact frozen source
-completes focused dashboard-history tests, the relevant local checks,
-independent security review, and fresh GitHub CI/CodeQL evidence. It still does
-not prove external HTTPS/proxy behavior or a production deployment.
+Exact commit <code>465186e</code> completed focused dashboard-history tests,
+the relevant local checks, independent security review, and fresh GitHub
+CI/CodeQL evidence. It still does not prove external HTTPS/proxy behavior or a
+production deployment.
 
 ## Explicitly not proven or not implemented
 
@@ -246,19 +256,19 @@ not prove external HTTPS/proxy behavior or a production deployment.
 - No dispatch queue/worker, retry, attempt/timeout policy, delivery/read status,
   template, media, OAuth, provider access-token storage, Graph API request,
   Facebook User, Zalo User, or WhatsApp User surface exists. Phase 4c has only
-  an immutable intent ledger, Phase 4d has only its scoped history, and the
-  Phase 4e candidate only renders that history; none is a delivery engine.
+  an immutable intent ledger, Phase 4d has only its scoped history, and Phase
+  4e only renders that history; none is a delivery engine.
 - A `200` from the local synthetic feed or a green test/GitHub check does not
   prove a TLS endpoint, provider eligibility, live message operation, or a
   production-ready access model.
 
 ## Next authorized work
 
-Freeze and verify the Phase 4e candidate before making a dashboard-history
-claim: run its focused checks and relevant local gates, complete independent
-security review, and read fresh exact GitHub CI/CodeQL evidence. Keep all live
-provider use separate: require explicit owner authorization before connecting a
-real account or exposing public TLS. Any later full user/organization
-authorization, conversation model, dispatch engine, or dashboard deployment
-must start with its own bounded design, migration/security review, and
-verification criteria.
+Keep the verified Phase 4e evidence frozen at <code>465186e</code>. Any change
+to its dashboard history, session/scope boundary, or browser projection must
+start as a new candidate with focused checks, independent security review, and
+fresh exact CI evidence. Keep all live provider use separate: require explicit
+owner authorization before connecting a real account or exposing public TLS.
+Any later full user/organization authorization, conversation model, dispatch
+engine, or dashboard deployment must start with its own bounded design,
+migration/security review, and verification criteria.

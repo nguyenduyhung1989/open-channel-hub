@@ -15,8 +15,9 @@ The existing Phase 4b dashboard already authenticates configured local
 principals with a server-held session and limits each principal to configured
 inboxes. A small operational view of queued intent is useful, but it must not
 grow into a command-creation surface, a provider dispatcher, or a delivery
-timeline. This ADR records the decision for the Phase 4e candidate; acceptance
-of the boundary does not claim that the candidate is verified or deployed.
+timeline. This ADR records the decision implemented in the verified Phase 4e
+source at exact commit <code>465186e</code>. Source verification does not claim
+public TLS, a provider send, or production deployment.
 
 ## Decision
 
@@ -100,10 +101,9 @@ could drift apart.
   HTML. It remains sensitive and untrusted data, so it must be escaped and
   protected by the same browser/session and operational handling rules as
   inbound text.
-- Phase 4e remains a candidate until the exact frozen source completes focused
-  dashboard-history tests, local checks, independent review, and the required
-  fresh CI evidence. External HTTPS/proxy and production authorization proof
-  remain separate work.
+- Exact commit <code>465186e</code> completed focused dashboard-history tests,
+  local checks, independent review, and fresh GitHub CI/CodeQL evidence.
+  External HTTPS/proxy and production authorization proof remain separate work.
 - A future dispatcher must introduce its own durable attempt/state model and
   provider-specific review. It must not infer a safe retry or delivery result
   from this read-only page.

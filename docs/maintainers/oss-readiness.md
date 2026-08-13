@@ -63,9 +63,9 @@ organization has accepted the project.
   verification, synthetic Compose proof, independent security review, GitHub
   CI, and CodeQL.
 
-## Current candidate, not verified
+## Verified Phase 4e source
 
-- Phase 4e is a server-rendered dashboard-history candidate. An authenticated
+- Phase 4e is a server-rendered dashboard-history source. An authenticated
   configured dashboard principal can inspect only `queued` command history for
   an already assigned inbox through `GET /operator/outbound-commands`. The
   page uses the existing scope-bound Phase 4d cursor, has a fixed 50-row page,
@@ -75,10 +75,10 @@ organization has accepted the project.
   private target/source metadata, client operation IDs, credentials, and
   delivery data. It adds no migration, command write, browser API bearer,
   provider request, worker, send, retry, cancel, or delivery state.
-- This candidate has not completed final local verification, independent
-  security review, fresh GitHub CI/CodeQL, public-TLS proof, or production
-  deployment. Do not list it as a verified feature or use it as evidence of
-  provider dispatch.
+- Exact commit <code>465186e</code> passed final local verification,
+  independent security review, a synthetic Compose proof, and fresh GitHub
+  CI/CodeQL. It is a verified source feature, not public-TLS proof, a
+  production deployment, or evidence of provider dispatch.
 
 ## Verified GitHub evidence
 
@@ -99,6 +99,8 @@ organization has accepted the project.
   at <code>705db0a</code>.
 - GitHub CI and CodeQL succeeded for the combined Phase 4c–4d reply-command
   candidate at <code>160414e</code>.
+- GitHub CI and CodeQL succeeded for the Phase 4e dashboard-history source at
+  exact commit <code>465186e</code>.
 - GitHub Private Vulnerability Reporting, secret scanning, Dependabot alerts,
   and automatic security fixes are enabled.
 - The <code>main</code> branch blocks force pushes and deletion, including by
@@ -130,7 +132,7 @@ organization has accepted the project.
   and operational observability before operating real customer data. Phase 4c
   additionally stores outgoing reply text and private source-derived target
   metadata; Phase 4d returns that recorded text to the authorized scoped inbox
-  bearer. The Phase 4e candidate renders a smaller escaped projection through
+  bearer. The Phase 4e source renders a smaller escaped projection through
   an authenticated dashboard session. Protect every path to that text to the
   same standard and keep messages out of examples, logs, screenshots, and
   public discussion.
@@ -138,7 +140,7 @@ organization has accepted the project.
   A future provider dispatcher needs a separate official-provider policy,
   attempt/timeout/receipt model, migration, review, and verification. The legacy
   Phase 1a Telegram direct-send route is separate compatibility behavior, not
-  evidence that all sends are durable. The Phase 4e candidate only renders
+  evidence that all sends are durable. Phase 4e only renders
   intent history and does not change that boundary.
 - Keep examples, fixtures, screenshots, logs, and public discussions free of
   user data and secrets.

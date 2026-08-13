@@ -109,17 +109,17 @@ operational data. They remain inside PostgreSQL and never belong in repository
 fixtures, issue text, screenshots, logs, or diagnostic commands. Phase 4d adds
 one scope-bound history route that returns the text with safe command metadata,
 but never the private target/source fields or client operation ID. The Phase 4e
-candidate renders a smaller escaped dashboard projection through a signed
+source renders a smaller escaped dashboard projection through a signed
 session, not a browser bearer; see the
 [queued command-history guide](outbound-command-history-4d.md) and
-[Phase 4e candidate guide](operator-dashboard-queued-history-4e.md).
+[Phase 4e guide](operator-dashboard-queued-history-4e.md).
 
 ## What this deliberately does not do
 
 - No provider dispatch, HTTP client, provider token, OAuth, template, media,
   attachment, delivery/read receipt, attempt record, retry, or timeout policy.
 - No mutation of the command after `queued`; no claim that it was sent.
-- No dashboard reply form. The Phase 4e candidate only renders queued-history
+- No dashboard reply form. The Phase 4e source only renders queued-history
   text and source connection IDs through the existing read-only dashboard; it
   adds no command creation, recipient, send, retry, cancellation, or provider
   action.

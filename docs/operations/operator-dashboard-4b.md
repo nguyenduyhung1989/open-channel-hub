@@ -131,12 +131,12 @@ next-page link is read-only. Message text is rendered as escaped text; it is
 still sensitive operational data and should not be copied into public issues
 or screenshots.
 
-The Phase 4e candidate adds a separate read-only history page at
+The verified Phase 4e source adds a separate read-only history page at
 `/operator/outbound-commands`. It uses the same session and configured-principal
 boundary, accepts only an optional allowed inbox ID and opaque history cursor,
 and reads a fixed 50-row page. It does not require a new configuration field or
 an inbox bearer in the browser. See the
-[queued-command history candidate guide](operator-dashboard-queued-history-4e.md)
+[queued-command history guide](operator-dashboard-queued-history-4e.md)
 for its narrower projection and explicit no-send boundary.
 
 Use the dashboard's **Log out** form when leaving the workstation. It revokes
@@ -190,7 +190,7 @@ for a documented operation.
   attachment, provider dispatch, provider access-token, OAuth, or live provider
   operation. Phase 4c's API-only source-bound reply-command ledger and Phase
   4d's API-only queued-history reader have no dashboard reply form. The Phase
-  4e candidate renders history only; it has no command-creation, recipient,
+  4e source renders history only; it has no command-creation, recipient,
   send, retry, or cancellation control. The dashboard remains read-only apart
   from normal session management such as logout.
 
