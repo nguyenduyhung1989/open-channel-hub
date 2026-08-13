@@ -6,7 +6,8 @@ import type {
   DashboardSessionStore,
   InboundEventFeedReader,
   InboundEventReader,
-  InboundEventStore
+  InboundEventStore,
+  OutboundReplyCommandStore
 } from '@open-channel-hub/domain';
 
 import { PostgresConnectionRegistry } from './postgres-connection-registry.js';
@@ -16,6 +17,7 @@ import { PostgresInboundEventFeedReader } from './postgres-inbound-event-feed-re
 import { PostgresInboundEventStore } from './postgres-inbound-event-store.js';
 import { PostgresInboundEventReader } from './postgres-inbound-event-reader.js';
 import { assertPostgresSchemaCurrent, migratePostgresSchema } from './postgres-migrations.js';
+import { PostgresOutboundReplyCommandStore } from './postgres-outbound-reply-command-store.js';
 import type { SqlClient, SqlPool, SqlQueryResult } from './sql.js';
 
 export interface PostgresDatabaseOptions {
@@ -32,6 +34,7 @@ export interface PostgresDatabase {
   readonly inboundEventFeedReader: InboundEventFeedReader;
   readonly inboundEventReader: InboundEventReader;
   readonly inboundEventStore: InboundEventStore;
+  readonly outboundReplyCommandStore: OutboundReplyCommandStore;
   checkReadiness(): Promise<void>;
   close(): Promise<void>;
   migrate(): Promise<void>;
@@ -69,6 +72,7 @@ export const createPostgresDatabase = async (
   const inboundEventFeedReader = new PostgresInboundEventFeedReader(sqlPool);
   const inboundEventReader = new PostgresInboundEventReader(sqlPool);
   const inboundEventStore = new PostgresInboundEventStore(sqlPool);
+  const outboundReplyCommandStore = new PostgresOutboundReplyCommandStore(sqlPool);
 
   return Object.freeze({
     connectionRegistry,
@@ -76,6 +80,7 @@ export const createPostgresDatabase = async (
     inboundEventFeedReader,
     inboundEventReader,
     inboundEventStore,
+    outboundReplyCommandStore,
     checkReadiness: async (): Promise<void> => {
       try {
         if (idleClientError) {

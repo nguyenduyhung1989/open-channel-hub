@@ -306,6 +306,37 @@ independent review, and GitHub CI/CodeQL evidence are complete for exact commit
       cookie/header logging policy, and the exact public browser origin before
       claiming a dashboard deployment.
 
+### 4c — durable source-bound reply-command ledger
+
+**Status: implementation candidate. Final local verification, synthetic Compose
+proof, independent security review, and fresh GitHub CI/CodeQL evidence are
+still required before this source can be called verified.**
+
+- [x] `POST /v1/inbox/outbound-commands` resolves an existing configured inbox
+      bearer before body parsing. It accepts only `clientOperationId`,
+      `sourceConnectionId`, `sourceProviderEventId`, and `text`; there is no
+      caller-selected recipient, channel, source-message ID, retry, or state.
+- [x] The command store accepts only an already-durable source event inside the
+      inbox's fixed connection allow-list. It derives and privately stores the
+      reply target from canonical `conversation_id`, with the source message ID
+      and channel, instead of trusting request input.
+- [x] Migration <code>0009_outbound_reply_commands</code> creates an immutable
+      `outbound_commands` table with a composite source-event foreign key,
+      per-connection client-operation uniqueness, and a trigger that rejects
+      update/delete. The only current state is <code>queued</code>.
+- [x] A first commit returns <code>201</code>; an exact replay returns
+      <code>200</code>; reuse of the same operation ID with different source
+      or text returns <code>409</code>; missing and out-of-scope source events
+      share one generic <code>404</code>. Public responses omit the reply
+      target, text, source message/channel, raw payloads, and credentials.
+- [x] No worker, dispatch, provider HTTP request, provider token/OAuth storage,
+      retry, attempt, delivery/read receipt, state transition, or dashboard
+      send form is part of this phase. <code>queued</code> records intent only;
+      it is not a sent or delivered claim.
+- [ ] Freeze this candidate, run its full local checks and synthetic Compose
+      proof, complete independent security review, then record fresh exact
+      GitHub CI/CodeQL evidence.
+
 ### Later Phase 4 work
 
 - Full user accounts/organizations, tested RBAC, invitation/password-reset
@@ -313,9 +344,10 @@ independent review, and GitHub CI/CodeQL evidence are complete for exact commit
 - Conversation summaries, read/unread state, assignment, labels, search,
   attachments, retention/deletion, backups/restore, and encryption-at-rest
   assurance.
-- A durable outbound queue, provider-specific policy/capability design,
-  delivery status, and retries only after official provider review and a
-  separate security boundary.
+- Provider-specific dispatch policy/capabilities, durable attempts, timeout
+  uncertainty, delivery/read status, and retries only after official provider
+  review and a separate security boundary. The Phase 4c command ledger is not
+  any of those delivery capabilities.
 
 ## Phase 5 — experimental connectors, only with evidence
 

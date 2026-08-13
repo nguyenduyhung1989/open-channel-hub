@@ -1,4 +1,8 @@
-import type { InboundEventFeedReader, InboundEventPage } from '@open-channel-hub/domain';
+import type {
+  InboundEventFeedReader,
+  InboundEventPage,
+  OutboundReplyCommandStore
+} from '@open-channel-hub/domain';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { RuntimeInbox } from '../connections/runtime-connection-configuration.js';
@@ -11,10 +15,23 @@ const RUNTIME_INBOX: RuntimeInbox = Object.freeze({
 });
 
 describe('createRuntimeInboxFeatures', () => {
-  it('binds the immutable configured scope into the reader closure', async () => {
+  it('binds the immutable configured scope into its reader and command closures', async () => {
     const list = vi.fn(async (): Promise<InboundEventPage> => ({ events: [] }));
     const reader: InboundEventFeedReader = Object.freeze({ list });
-    const features = createRuntimeInboxFeatures([RUNTIME_INBOX], reader);
+    const create = vi.fn(async () =>
+      Object.freeze({
+        command: Object.freeze({
+          createdAt: '2026-08-13T00:00:00.000Z',
+          id: '42',
+          sourceConnectionId: 'telegram-bot-support',
+          sourceProviderEventId: '9001',
+          state: 'queued' as const
+        }),
+        kind: 'created' as const
+      })
+    );
+    const commandStore: OutboundReplyCommandStore = Object.freeze({ create });
+    const features = createRuntimeInboxFeatures([RUNTIME_INBOX], reader, commandStore);
     const feature = features[0];
 
     expect(feature).toBeDefined();
@@ -36,6 +53,21 @@ describe('createRuntimeInboxFeatures', () => {
       connectionIds: RUNTIME_INBOX.connectionIds,
       cursor: { beforeSequence: '2', snapshotMaxSequence: '5' },
       pageSize: 25
+    });
+
+    await feature?.createOutboundReplyCommand({
+      clientOperationId: 'operator-command-20260813-0001',
+      sourceConnectionId: 'telegram-bot-support',
+      sourceProviderEventId: '9001',
+      text: '  Preserve the operator text exactly.  '
+    });
+
+    expect(create).toHaveBeenCalledWith({
+      allowedConnectionIds: RUNTIME_INBOX.connectionIds,
+      clientOperationId: 'operator-command-20260813-0001',
+      sourceConnectionId: 'telegram-bot-support',
+      sourceProviderEventId: '9001',
+      text: '  Preserve the operator text exactly.  '
     });
   });
 });

@@ -19,6 +19,12 @@ export type {
   InboundEventReader
 } from './ports/inbound-event-reader.js';
 export type { OutboundMessagePort } from './ports/outbound-message-port.js';
+export type {
+  CreateOutboundReplyCommandResult,
+  OutboundReplyCommand,
+  OutboundReplyCommandCreateInput,
+  OutboundReplyCommandStore
+} from './ports/outbound-reply-command-store.js';
 export { SendMessage } from './send-message.js';
 export type {
   SendMessageConnectionMismatchError,

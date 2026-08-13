@@ -2,12 +2,13 @@
 
 > A self-hosted, official-first multichannel messaging hub.
 
-**Status: Phase 4b alpha.** The repository contains a durable
+**Status: Phase 4c alpha.** The repository contains a durable
 PostgreSQL inbound-event ledger, account-scoped operator read APIs, a
-configured multi-connection read-only inbox API, an optional server-rendered
-operator dashboard, secret-backed runtime configuration for official accounts,
-and narrow official Zalo Official Account (OA), Facebook Page, and WhatsApp
-Business signed inbound-text boundaries. Phase 4a passed final local checks,
+configured multi-connection inbox API, an optional server-rendered read-only
+operator dashboard, a durable source-bound reply-command ledger, secret-backed
+runtime configuration for official accounts, and narrow official Zalo Official
+Account (OA), Facebook Page, and WhatsApp Business signed inbound-text
+boundaries. Phase 4a passed final local checks,
 independent review, a synthetic Docker proof, and GitHub CI/CodeQL for exact
 commit <code>705db0a</code>. Phase 4b passed the same local verification,
 independent review, synthetic Docker proof, and GitHub CI/CodeQL for exact
@@ -18,7 +19,7 @@ TLS; Phases 3a, 3b, and 3c likewise have no owner-authorized real provider
 proof.
 
 The official Telegram Bot HTTP transport is wired for a deliberately narrow
-text send/receive slice. Legacy mode uses <code>OPERATOR_API_TOKEN</code>;
+legacy text send/receive slice. Legacy mode uses <code>OPERATOR_API_TOKEN</code>;
 multi-connection mode uses one unique configured operator token per account.
 Telegram must supply a separate <code>X-Telegram-Bot-Api-Secret-Token</code>
 webhook header. In Phase 2a, an accepted canonical inbound event is stored in
@@ -108,6 +109,23 @@ bearer or provider credential. It is deliberately absent from the supplied
 loopback HTTP Compose configuration because browser authentication requires an
 external HTTPS origin and a TLS reverse proxy.
 
+Phase 4c adds <code>POST /v1/inbox/outbound-commands</code> for a configured
+inbox bearer. It records an immutable <code>queued</code> reply intent against
+an existing canonical inbound event in the bearer-selected connection scope.
+The body contains only a client operation ID, source connection ID, source
+provider event ID, and text. PostgreSQL derives and privately stores the reply
+target from the source event's canonical conversation; the caller cannot choose
+or inspect a recipient. A new command returns <code>201</code>; an exact
+idempotent replay returns <code>200</code>; a reused operation ID with different
+source/text returns <code>409</code>; absent and out-of-scope sources share the
+same <code>404</code>. <code>queued</code> means the intent is durable only: no
+worker, provider call, retry, attempt, delivery receipt, OAuth/token storage,
+or dashboard send form exists in this phase.
+
+The earlier <code>POST /v1/telegram-bot/messages</code> remains a separate
+Phase 1a legacy compatibility endpoint. It is not routed through the Phase 4c
+ledger and does not prove that all sends are durable.
+
 Multi-connection IDs are opaque safe route labels; <code>.</code> and
 <code>..</code> are rejected because webhook ingress places the ID in a dynamic
 path. This restriction does not rewrite a historical legacy one-Bot environment
@@ -139,8 +157,10 @@ CAPTCHA bypass, fingerprint spoofing, session theft, or bulk-spam capabilities.
   secret-backed multi-connection mode for official Telegram Bot, Zalo OA,
   Facebook Page, and WhatsApp Business accounts. The latter maps each unique operator token to exactly one
   configured account.
-- Optional configured read-only inbox principals, each with a separate bearer
-  and an explicit server-side allow-list of one or more configured accounts.
+- Optional configured inbox principals, each with a separate bearer and an
+  explicit server-side allow-list of one or more configured accounts. They can
+  read canonical inbound events and record a source-bound reply intent, but
+  cannot choose an arbitrary recipient or dispatch a provider message.
 - An optional server-rendered, no-JavaScript, read-only operator dashboard.
   It uses local configured password principals and browser session cookies;
   it never exposes an inbox bearer or provider credential to the browser.
@@ -178,7 +198,9 @@ The following remain plans or explicitly incomplete operational work:
   storage, search, retention/deletion policy, backups, restore drills, or
   encryption-at-rest assurance. The narrow Phase 4b dashboard is not a claim
   to provide those capabilities.
-- Redis, a queue, durable outbound delivery, retries, and an outbox.
+- Redis, a dispatch queue/worker, provider delivery, retries, attempts,
+  delivery/read status, and a provider-specific outbox policy. Phase 4c stores
+  an immutable reply intent only.
 - User accounts, role-based access control, multiple
   organizations, webhook administration, public connection management, or a
   connection listing API.

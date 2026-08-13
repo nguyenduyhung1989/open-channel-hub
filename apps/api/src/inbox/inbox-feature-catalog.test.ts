@@ -1,4 +1,4 @@
-import type { InboundEventPage } from '@open-channel-hub/domain';
+import type { CreateOutboundReplyCommandResult, InboundEventPage } from '@open-channel-hub/domain';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { InboxFeature } from './inbox-feature.js';
@@ -29,6 +29,7 @@ describe('createInboxFeatureCatalog', () => {
       token: SUPPORT_TOKEN
     });
     expect(selectedSupport?.readInboundEvents).toBe(support.readInboundEvents);
+    expect(selectedSupport?.createOutboundReplyCommand).toBe(support.createOutboundReplyCommand);
     expect(selectedSales).toMatchObject({
       connectionIds: ['telegram-bot-sales'],
       id: 'sales',
@@ -93,6 +94,9 @@ describe('createInboxFeatureCatalog', () => {
 const createFeature = (overrides: Readonly<Partial<InboxFeature>> = {}): InboxFeature =>
   Object.freeze({
     connectionIds: Object.freeze(['telegram-bot-support']),
+    createOutboundReplyCommand: vi.fn(async (): Promise<CreateOutboundReplyCommandResult> =>
+      Object.freeze({ kind: 'source_unavailable' })
+    ),
     id: 'support',
     readInboundEvents: vi.fn(async (): Promise<InboundEventPage> => ({ events: [] })),
     token: SUPPORT_TOKEN,

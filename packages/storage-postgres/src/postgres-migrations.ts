@@ -245,6 +245,97 @@ CREATE INDEX dashboard_sessions_active_expiry
 `
 ]);
 
+/**
+ * Reply commands retain their immutable source event and the reply target
+ * derived from that event's canonical conversation. No caller can choose or
+ * inspect the stored target. This first durable-outbound slice records only a
+ * queued intent; provider dispatch, receipts, and state transitions require a
+ * later migration with their own safety policy.
+ */
+const OUTBOUND_REPLY_COMMANDS_ID = '0009_outbound_reply_commands';
+
+const OUTBOUND_REPLY_COMMANDS_STATEMENTS = Object.freeze([
+  `
+CREATE TABLE ${POSTGRES_SCHEMA}.outbound_commands (
+  command_id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  connection_id text NOT NULL,
+  source_provider_event_id text NOT NULL,
+  client_operation_id text NOT NULL,
+  reply_target_id text NOT NULL,
+  source_message_id text NOT NULL,
+  source_channel text NOT NULL,
+  message_text text NOT NULL,
+  state text NOT NULL DEFAULT 'queued',
+  created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT outbound_commands_connection_id_format CHECK (
+    connection_id ~ '^[A-Za-z0-9._:-]{1,128}$'
+  ),
+  CONSTRAINT outbound_commands_source_provider_event_id_format CHECK (
+    char_length(source_provider_event_id) BETWEEN 1 AND 512
+    AND source_provider_event_id ~ '^[!-~]+$'
+  ),
+  CONSTRAINT outbound_commands_client_operation_id_format CHECK (
+    client_operation_id ~ '^[A-Za-z0-9._:-]{1,128}$'
+    AND client_operation_id NOT IN ('.', '..')
+  ),
+  CONSTRAINT outbound_commands_reply_target_id_format CHECK (
+    char_length(reply_target_id) BETWEEN 1 AND 512
+    AND reply_target_id ~ '^[!-~]+$'
+  ),
+  CONSTRAINT outbound_commands_source_message_id_format CHECK (
+    char_length(source_message_id) BETWEEN 1 AND 512
+    AND source_message_id ~ '^[!-~]+$'
+  ),
+  CONSTRAINT outbound_commands_source_channel_known CHECK (
+    source_channel IN (
+      'telegram_bot',
+      'zalo_oa',
+      'facebook_page',
+      'whatsapp_business',
+      'telegram_user',
+      'zalo_user',
+      'whatsapp_user',
+      'facebook_user'
+    )
+  ),
+  CONSTRAINT outbound_commands_message_text_valid CHECK (
+    char_length(message_text) BETWEEN 1 AND 4096
+    AND message_text !~ '^[[:space:]]*$'
+  ),
+  CONSTRAINT outbound_commands_state_queued CHECK (
+    state = 'queued'
+  ),
+  CONSTRAINT outbound_commands_source_event_fk FOREIGN KEY (
+    connection_id,
+    source_provider_event_id
+  ) REFERENCES ${POSTGRES_SCHEMA}.inbound_events (
+    connection_id,
+    provider_event_id
+  ),
+  CONSTRAINT outbound_commands_connection_client_operation_unique UNIQUE (
+    connection_id,
+    client_operation_id
+  )
+)
+`,
+  `
+CREATE FUNCTION ${POSTGRES_SCHEMA}.reject_outbound_command_mutation()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RAISE EXCEPTION 'Outbound commands are immutable.';
+END;
+$$
+`,
+  `
+CREATE TRIGGER outbound_commands_immutable
+BEFORE UPDATE OR DELETE ON ${POSTGRES_SCHEMA}.outbound_commands
+FOR EACH ROW
+EXECUTE FUNCTION ${POSTGRES_SCHEMA}.reject_outbound_command_mutation()
+`
+]);
+
 const MIGRATIONS = Object.freeze([
   Object.freeze({
     id: INBOUND_EVENT_LEDGER_ID,
@@ -300,6 +391,11 @@ const MIGRATIONS = Object.freeze([
     id: DASHBOARD_SESSIONS_ID,
     checksum: checksumFor(DASHBOARD_SESSIONS_ID, DASHBOARD_SESSIONS_STATEMENTS),
     statements: DASHBOARD_SESSIONS_STATEMENTS
+  }),
+  Object.freeze({
+    id: OUTBOUND_REPLY_COMMANDS_ID,
+    checksum: checksumFor(OUTBOUND_REPLY_COMMANDS_ID, OUTBOUND_REPLY_COMMANDS_STATEMENTS),
+    statements: OUTBOUND_REPLY_COMMANDS_STATEMENTS
   })
 ]);
 

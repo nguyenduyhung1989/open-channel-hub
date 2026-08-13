@@ -24,9 +24,12 @@
 - [Phase 4b operator dashboard](operations/operator-dashboard-4b.md): optional
   server-rendered dashboard, TLS-only deployment boundary, and local-principal
   session operation.
-- [Phase 0–4b threat model](security/threat-model.md): assets, trust
+- [Phase 4c durable reply commands](operations/outbound-reply-commands-4c.md):
+  source-bound immutable reply-intent ledger, idempotency, and the explicit
+  no-dispatch boundary.
+- [Phase 0–4c threat model](security/threat-model.md): assets, trust
   boundaries, current controls, and planned work.
 - [Open-source readiness](maintainers/oss-readiness.md): an honest operating
   checklist for maintainers.
-- [Phase 4a–4b checkpoint](maintainers/current-phase.md):
+- [Phase 4a–4c checkpoint](maintainers/current-phase.md):
   verified milestones, active code state, risks, and exact next verification.

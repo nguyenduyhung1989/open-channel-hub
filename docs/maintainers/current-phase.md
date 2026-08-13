@@ -1,4 +1,4 @@
-# Public checkpoint: Phase 4a and Phase 4b verified locally
+# Public checkpoint: Phase 4a–4b verified; Phase 4c candidate
 
 **Verified scope:** Phase 4a is a configured, read-only aggregate feed across
 an explicit set of existing official connections. It builds on the Telegram
@@ -10,6 +10,13 @@ local-principal browser view over that same inbox scope. It is not a deployed
 browser service or a full user login, organization/RBAC model,
 conversation/thread model, search service, attachment store, outbound queue,
 provider credential manager, real provider test, or production deployment.
+
+**Current candidate scope:** Phase 4c adds a durable, source-bound reply-command
+ledger behind an existing configured inbox bearer. It records only immutable
+`queued` intent. It does not dispatch a provider message, retry, track an
+attempt/receipt, or add a dashboard reply form. Its final local verification,
+synthetic Compose proof, independent security review, and fresh GitHub
+CI/CodeQL evidence are pending for the frozen candidate.
 
 ## Exact verified history
 
@@ -32,7 +39,7 @@ provider credential manager, real provider test, or production deployment.
   security review, a synthetic Compose proof, and fresh GitHub CI/CodeQL for
   exact commit <code>7672be9</code>.
 - Historical evidence proves only those exact revisions. It does not verify any
-  live provider account.
+  live provider account or the current Phase 4c candidate.
 
 ## Verified Phase 4a source
 
@@ -123,6 +130,37 @@ medium-severity issue, and GitHub CI plus CodeQL both succeeded for that exact
 commit. An external TLS proxy, edge rate limit, cookie/header log policy, and
 real public origin remain separate operational proof.
 
+## Current Phase 4c candidate
+
+The candidate adds one narrow write capability to a configured inbox bearer:
+
+- `POST /v1/inbox/outbound-commands` resolves that bearer before Fastify parses
+  the request body. The body is strict and accepts only `clientOperationId`,
+  `sourceConnectionId`, `sourceProviderEventId`, and `text`. It never accepts a
+  recipient ID, channel, source message ID, retry, or delivery-state value.
+- The domain-owned PostgreSQL store resolves the source event only after it
+  applies the bearer-selected immutable connection scope. It derives the
+  private reply target from the event's canonical conversation and snapshots
+  the private source message/channel fields. A caller cannot supply or inspect
+  those values.
+- `0009_outbound_reply_commands` creates `outbound_commands`: a composite
+  foreign key binds each command to its exact inbound source; unique
+  `(connection_id, client_operation_id)` supplies idempotency; a database
+  trigger rejects every update and delete. The only stored state is `queued`.
+- A first accepted intent returns `201`; the exact same operation replays with
+  `200`; reusing an operation ID with different source or text returns `409`.
+  Missing and out-of-scope sources intentionally share the same generic `404`.
+  Public data omits outgoing text, target, source message/channel, raw provider
+  data, and credentials.
+- There is no worker, provider HTTP call, provider credential/OAuth storage,
+  attempt, timeout/retry behavior, receipt, delivery/read state, or dashboard
+  send UI. `queued` proves a database commit only. The legacy Phase 1a Telegram
+  direct-send route remains separate compatibility behavior and is not proof
+  that all sends are durable.
+
+The candidate must not be described as locally verified until its exact frozen
+revision completes the relevant checks and independent review.
+
 ## Explicitly not proven or not implemented
 
 - No owner-authorized Telegram Bot, Zalo OA, Facebook Page, Meta App, WABA,
@@ -137,17 +175,20 @@ real public origin remain separate operational proof.
   attachment, retention/deletion workflow, backup/restore proof,
   encryption-at-rest assurance, rate-limit, structured observability,
   alerting, or production deployment exists.
-- No outbound queue, retry, delivery/read status, template, media, OAuth,
-  provider access-token storage, Graph API request, Facebook User, Zalo User,
-  or WhatsApp User surface exists.
+- No dispatch queue/worker, retry, attempt/timeout policy, delivery/read status,
+  template, media, OAuth, provider access-token storage, Graph API request,
+  Facebook User, Zalo User, or WhatsApp User surface exists. Phase 4c has only
+  an immutable intent ledger, not a delivery engine.
 - A `200` from the local synthetic feed or a green test/GitHub check does not
   prove a TLS endpoint, provider eligibility, live message operation, or a
   production-ready access model.
 
 ## Next authorized work
 
-Keep all live provider use separate: require explicit owner authorization before
-connecting a real account or exposing public TLS. Any later full
-user/organization authorization, conversation model, durable outbound engine,
-or dashboard deployment must start with its own bounded design,
-migration/security review, and verification criteria.
+Freeze and verify Phase 4c before claiming it: run the candidate's full local
+checks, synthetic Compose proof, independent security review, and fresh GitHub
+CI/CodeQL. Keep all live provider use separate: require explicit owner
+authorization before connecting a real account or exposing public TLS. Any later
+full user/organization authorization, conversation model, dispatch engine, or
+dashboard deployment must start with its own bounded design, migration/security
+review, and verification criteria.

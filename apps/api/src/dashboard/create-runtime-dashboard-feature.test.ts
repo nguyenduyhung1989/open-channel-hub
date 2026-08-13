@@ -1,4 +1,8 @@
-import type { DashboardSessionStore, InboundEventPage } from '@open-channel-hub/domain';
+import type {
+  CreateOutboundReplyCommandResult,
+  DashboardSessionStore,
+  InboundEventPage
+} from '@open-channel-hub/domain';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { RuntimeDashboard } from '../connections/runtime-connection-configuration.js';
@@ -97,6 +101,8 @@ const inbox = (
 ): InboxFeature =>
   Object.freeze({
     connectionIds: Object.freeze(['telegram-bot-support']),
+    createOutboundReplyCommand: async (): Promise<CreateOutboundReplyCommandResult> =>
+      Object.freeze({ kind: 'source_unavailable' }),
     id,
     readInboundEvents,
     token

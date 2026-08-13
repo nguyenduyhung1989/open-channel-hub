@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 
 import type { CanonicalEvent } from '@open-channel-hub/contracts';
-import type { InboundEventPage } from '@open-channel-hub/domain';
+import type { CreateOutboundReplyCommandResult, InboundEventPage } from '@open-channel-hub/domain';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { buildApp } from '../app.js';
@@ -222,6 +222,9 @@ const createFeature = (
     overrides.readInboundEvents ?? vi.fn(async (): Promise<InboundEventPage> => ({ events: [] }));
   const feature = Object.freeze({
     connectionIds: SUPPORT_CONNECTION_IDS,
+    createOutboundReplyCommand: vi.fn(async (): Promise<CreateOutboundReplyCommandResult> =>
+      Object.freeze({ kind: 'source_unavailable' })
+    ),
     id: 'support',
     readInboundEvents,
     token: SUPPORT_TOKEN,

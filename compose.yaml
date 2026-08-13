@@ -10,7 +10,9 @@ name: open-channel-hub
 # It encodes (but does not encrypt) one or more official Telegram Bot, Zalo OA, Facebook Page, and/or WhatsApp Business connections and must not be mixed with temporary legacy Telegram variables.
 # PostgreSQL is initialized for this hub only: database `open_channel_hub`, schema `open_channel_hub`, and a non-superuser
 # application role. The migration service applies idempotent schema changes before the API starts. This stack still does not provide
-# Redis, a queue, TLS, a public proxy, backups, or a production deployment.
+# Redis, a dispatch queue/worker, provider delivery, TLS, a public proxy,
+# backups, or a production deployment. The Phase 4c command ledger records
+# `queued` source-bound intent only; it makes no provider request.
 services:
   postgres:
     image: postgres:18.4-alpine3.24

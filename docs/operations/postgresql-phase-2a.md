@@ -1,8 +1,9 @@
 # Phase 2a PostgreSQL: operations and data boundary
 
-**Status:** the durable inbound-event ledger, connection registry, and
-synthetic Docker proof source are implemented. This is not a production
-deployment, a backup/restore solution, or a real provider verification.
+**Status:** the durable inbound-event ledger, connection registry, immutable
+source-bound reply-command ledger, and synthetic Docker proof source are
+implemented. This is not a production deployment, a backup/restore solution,
+or a real provider verification.
 
 ## What this stack creates
 
@@ -19,12 +20,13 @@ The supplied Compose stack creates three services:
 The database and schema are both named <code>open_channel_hub</code>. The
 application schema contains:
 
-| Object                           | Purpose                                                                                                                                                                                                            |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| <code>schema_migrations</code>   | Immutable record of forward schema migrations applied by this binary.                                                                                                                                              |
-| <code>connection_registry</code> | Opaque connection ID, immutable connector metadata, registration timestamp, and a non-secret Zalo OA, Facebook Page, or WhatsApp Business provider-identity fingerprint when those channels are configured.        |
-| <code>inbound_events</code>      | Canonical inbound text-event ledger. Its primary key is <code>(connection_id, provider_event_id)</code>.                                                                                                           |
-| <code>dashboard_sessions</code>  | Optional Phase 4b browser-session metadata: only HMACs of random session/anti-forgery values, principal ID, timestamps, and revocation state. It contains no raw token, password, credential, or inbox membership. |
+| Object                           | Purpose                                                                                                                                                                                                                                                                                                  |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| <code>schema_migrations</code>   | Immutable record of forward schema migrations applied by this binary.                                                                                                                                                                                                                                    |
+| <code>connection_registry</code> | Opaque connection ID, immutable connector metadata, registration timestamp, and a non-secret Zalo OA, Facebook Page, or WhatsApp Business provider-identity fingerprint when those channels are configured.                                                                                              |
+| <code>inbound_events</code>      | Canonical inbound text-event ledger. Its primary key is <code>(connection_id, provider_event_id)</code>.                                                                                                                                                                                                 |
+| <code>dashboard_sessions</code>  | Optional Phase 4b browser-session metadata: only HMACs of random session/anti-forgery values, principal ID, timestamps, and revocation state. It contains no raw token, password, credential, or inbox membership.                                                                                       |
+| <code>outbound_commands</code>   | Phase 4c immutable source-bound reply intents. It retains a private target derived from canonical inbound `conversation_id`, source message/channel, message text, client operation ID, `queued` state, and timestamps. It has no provider credential, raw payload, attempt, receipt, or delivery state. |
 
 The ledger stores a canonical event ID, channel/type/timestamps, conversation
 and sender/message identifiers, and message text. It intentionally does **not**
@@ -59,6 +61,16 @@ from both the event ledger and registry. It records only HMACs of random
 browser-token values, a configured principal ID, session times, and revocation
 state. It does not record a raw browser token, password, password hash, inbox
 bearer, provider credential, or inbox membership.
+
+Phase 4c's additive <code>0009_outbound_reply_commands</code> migration creates
+the separate <code>outbound_commands</code> ledger. It has a composite foreign
+key to the exact source <code>inbound_events</code> row and unique
+<code>(connection_id, client_operation_id)</code> idempotency. PostgreSQL
+rejects every update and delete through an immutable-row trigger. Its private
+reply target is copied from the source event's canonical conversation inside
+the storage transaction; it is not a request field or public API field. The
+only current state, <code>queued</code>, proves a committed intent only, not
+provider acceptance, a send attempt, delivery, or read receipt.
 
 ## Configure without exposing passwords
 
@@ -144,7 +156,13 @@ path calls a provider or uses a real credential or message. Phase 4b's exact
 commit <code>7672be9</code> adds the eighth migration for HMAC-only dashboard
 sessions; it passed the same local verification, independent review, synthetic
 Compose proof, and GitHub CI/CodeQL. The smoke remains dashboard-free because
-it is loopback HTTP, not proof of browser cookies over external HTTPS.
+it is loopback HTTP, not proof of browser cookies over external HTTPS. Phase
+4c's candidate extends the synthetic proof to a source-bound reply command:
+one `201` create and one `200` exact replay produce one immutable row; a
+different payload under the same operation ID returns `409`; absent and
+out-of-scope sources share `404`; SQL proves that the stored reply target is
+the source conversation. The proof makes no provider request and treats
+`queued` as an unsent intent.
 
 ## Container and network boundary
 
@@ -177,17 +195,20 @@ docker compose down --volumes
 ```
 
 It deletes the named <code>postgres-data</code> volume and all durable inbound
-events in it. There is no implemented backup or restore drill. Do not use it as
-a routine reset, and do not run it against any data you need to keep.
+events and outgoing reply-command data in it. There is no implemented backup
+or restore drill. Do not use it as a routine reset, and do not run it against
+any data you need to keep.
 
 ## Explicit operational gaps
 
 - No backup schedule, encrypted backup, restore procedure, or recovery test.
-- No retention/deletion workflow or owner-facing request process.
+- No retention/deletion workflow or owner-facing request process for either
+  inbound text or immutable reply-command text/targets.
 - No database audit trail, user/account authorization model, rate limit, or
   capacity policy.
 - No encryption-at-rest claim for the Docker volume or host disk.
-- No public TLS/proxy, real Telegram, Zalo OA, Facebook Page, or WhatsApp
-  Business confirmation, or production monitoring.
+- No dispatch worker, provider send/receipt path, retry policy, public
+  TLS/proxy, real Telegram, Zalo OA, Facebook Page, or WhatsApp Business
+  confirmation, or production monitoring.
 
 These gaps are intentionally left visible in the roadmap and threat model.

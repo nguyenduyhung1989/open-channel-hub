@@ -1,8 +1,8 @@
 # Runtime multi-connection configuration
 
 This guide configures the current alpha's official Telegram Bot, Zalo Official
-Account (OA), Facebook Page, WhatsApp Business, optional read-only inbox
-entries, and optional Phase 4b operator dashboard. The dashboard is a small
+Account (OA), Facebook Page, WhatsApp Business, optional inbox entries, and
+optional Phase 4b operator dashboard. The dashboard is a small
 server-rendered local-principal surface, not a full user, organization,
 public-connection, or permission model. It has not been verified with a real
 provider account or public TLS endpoint.
@@ -11,7 +11,7 @@ provider account or public TLS endpoint.
 
 One secret JSON document can configure one to one hundred Telegram Bot, Zalo
 OA, Facebook Page, and WhatsApp Business connections, plus up to one hundred
-optional configured read-only inboxes and up to one hundred optional dashboard
+optional configured inboxes and up to one hundred optional dashboard
 principals. It contains credentials and password verifiers, so treat the
 entire document as a secret even though its IDs are opaque internal labels.
 
@@ -142,14 +142,18 @@ another inbox token or any Bot, webhook, provider, or account-operator
 credential. Connection IDs are canonicalized in ascending order before the
 inbox is used.
 
-An inbox token grants canonical inbound-event reads only for its explicit
-connection set through `GET /v1/inbox/inbound-events`. It is distinct from the
-one-account operator bearer on each connection; neither token works for the
-other route. Phase 4a itself did not create a browser UI; Phase 4b can add the
-separate server-rendered dashboard described below. Neither creates a full
-user, organization, role, conversation summary, outbound action, or provider
-credential. See the [Phase 4a unified inbox guide](unified-inbox-4a.md) for
-the API cursor boundary.
+An inbox token grants canonical inbound-event reads for its explicit connection
+set through `GET /v1/inbox/inbound-events`, and Phase 4c permits it to record a
+source-bound reply intent through `POST /v1/inbox/outbound-commands`. It is
+distinct from the one-account operator bearer on each connection; neither token
+works for the other's route. The command route accepts no arbitrary recipient
+and makes no provider call: `queued` means only a durable intent. Phase 4a did
+not create a browser UI; Phase 4b adds the separate server-rendered dashboard
+described below, which remains read-only. None creates a full user,
+organization, role, conversation summary, dispatch action, or provider
+credential. See the [Phase 4a inbox-scope guide](unified-inbox-4a.md) and
+[Phase 4c reply-command guide](outbound-reply-commands-4c.md) for the API
+boundaries.
 
 The root document may additionally include `dashboard`, but only when
 `inboxes` is present:
@@ -339,6 +343,15 @@ principal ID, and session times/revocation state. It does not store a raw
 browser token, password, password hash, inbox bearer, provider credential, or
 inbox membership.
 
+Migration <code>0009_outbound_reply_commands</code> adds immutable
+source-bound reply intents. It records outgoing message text and private
+source-derived target/message/channel metadata in PostgreSQL, but never a
+provider credential, raw payload, attempt, receipt, or delivery state. The
+runtime secret does not add a new field for this feature: an existing configured
+inbox bearer selects its allowed source connections. See the
+[Phase 4c reply-command guide](outbound-reply-commands-4c.md) before using the
+write endpoint.
+
 Migration <code>0004_inbound_events_connection_registry_fk</code> is a
 PostgreSQL foreign key marked <code>NOT VALID</code>. New event writes must
 reference a registered connection. Existing Phase 2a event rows can remain
@@ -375,14 +388,16 @@ The repository's disposable Compose smoke test uses two synthetic Telegram Bot
 connections, two synthetic Zalo OA connections, two synthetic Facebook Pages,
 and two synthetic WhatsApp business phones on one fake shared Meta App. It also
 configures separate support and sales inboxes, each spanning four of those
-accounts. It migrates the eight immutable schema entries twice, verifies
+accounts. It migrates the nine immutable schema entries twice, verifies
 registry rows and Zalo/Facebook/WhatsApp fingerprint presence without printing
 them, checks Telegram dynamic webhook behavior, proves Zalo raw-byte hashing
 and shared Meta raw-byte HMAC boundaries, checks duplicate idempotency within
 every connection, verifies account and inbox bearer scopes, and rejects both
-cross-account and cross-inbox cursors. It deliberately omits `dashboard` and
-does not attempt browser login over HTTP. It makes no provider network request
-and uses no real credential or message.
+cross-account and cross-inbox cursors. It also records one synthetic
+source-bound reply command, proves exact idempotency/conflict/scope behavior,
+and verifies its source-derived private target in PostgreSQL. It deliberately
+omits `dashboard` and does not attempt browser login over HTTP. It makes no
+provider network request and uses no real credential or message.
 
 Before a real account is used, still complete TLS/proxy, rate limiting,
 monitoring, backup/restore, retention/deletion, secret rotation, access/audit,

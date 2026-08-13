@@ -1,16 +1,18 @@
-# Phase 4a unified read-only inbox
+# Phase 4a inbox scope and Phase 4c reply-command boundary
 
 Phase 4a adds one deliberately small aggregate read API. A configured inbox
 can return canonical inbound events from an explicit set of existing
-connections through one bearer credential. Phase 4a itself does not add a web
-dashboard, user account, organization, role model, conversation summary,
-search, outbound message, provider token, or live-provider operation. A later,
-separate Phase 4b server-rendered dashboard can consume only this same bounded
-scope; see the [operator dashboard guide](operator-dashboard-4b.md).
+connections through one bearer credential. Phase 4a itself did not add an
+outbound message path. Phase 4c now allows that same bearer to record a
+source-bound reply intent, but still adds no web dashboard send form, user
+account, organization, role model, conversation summary, search, provider
+token, or live-provider operation. The separate Phase 4b dashboard can consume
+only the read path and remains read-only; see the
+[operator dashboard guide](operator-dashboard-4b.md).
 
-The word "inbox" in this phase means a server-selected read scope, not a
-complete customer-support product. The PostgreSQL ledger remains the source of
-the events, and raw provider payloads remain outside storage and this API.
+The word "inbox" in these phases means a server-selected scope, not a complete
+customer-support product. The PostgreSQL ledger remains the source of the
+events, and raw provider payloads remain outside storage and these APIs.
 
 ## Prerequisites and configuration
 
@@ -131,11 +133,31 @@ route, and an inbox token cannot select an individual connection route. Keep
 the two credentials separate and rotate them through the secret-management
 workflow when one is suspected exposed.
 
-The endpoint returns canonical fields already retained by the ledger. It does
+The read endpoint returns canonical fields already retained by the ledger. It does
 not return raw provider payloads, configuration values, provider secrets,
 inbox membership metadata, database ledger IDs, or an account listing.
 
-## What remains outside Phase 4a
+## Phase 4c source-bound command addition
+
+The same configured inbox bearer can call
+`POST /v1/inbox/outbound-commands` to record a durable reply intent for one
+already stored event in its configured connection set. The strict body contains
+only `clientOperationId`, `sourceConnectionId`, `sourceProviderEventId`, and
+`text`. It has no caller-selected recipient or provider delivery setting.
+
+The database derives the private reply target from the canonical source event's
+`conversationId`, stores it alongside the source message/channel and message
+text, and returns none of those private fields. A new command returns `201`;
+the exact same command returns `200`; reusing that client operation ID with a
+different source or text returns `409`; a missing event and an event outside
+the selected scope both return the same `404`. See the dedicated
+[Phase 4c reply-command guide](outbound-reply-commands-4c.md) for the request,
+idempotency, and data boundary.
+
+`queued` means the intent is durably recorded only. There is no worker,
+provider dispatch, retry, receipt, or delivery state in Phase 4c.
+
+## What remains outside Phase 4c
 
 - No full user identity, organization, role-based access control, invitation
   flow, audit log, public connection administration, or token rotation
@@ -144,8 +166,10 @@ inbox membership metadata, database ledger IDs, or an account listing.
 - No conversation aggregation, read/unread state, assignment, labels, search,
   attachment handling, retention/deletion workflow, backup/restore proof, or
   encryption-at-rest assurance.
-- No outbound queue, retry policy, delivery status, template, Graph API call,
-  OAuth, provider access-token storage, or live-provider request.
+- No dispatch worker, provider HTTP client, retry policy, attempt record,
+  delivery/read status, template, Graph API call, OAuth, provider access-token
+  storage, or live-provider request. The separate legacy Phase 1a Telegram
+  direct-send endpoint is not part of the durable command path.
 - No public TLS deployment or live Telegram, Zalo OA, Facebook Page, or
   WhatsApp Business verification.
 

@@ -51,6 +51,13 @@ organization has accepted the project.
   <code>7672be9</code>. The local smoke intentionally remains dashboard-free
   because it is HTTP on loopback and cannot prove the required external HTTPS
   browser boundary.
+- Phase 4c adds an implementation candidate for an immutable source-bound
+  reply-command ledger. A configured inbox bearer can record an intent against
+  an already durable in-scope event; PostgreSQL derives the private reply target
+  from canonical source data. The candidate has no provider dispatch, retry,
+  receipt, OAuth/token storage, or dashboard send form. Do not claim final
+  local verification, synthetic Compose proof, independent review, or GitHub
+  evidence until the exact frozen revision has completed them.
 
 ## Verified GitHub evidence
 
@@ -97,7 +104,14 @@ organization has accepted the project.
   in PostgreSQL.
 - Treat canonical message text and identifiers as sensitive data. Build and
   test backup/restore, retention/deletion, secret rotation, access controls,
-  and operational observability before operating real customer data.
+  and operational observability before operating real customer data. Phase 4c
+  additionally stores outgoing reply text and private source-derived target
+  metadata; protect it to the same standard.
+- Do not mistake Phase 4c `queued` intents for sends. A future provider
+  dispatcher needs a separate official-provider policy, attempt/timeout/receipt
+  model, migration, review, and verification. The legacy Phase 1a Telegram
+  direct-send route is separate compatibility behavior, not evidence that all
+  sends are durable.
 - Keep examples, fixtures, screenshots, logs, and public discussions free of
   user data and secrets.
 - Respond to issues and pull requests, record material decisions, and create

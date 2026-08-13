@@ -17,6 +17,7 @@ it does not mean a feature is complete.
 | [0009](0009-whatsapp-business-signed-inbound.md)       | accepted | WhatsApp Business signed inbound text boundary                 |
 | [0010](0010-configured-read-only-inbox-principals.md)  | accepted | Configured read-only inbox principals                          |
 | [0011](0011-server-rendered-operator-dashboard.md)     | accepted | Server-rendered local-principal operator dashboard             |
+| [0012](0012-source-bound-durable-reply-commands.md)    | accepted | Source-bound durable reply commands before provider dispatch   |
 
 Template for a new ADR:
 

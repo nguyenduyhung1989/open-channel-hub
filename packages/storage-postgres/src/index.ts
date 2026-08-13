@@ -6,4 +6,5 @@ export { PostgresDashboardSessionStore } from './postgres-dashboard-session-stor
 export { PostgresInboundEventFeedReader } from './postgres-inbound-event-feed-reader.js';
 export { PostgresInboundEventReader } from './postgres-inbound-event-reader.js';
 export { PostgresInboundEventStore } from './postgres-inbound-event-store.js';
+export { PostgresOutboundReplyCommandStore } from './postgres-outbound-reply-command-store.js';
 export { POSTGRES_SCHEMA } from './postgres-migrations.js';

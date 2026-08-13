@@ -64,6 +64,7 @@ const toFeatureSnapshot = (features: readonly InboxFeature[]): readonly InboxFea
 
     return Object.freeze({
       connectionIds: Object.freeze([...feature.connectionIds]),
+      createOutboundReplyCommand: feature.createOutboundReplyCommand,
       id: feature.id,
       readInboundEvents: feature.readInboundEvents,
       token: feature.token
@@ -78,6 +79,7 @@ const isFeature = (value: unknown): value is InboxFeature => {
     typeof value !== 'object' ||
     value === null ||
     !('connectionIds' in value) ||
+    !('createOutboundReplyCommand' in value) ||
     !('id' in value) ||
     !('readInboundEvents' in value) ||
     !('token' in value) ||
@@ -86,6 +88,7 @@ const isFeature = (value: unknown): value is InboxFeature => {
     value.connectionIds.length > MAXIMUM_CONNECTIONS_PER_INBOX ||
     typeof value.id !== 'string' ||
     !isIdentifier(value.id) ||
+    typeof value.createOutboundReplyCommand !== 'function' ||
     typeof value.readInboundEvents !== 'function' ||
     typeof value.token !== 'string' ||
     !PRINTABLE_TOKEN_PATTERN.test(value.token)

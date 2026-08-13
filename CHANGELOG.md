@@ -126,6 +126,18 @@ follows [Semantic Versioning](https://semver.org/).
   browser cookies, anti-forgery forms, bounded session lifetime, and forward
   migration <code>0008_dashboard_sessions</code> for HMAC-only session
   metadata.
+- Phase 4c: `POST /v1/inbox/outbound-commands`, authenticated by an existing
+  configured inbox bearer before body parsing. It records a reply intent only
+  for an already durable inbound source event in that inbox's server-selected
+  connection scope.
+- Phase 4c: forward migration <code>0009_outbound_reply_commands</code> and
+  an immutable PostgreSQL command ledger. It snapshots private reply target,
+  source message ID, and channel from canonical source data; callers never
+  provide or receive those fields.
+- Phase 4c: exact per-connection idempotency for a client operation ID, safe
+  `201` create/`200` replay/`409` conflict behavior, and indistinguishable
+  missing versus out-of-scope `404` responses. It adds no dispatch, provider
+  request, retry, attempt, receipt, OAuth/token storage, or dashboard send UI.
 
 ### Changed
 
@@ -169,8 +181,9 @@ follows [Semantic Versioning](https://semver.org/).
   sequence rather than a text alias; callers must restart from page one after
   upgrading so a mixed ordering cannot silently skip events.
 - The supplied loopback-only HTTP Compose smoke remains intentionally dashboard
-  free. It now verifies all eight immutable schema migrations but does not
-  attempt a browser login whose `Secure` cookies and exact origin require TLS.
+  free. It now verifies all nine immutable schema migrations, source-bound
+  reply-command idempotency and target derivation, but does not attempt a
+  browser login whose `Secure` cookies and exact origin require TLS.
 
 ### Security
 
@@ -218,6 +231,11 @@ follows [Semantic Versioning](https://semver.org/).
   logout enforce the exact configured external HTTPS origin and anti-forgery
   tokens. The feature is locally verified, but has not verified a TLS proxy or
   production deployment.
+- The durable reply-command route authenticates the inbox bearer before body
+  parsing, accepts no caller-selected recipient, and stores only a private
+  target derived from an in-scope canonical source event. Its public response
+  omits message text and private source/target fields; `queued` is a durable
+  intent, not a provider-delivery claim.
 - The <code>main</code> branch now blocks force pushes and deletion, including
   for administrators. Required checks and pull-request reviews remain
   intentionally unset for the owner-controlled direct-push workflow.

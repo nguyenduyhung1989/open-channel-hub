@@ -1,7 +1,11 @@
-import type { InboundEventFeedReader } from '@open-channel-hub/domain';
+import type { InboundEventFeedReader, OutboundReplyCommandStore } from '@open-channel-hub/domain';
 
 import type { RuntimeInbox } from '../connections/runtime-connection-configuration.js';
-import type { InboxFeature, InboxInboundEventListInput } from './inbox-feature.js';
+import type {
+  InboxFeature,
+  InboxInboundEventListInput,
+  InboxOutboundReplyCommandInput
+} from './inbox-feature.js';
 
 /**
  * Binds a storage feed reader to an already-validated runtime inbox snapshot.
@@ -10,16 +14,28 @@ import type { InboxFeature, InboxInboundEventListInput } from './inbox-feature.j
  */
 export const createRuntimeInboxFeatures = (
   inboxes: readonly RuntimeInbox[],
-  inboundEventFeedReader: InboundEventFeedReader
+  inboundEventFeedReader: InboundEventFeedReader,
+  outboundReplyCommandStore: OutboundReplyCommandStore
 ): readonly InboxFeature[] =>
   Object.freeze(
     inboxes.map((inbox) => {
       const connectionIds = Object.freeze([...inbox.connectionIds]);
       const readInboundEvents = async (input: InboxInboundEventListInput) =>
         inboundEventFeedReader.list({ connectionIds, ...input });
+      const createOutboundReplyCommand = async (input: InboxOutboundReplyCommandInput) =>
+        outboundReplyCommandStore.create(
+          Object.freeze({
+            allowedConnectionIds: connectionIds,
+            clientOperationId: input.clientOperationId,
+            sourceConnectionId: input.sourceConnectionId,
+            sourceProviderEventId: input.sourceProviderEventId,
+            text: input.text
+          })
+        );
 
       return Object.freeze({
         connectionIds,
+        createOutboundReplyCommand,
         id: inbox.id,
         readInboundEvents,
         token: inbox.token

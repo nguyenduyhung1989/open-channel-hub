@@ -56,13 +56,36 @@ describe('PostgreSQL migrations', () => {
     expect(sql).toContain('idle_expires_at <= absolute_expires_at');
     expect(sql).toContain('CREATE INDEX dashboard_sessions_active_expiry');
     expect(sql).toContain('WHERE revoked_at IS NULL');
-    const dashboardSessionSql = sql.slice(
-      sql.indexOf('CREATE TABLE open_channel_hub.dashboard_sessions')
-    );
+    const dashboardStart = sql.indexOf('CREATE TABLE open_channel_hub.dashboard_sessions');
+    const outboundCommandStart = sql.indexOf('CREATE TABLE open_channel_hub.outbound_commands');
+    const dashboardSessionSql = sql.slice(dashboardStart, outboundCommandStart);
     expect(dashboardSessionSql).not.toContain('password');
     expect(dashboardSessionSql).not.toContain('inbox');
     expect(dashboardSessionSql).not.toContain('provider_');
     expect(dashboardSessionSql).not.toContain('raw_token');
+    expect(sql).toContain('CREATE TABLE open_channel_hub.outbound_commands');
+    expect(sql).toContain('command_id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY');
+    expect(sql).toContain('source_provider_event_id text NOT NULL');
+    expect(sql).toContain('client_operation_id text NOT NULL');
+    expect(sql).toContain('reply_target_id text NOT NULL');
+    expect(sql).toContain('source_message_id text NOT NULL');
+    expect(sql).toContain('source_channel text NOT NULL');
+    expect(sql).toContain('message_text text NOT NULL');
+    expect(sql).toContain("state text NOT NULL DEFAULT 'queued'");
+    expect(sql).toContain('char_length(source_provider_event_id) BETWEEN 1 AND 512');
+    expect(sql).toContain("source_provider_event_id ~ '^[!-~]+$'");
+    expect(sql).toContain('char_length(reply_target_id) BETWEEN 1 AND 512');
+    expect(sql).toContain("reply_target_id ~ '^[!-~]+$'");
+    expect(sql).toContain('char_length(source_message_id) BETWEEN 1 AND 512');
+    expect(sql).toContain("source_message_id ~ '^[!-~]+$'");
+    expect(sql).toContain('char_length(message_text) BETWEEN 1 AND 4096');
+    expect(sql).toContain("message_text !~ '^[[:space:]]*$'");
+    expect(sql).toContain("state = 'queued'");
+    expect(sql).toContain('REFERENCES open_channel_hub.inbound_events');
+    expect(sql).toContain('outbound_commands_connection_client_operation_unique UNIQUE');
+    expect(sql).toContain('CREATE FUNCTION open_channel_hub.reject_outbound_command_mutation()');
+    expect(sql).toContain('CREATE TRIGGER outbound_commands_immutable');
+    expect(sql).toContain('BEFORE UPDATE OR DELETE ON open_channel_hub.outbound_commands');
     expect(sql).toContain('INSERT INTO open_channel_hub.schema_migrations');
     expect(sql).not.toContain('public.');
     expect(
@@ -77,7 +100,8 @@ describe('PostgreSQL migrations', () => {
       '0005_connection_registry_provider_identity',
       '0006_connection_registry_facebook_page_provider_identity',
       '0007_connection_registry_whatsapp_business_provider_identity',
-      '0008_dashboard_sessions'
+      '0008_dashboard_sessions',
+      '0009_outbound_reply_commands'
     ]);
     expect(pool.releaseCount).toBe(1);
   });
@@ -108,6 +132,11 @@ describe('PostgreSQL migrations', () => {
     );
     expect(secondRunSql).not.toContain('CREATE TABLE open_channel_hub.dashboard_sessions');
     expect(secondRunSql).not.toContain('CREATE INDEX dashboard_sessions_active_expiry');
+    expect(secondRunSql).not.toContain('CREATE TABLE open_channel_hub.outbound_commands');
+    expect(secondRunSql).not.toContain(
+      'CREATE FUNCTION open_channel_hub.reject_outbound_command_mutation()'
+    );
+    expect(secondRunSql).not.toContain('CREATE TRIGGER outbound_commands_immutable');
     expect(secondRunSql).not.toContain('INSERT INTO open_channel_hub.schema_migrations');
     expect(pool.releaseCount).toBe(2);
   });

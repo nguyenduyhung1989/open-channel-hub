@@ -179,8 +179,9 @@ for a documented operation.
   or restore proof, encryption-at-rest assurance, monitoring/alerting, or
   production deployment evidence.
 - No conversation model, read/unread state, assignment, label, search,
-  attachment, outbound message, provider access-token, OAuth, or live provider
-  operation.
+  attachment, provider dispatch, provider access-token, OAuth, or live provider
+  operation. Phase 4c's API-only source-bound reply-command ledger has no
+  dashboard form; this dashboard remains read-only.
 
 The repository's Compose smoke test deliberately validates only the database
 migration count and existing synthetic API paths over loopback HTTP. Dashboard
