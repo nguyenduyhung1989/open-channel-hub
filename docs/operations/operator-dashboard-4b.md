@@ -180,8 +180,9 @@ for a documented operation.
   production deployment evidence.
 - No conversation model, read/unread state, assignment, label, search,
   attachment, provider dispatch, provider access-token, OAuth, or live provider
-  operation. Phase 4c's API-only source-bound reply-command ledger has no
-  dashboard form; this dashboard remains read-only.
+  operation. Phase 4c's API-only source-bound reply-command ledger and Phase
+  4d's API-only queued-history reader have no dashboard form; this dashboard
+  remains read-only.
 
 The repository's Compose smoke test deliberately validates only the database
 migration count and existing synthetic API paths over loopback HTTP. Dashboard

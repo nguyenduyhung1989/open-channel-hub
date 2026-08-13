@@ -58,6 +58,14 @@ organization has accepted the project.
   receipt, OAuth/token storage, or dashboard send form. Do not claim final
   local verification, synthetic Compose proof, independent review, or GitHub
   evidence until the exact frozen revision has completed them.
+- Phase 4d adds an implementation candidate for a read-only history of those
+  `queued` intents. The same inbox bearer can read only its fixed scope through
+  a separate version-1 cursor; the projection returns recorded text with safe
+  command/source metadata but omits private target/source metadata and client
+  operation IDs. It adds no migration, provider request, dispatch, retry,
+  delivery state, or dashboard history UI. Do not claim final local
+  verification, synthetic Compose proof, independent review, or GitHub evidence
+  until the exact frozen Phase 4c–4d revision has completed them.
 
 ## Verified GitHub evidence
 
@@ -106,12 +114,14 @@ organization has accepted the project.
   test backup/restore, retention/deletion, secret rotation, access controls,
   and operational observability before operating real customer data. Phase 4c
   additionally stores outgoing reply text and private source-derived target
-  metadata; protect it to the same standard.
-- Do not mistake Phase 4c `queued` intents for sends. A future provider
-  dispatcher needs a separate official-provider policy, attempt/timeout/receipt
-  model, migration, review, and verification. The legacy Phase 1a Telegram
-  direct-send route is separate compatibility behavior, not evidence that all
-  sends are durable.
+  metadata; Phase 4d returns that recorded text to the authorized scoped inbox
+  bearer. Protect both paths to the same standard and keep messages out of
+  examples, logs, screenshots, and public discussion.
+- Do not mistake Phase 4c `queued` intents or Phase 4d history rows for sends.
+  A future provider dispatcher needs a separate official-provider policy,
+  attempt/timeout/receipt model, migration, review, and verification. The legacy
+  Phase 1a Telegram direct-send route is separate compatibility behavior, not
+  evidence that all sends are durable.
 - Keep examples, fixtures, screenshots, logs, and public discussions free of
   user data and secrets.
 - Respond to issues and pull requests, record material decisions, and create

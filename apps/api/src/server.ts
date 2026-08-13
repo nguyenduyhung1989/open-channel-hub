@@ -143,15 +143,21 @@ try {
       if (configuredInboxes !== undefined) {
         const inboundEventFeedReader = postgres?.inboundEventFeedReader;
         const outboundReplyCommandStore = postgres?.outboundReplyCommandStore;
+        const outboundReplyCommandHistoryReader = postgres?.outboundReplyCommandHistoryReader;
 
-        if (inboundEventFeedReader === undefined || outboundReplyCommandStore === undefined) {
+        if (
+          inboundEventFeedReader === undefined ||
+          outboundReplyCommandStore === undefined ||
+          outboundReplyCommandHistoryReader === undefined
+        ) {
           throw new EnvironmentConfigurationError();
         }
 
         inboxes = createRuntimeInboxFeatures(
           configuredInboxes,
           inboundEventFeedReader,
-          outboundReplyCommandStore
+          outboundReplyCommandStore,
+          outboundReplyCommandHistoryReader
         );
 
         const dashboardConfiguration = configuredConnectionConfiguration?.dashboard;

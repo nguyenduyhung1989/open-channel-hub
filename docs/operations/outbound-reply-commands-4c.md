@@ -106,8 +106,10 @@ update or delete through an immutable-row trigger.
 
 Outgoing message text and private reply-target metadata are sensitive
 operational data. They remain inside PostgreSQL and never belong in repository
-fixtures, issue text, screenshots, logs, or diagnostic commands. The public API
-does not provide a command listing endpoint.
+fixtures, issue text, screenshots, logs, or diagnostic commands. Phase 4d adds
+one scope-bound history route that returns the text with safe command metadata,
+but never the private target/source fields or client operation ID; see the
+[queued command-history guide](outbound-command-history-4d.md).
 
 ## What this deliberately does not do
 

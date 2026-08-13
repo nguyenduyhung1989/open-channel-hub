@@ -2,13 +2,14 @@
 
 > A self-hosted, official-first multichannel messaging hub.
 
-**Status: Phase 4c alpha.** The repository contains a durable
+**Status: Phase 4d alpha.** The repository contains a durable
 PostgreSQL inbound-event ledger, account-scoped operator read APIs, a
 configured multi-connection inbox API, an optional server-rendered read-only
-operator dashboard, a durable source-bound reply-command ledger, secret-backed
-runtime configuration for official accounts, and narrow official Zalo Official
-Account (OA), Facebook Page, and WhatsApp Business signed inbound-text
-boundaries. Phase 4a passed final local checks,
+operator dashboard, a durable source-bound reply-command ledger, a scoped
+queued-command history API, secret-backed runtime configuration for official
+accounts, and narrow official Zalo Official Account (OA), Facebook Page, and
+WhatsApp Business signed inbound-text boundaries. Phase 4a passed final local
+checks,
 independent review, a synthetic Docker proof, and GitHub CI/CodeQL for exact
 commit <code>705db0a</code>. Phase 4b passed the same local verification,
 independent review, synthetic Docker proof, and GitHub CI/CodeQL for exact
@@ -126,6 +127,16 @@ The earlier <code>POST /v1/telegram-bot/messages</code> remains a separate
 Phase 1a legacy compatibility endpoint. It is not routed through the Phase 4c
 ledger and does not prove that all sends are durable.
 
+Phase 4d adds <code>GET /v1/inbox/outbound-commands</code>. It returns only
+the configured inbox's queued reply intents in stable reverse command-ID order.
+The response includes the recorded text, command/source identifiers,
+<code>queued</code>, timestamp, and an optional opaque cursor; it omits the
+private reply target, source message/channel, client operation ID, raw provider
+data, and credentials. Its cursor has its own version and binds the exact inbox
+ID plus configured connection set. No migration is added: the ninth
+<code>0009_outbound_reply_commands</code> migration remains unchanged. This is
+a history of durable intent, not delivery status or provider activity.
+
 Multi-connection IDs are opaque safe route labels; <code>.</code> and
 <code>..</code> are rejected because webhook ingress places the ID in a dynamic
 path. This restriction does not rewrite a historical legacy one-Bot environment
@@ -159,8 +170,9 @@ CAPTCHA bypass, fingerprint spoofing, session theft, or bulk-spam capabilities.
   configured account.
 - Optional configured inbox principals, each with a separate bearer and an
   explicit server-side allow-list of one or more configured accounts. They can
-  read canonical inbound events and record a source-bound reply intent, but
-  cannot choose an arbitrary recipient or dispatch a provider message.
+  read canonical inbound events and queued reply-command history, and record a
+  source-bound reply intent, but cannot choose an arbitrary recipient or
+  dispatch a provider message.
 - An optional server-rendered, no-JavaScript, read-only operator dashboard.
   It uses local configured password principals and browser session cookies;
   it never exposes an inbox bearer or provider credential to the browser.
@@ -199,8 +211,8 @@ The following remain plans or explicitly incomplete operational work:
   encryption-at-rest assurance. The narrow Phase 4b dashboard is not a claim
   to provide those capabilities.
 - Redis, a dispatch queue/worker, provider delivery, retries, attempts,
-  delivery/read status, and a provider-specific outbox policy. Phase 4c stores
-  an immutable reply intent only.
+  delivery/read status, and a provider-specific outbox policy. Phase 4c–4d
+  store and list immutable reply intent only.
 - User accounts, role-based access control, multiple
   organizations, webhook administration, public connection management, or a
   connection listing API.
@@ -311,8 +323,8 @@ docker compose down
 ```
 
 Do **not** casually run <code>docker compose down --volumes</code>. It deletes
-the named PostgreSQL volume and therefore every stored inbound event. Backups
-and restore drills are not implemented yet.
+the named PostgreSQL volume and therefore every stored inbound event and reply
+intent. Backups and restore drills are not implemented yet.
 
 Telegram, Zalo OA, Facebook Page, and WhatsApp Business require public HTTPS webhooks. Put a TLS reverse proxy in
 front of Compose, keep the operator API on loopback, and follow the
@@ -321,6 +333,7 @@ front of Compose, keep the operator API on loopback, and follow the
 [Phase 3b Facebook Page guide](docs/operations/facebook-page-3b.md), or
 [Phase 3c WhatsApp Business guide](docs/operations/whatsapp-business-3c.md), or
 [Phase 4a unified inbox guide](docs/operations/unified-inbox-4a.md), or
+[Phase 4d queued command-history guide](docs/operations/outbound-command-history-4d.md), or
 [Phase 4b operator dashboard guide](docs/operations/operator-dashboard-4b.md), or
 [Phase 1a legacy guide](docs/operations/telegram-bot-1a.md) only after an
 authorized test is agreed. Starting Compose does not provide TLS or register a
@@ -361,6 +374,23 @@ Per-account cursors from releases before Phase 4a are intentionally no longer
 accepted and return <code>400</code>. Those cursors used an older ordering
 format; restart the traversal at page one after upgrading. Phase 4a inbox
 cursors are new and already carry the current ordering version.
+
+## Read queued reply-command history
+
+When a configured inbox bearer has recorded Phase 4c reply intents, call
+<code>GET /v1/inbox/outbound-commands</code> to list only `queued` commands in
+that inbox's fixed connection scope. It accepts the same bounded 1–100
+<code>limit</code> convention (default 50) and its own opaque
+<code>nextCursor</code>. It returns recorded message text, so treat the result
+as sensitive operational data. It does not return a recipient, source
+message/channel, client operation ID, credential, attempt, provider receipt, or
+delivery/read state.
+
+The history cursor is not interchangeable with an inbound-event cursor. It is
+bound to the exact inbox and canonical connection set; malformed, foreign, or
+scope-changed cursors return <code>400</code>. See the
+[Phase 4d queued command-history guide](docs/operations/outbound-command-history-4d.md)
+for the exact response and operational boundary.
 
 ## Use the optional browser dashboard
 

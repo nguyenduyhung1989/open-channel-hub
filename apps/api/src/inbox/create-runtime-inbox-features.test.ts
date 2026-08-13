@@ -1,6 +1,8 @@
 import type {
   InboundEventFeedReader,
   InboundEventPage,
+  OutboundReplyCommandHistoryPage,
+  OutboundReplyCommandHistoryReader,
   OutboundReplyCommandStore
 } from '@open-channel-hub/domain';
 import { describe, expect, it, vi } from 'vitest';
@@ -31,7 +33,18 @@ describe('createRuntimeInboxFeatures', () => {
       })
     );
     const commandStore: OutboundReplyCommandStore = Object.freeze({ create });
-    const features = createRuntimeInboxFeatures([RUNTIME_INBOX], reader, commandStore);
+    const listOutboundHistory = vi.fn(async (): Promise<OutboundReplyCommandHistoryPage> => ({
+      commands: []
+    }));
+    const outboundHistoryReader: OutboundReplyCommandHistoryReader = Object.freeze({
+      list: listOutboundHistory
+    });
+    const features = createRuntimeInboxFeatures(
+      [RUNTIME_INBOX],
+      reader,
+      commandStore,
+      outboundHistoryReader
+    );
     const feature = features[0];
 
     expect(feature).toBeDefined();
@@ -52,6 +65,17 @@ describe('createRuntimeInboxFeatures', () => {
     expect(list).toHaveBeenCalledWith({
       connectionIds: RUNTIME_INBOX.connectionIds,
       cursor: { beforeSequence: '2', snapshotMaxSequence: '5' },
+      pageSize: 25
+    });
+
+    await feature?.readOutboundReplyCommandHistory({
+      cursor: { beforeSequence: '3', snapshotMaxSequence: '7' },
+      pageSize: 25
+    });
+
+    expect(listOutboundHistory).toHaveBeenCalledWith({
+      allowedConnectionIds: RUNTIME_INBOX.connectionIds,
+      cursor: { beforeSequence: '3', snapshotMaxSequence: '7' },
       pageSize: 25
     });
 

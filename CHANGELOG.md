@@ -138,6 +138,16 @@ follows [Semantic Versioning](https://semver.org/).
   `201` create/`200` replay/`409` conflict behavior, and indistinguishable
   missing versus out-of-scope `404` responses. It adds no dispatch, provider
   request, retry, attempt, receipt, OAuth/token storage, or dashboard send UI.
+- Phase 4d: `GET /v1/inbox/outbound-commands`, authenticated by the existing
+  inbox bearer before application query/cursor validation. It returns a
+  scope-bound read-only history of queued Phase 4c intents.
+- Phase 4d: a separate version-1 base64url cursor bound to the exact inbox ID
+  and canonical connection set. It uses a stable reverse command-ID snapshot
+  and cannot be reused for inbound events, another inbox, or a changed scope.
+- Phase 4d: a safe history projection containing command/source IDs, recorded
+  text, `queued`, and creation time only. It exposes no reply target, source
+  message/channel, client operation ID, raw provider data, credential, or
+  future attempt/delivery field, and adds no database migration or dispatch.
 
 ### Changed
 
@@ -181,9 +191,11 @@ follows [Semantic Versioning](https://semver.org/).
   sequence rather than a text alias; callers must restart from page one after
   upgrading so a mixed ordering cannot silently skip events.
 - The supplied loopback-only HTTP Compose smoke remains intentionally dashboard
-  free. It now verifies all nine immutable schema migrations, source-bound
-  reply-command idempotency and target derivation, but does not attempt a
-  browser login whose `Secure` cookies and exact origin require TLS.
+  free. It retains all nine immutable schema migrations and now verifies
+  source-bound reply-command idempotency/target derivation plus queued-history
+  scope, safe projection, cursor continuation, and cursor rejection. It does
+  not attempt a browser login whose `Secure` cookies and exact origin require
+  TLS.
 
 ### Security
 
@@ -236,6 +248,11 @@ follows [Semantic Versioning](https://semver.org/).
   target derived from an in-scope canonical source event. Its public response
   omits message text and private source/target fields; `queued` is a durable
   intent, not a provider-delivery claim.
+- The queued command-history route authenticates the inbox bearer before
+  application query/cursor validation, fixes its scope server side, and returns
+  recorded text only with safe command metadata. Its separate cursor binds the
+  inbox/scope/snapshot; private target/source fields, client operation IDs,
+  credentials, dispatch behavior, and delivery semantics remain absent.
 - The <code>main</code> branch now blocks force pushes and deletion, including
   for administrators. Required checks and pull-request reviews remain
   intentionally unset for the owner-controlled direct-push workflow.

@@ -8,6 +8,7 @@ import type { InboxFeature } from './inbox/inbox-feature.js';
 import { createInboxFeatureCatalog } from './inbox/inbox-feature-catalog.js';
 import { registerInboxInboundEventsRoute } from './inbox/inbox-inbound-events-route.js';
 import { registerInboxOutboundCommandsRoute } from './inbox/inbox-outbound-commands-route.js';
+import { registerInboxOutboundCommandHistoryRoute } from './inbox/inbox-outbound-command-history-route.js';
 import type { DashboardFeature } from './dashboard/dashboard-feature.js';
 import { registerDashboardRoutes } from './dashboard/dashboard-routes.js';
 import { registerHealthRoute } from './health/health-route.js';
@@ -111,6 +112,7 @@ export const buildApp = async (options: BuildAppOptions = {}): Promise<FastifyIn
 
     await registerInboxInboundEventsRoute(app, catalog);
     await registerInboxOutboundCommandsRoute(app, catalog);
+    await registerInboxOutboundCommandHistoryRoute(app, catalog);
   }
 
   if (options.telegramBot !== undefined && options.telegramBots !== undefined) {

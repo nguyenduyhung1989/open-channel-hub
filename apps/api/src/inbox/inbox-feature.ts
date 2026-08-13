@@ -1,7 +1,9 @@
 import type {
   CreateOutboundReplyCommandResult,
   InboundEventPage,
-  InboundEventPageCursor
+  InboundEventPageCursor,
+  OutboundReplyCommandHistoryPage,
+  OutboundReplyCommandHistoryPageCursor
 } from '@open-channel-hub/domain';
 
 /** An inbox-local page request with no caller-selectable connection scope. */
@@ -21,6 +23,12 @@ export interface InboxOutboundReplyCommandInput {
   readonly text: string;
 }
 
+/** An inbox-local outbound-command history request with no caller-selected scope. */
+export interface InboxOutboundReplyCommandHistoryListInput {
+  readonly cursor?: OutboundReplyCommandHistoryPageCursor;
+  readonly pageSize: number;
+}
+
 /**
  * A configured inbox principal. Its immutable connection set is selected from
  * runtime configuration, never from the HTTP request.
@@ -32,5 +40,8 @@ export interface InboxFeature {
   ) => Promise<CreateOutboundReplyCommandResult>;
   readonly id: string;
   readonly readInboundEvents: (input: InboxInboundEventListInput) => Promise<InboundEventPage>;
+  readonly readOutboundReplyCommandHistory: (
+    input: InboxOutboundReplyCommandHistoryListInput
+  ) => Promise<OutboundReplyCommandHistoryPage>;
   readonly token: string;
 }

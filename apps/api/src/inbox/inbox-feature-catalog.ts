@@ -67,6 +67,7 @@ const toFeatureSnapshot = (features: readonly InboxFeature[]): readonly InboxFea
       createOutboundReplyCommand: feature.createOutboundReplyCommand,
       id: feature.id,
       readInboundEvents: feature.readInboundEvents,
+      readOutboundReplyCommandHistory: feature.readOutboundReplyCommandHistory,
       token: feature.token
     });
   });
@@ -82,6 +83,7 @@ const isFeature = (value: unknown): value is InboxFeature => {
     !('createOutboundReplyCommand' in value) ||
     !('id' in value) ||
     !('readInboundEvents' in value) ||
+    !('readOutboundReplyCommandHistory' in value) ||
     !('token' in value) ||
     !Array.isArray(value.connectionIds) ||
     value.connectionIds.length === 0 ||
@@ -90,6 +92,7 @@ const isFeature = (value: unknown): value is InboxFeature => {
     !isIdentifier(value.id) ||
     typeof value.createOutboundReplyCommand !== 'function' ||
     typeof value.readInboundEvents !== 'function' ||
+    typeof value.readOutboundReplyCommandHistory !== 'function' ||
     typeof value.token !== 'string' ||
     !PRINTABLE_TOKEN_PATTERN.test(value.token)
   ) {

@@ -18,6 +18,7 @@ it does not mean a feature is complete.
 | [0010](0010-configured-read-only-inbox-principals.md)  | accepted | Configured read-only inbox principals                          |
 | [0011](0011-server-rendered-operator-dashboard.md)     | accepted | Server-rendered local-principal operator dashboard             |
 | [0012](0012-source-bound-durable-reply-commands.md)    | accepted | Source-bound durable reply commands before provider dispatch   |
+| [0013](0013-scoped-queued-reply-command-history.md)    | accepted | Scoped queued reply-command history without delivery semantics |
 
 Template for a new ADR:
 

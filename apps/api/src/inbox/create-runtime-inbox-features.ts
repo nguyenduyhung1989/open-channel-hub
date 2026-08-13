@@ -1,9 +1,14 @@
-import type { InboundEventFeedReader, OutboundReplyCommandStore } from '@open-channel-hub/domain';
+import type {
+  InboundEventFeedReader,
+  OutboundReplyCommandHistoryReader,
+  OutboundReplyCommandStore
+} from '@open-channel-hub/domain';
 
 import type { RuntimeInbox } from '../connections/runtime-connection-configuration.js';
 import type {
   InboxFeature,
   InboxInboundEventListInput,
+  InboxOutboundReplyCommandHistoryListInput,
   InboxOutboundReplyCommandInput
 } from './inbox-feature.js';
 
@@ -15,13 +20,18 @@ import type {
 export const createRuntimeInboxFeatures = (
   inboxes: readonly RuntimeInbox[],
   inboundEventFeedReader: InboundEventFeedReader,
-  outboundReplyCommandStore: OutboundReplyCommandStore
+  outboundReplyCommandStore: OutboundReplyCommandStore,
+  outboundReplyCommandHistoryReader: OutboundReplyCommandHistoryReader
 ): readonly InboxFeature[] =>
   Object.freeze(
     inboxes.map((inbox) => {
       const connectionIds = Object.freeze([...inbox.connectionIds]);
       const readInboundEvents = async (input: InboxInboundEventListInput) =>
         inboundEventFeedReader.list({ connectionIds, ...input });
+      const readOutboundReplyCommandHistory = async (
+        input: InboxOutboundReplyCommandHistoryListInput
+      ) =>
+        outboundReplyCommandHistoryReader.list({ ...input, allowedConnectionIds: connectionIds });
       const createOutboundReplyCommand = async (input: InboxOutboundReplyCommandInput) =>
         outboundReplyCommandStore.create(
           Object.freeze({
@@ -38,6 +48,7 @@ export const createRuntimeInboxFeatures = (
         createOutboundReplyCommand,
         id: inbox.id,
         readInboundEvents,
+        readOutboundReplyCommandHistory,
         token: inbox.token
       });
     })

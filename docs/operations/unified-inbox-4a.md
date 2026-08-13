@@ -1,10 +1,11 @@
-# Phase 4a inbox scope and Phase 4c reply-command boundary
+# Phase 4a inbox scope and Phase 4c–4d reply-command boundary
 
 Phase 4a adds one deliberately small aggregate read API. A configured inbox
 can return canonical inbound events from an explicit set of existing
 connections through one bearer credential. Phase 4a itself did not add an
 outbound message path. Phase 4c now allows that same bearer to record a
-source-bound reply intent, but still adds no web dashboard send form, user
+source-bound reply intent and Phase 4d lets it read the same scope's queued
+intent history, but these additions still add no web dashboard send form, user
 account, organization, role model, conversation summary, search, provider
 token, or live-provider operation. The separate Phase 4b dashboard can consume
 only the read path and remains read-only; see the
@@ -157,7 +158,24 @@ idempotency, and data boundary.
 `queued` means the intent is durably recorded only. There is no worker,
 provider dispatch, retry, receipt, or delivery state in Phase 4c.
 
-## What remains outside Phase 4c
+## Phase 4d queued command-history addition
+
+The same configured inbox bearer can call
+`GET /v1/inbox/outbound-commands` to read `queued` Phase 4c commands across
+its fixed connection set. The only accepted query fields are a 1–100 `limit`
+(default 50) and the history route's own opaque `cursor`. The result includes
+the recorded text, command/source IDs, `queued`, creation time, and optional
+`nextCursor`; it never includes private reply target, source message/channel,
+client operation ID, raw provider data, credentials, or delivery-attempt data.
+
+This cursor is separate from an inbound-event cursor. It has `orderVersion: 1`
+and binds its command-ID snapshot to the exact inbox ID plus canonical
+connection set. A malformed, foreign, or changed-scope cursor returns `400`.
+The history has no state filter and deliberately lists only `queued` intents;
+it is not a delivery timeline. See the dedicated
+[Phase 4d command-history guide](outbound-command-history-4d.md).
+
+## What remains outside Phase 4d
 
 - No full user identity, organization, role-based access control, invitation
   flow, audit log, public connection administration, or token rotation
@@ -175,5 +193,6 @@ provider dispatch, retry, receipt, or delivery state in Phase 4c.
 
 The repository's disposable Compose smoke test exercises multiple synthetic
 connections in two separate configured inboxes, bearer isolation, cursor-scope
-rejection, and canonical-only output. It makes no provider network request and
-does not prove a live account, TLS endpoint, or production authorization model.
+rejection, canonical-only inbound output, and queued-command history scope/safe
+projection. It makes no provider network request and does not prove a live
+account, TLS endpoint, delivery, or production authorization model.

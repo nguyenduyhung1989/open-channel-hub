@@ -249,7 +249,7 @@ independent review, and GitHub CI/CodeQL evidence are complete for exact commit
 - A capability matrix, health state, and separate contract tests for each
   connector.
 
-## Phase 4 — configured read-only inbox foundation
+## Phase 4 — configured inbox foundation
 
 ### 4a — explicit multi-connection inbound feed
 
@@ -333,6 +333,36 @@ still required before this source can be called verified.**
       retry, attempt, delivery/read receipt, state transition, or dashboard
       send form is part of this phase. <code>queued</code> records intent only;
       it is not a sent or delivered claim.
+- [ ] Freeze this candidate, run its full local checks and synthetic Compose
+      proof, complete independent security review, then record fresh exact
+      GitHub CI/CodeQL evidence.
+
+### 4d — scoped queued reply-command history
+
+**Status: implementation candidate. Final local verification, synthetic Compose
+proof, independent security review, and fresh GitHub CI/CodeQL evidence are
+still required before this source can be called verified.**
+
+- [x] `GET /v1/inbox/outbound-commands` resolves a configured inbox bearer
+      before it validates query input or decodes a cursor. It accepts only an
+      optional 1–100 `limit` and an opaque `cursor`; an HTTP caller cannot
+      choose an inbox, connection, recipient, command state, or provider.
+- [x] A domain-owned PostgreSQL history reader returns only queued Phase 4c
+      commands inside the inbox's fixed connection allow-list, newest command
+      ID first. Its public projection contains command/source IDs, recorded
+      text, `queued`, and creation time; it omits target, source message/channel,
+      client operation ID, raw provider data, credentials, and future
+      attempt/delivery fields.
+- [x] An independent base64url cursor uses `orderVersion: 1`, binds the inbox
+      ID and SHA-256 canonical connection set, and freezes a command-ID
+      snapshot. Foreign, changed-scope, malformed, unversioned, and unsupported
+      cursors return generic <code>400</code> before storage access.
+- [x] No database migration or state transition is added. Migration
+      <code>0009_outbound_reply_commands</code> remains the ninth immutable
+      migration, and the history reader explicitly filters `queued` rows only.
+- [x] No dashboard history UI, worker, dispatch, provider HTTP call, token/OAuth
+      storage, retry, attempt, timeout policy, receipt, delivery/read state, or
+      command mutation is part of this phase.
 - [ ] Freeze this candidate, run its full local checks and synthetic Compose
       proof, complete independent security review, then record fresh exact
       GitHub CI/CodeQL evidence.

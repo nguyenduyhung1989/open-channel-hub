@@ -20,13 +20,13 @@ The supplied Compose stack creates three services:
 The database and schema are both named <code>open_channel_hub</code>. The
 application schema contains:
 
-| Object                           | Purpose                                                                                                                                                                                                                                                                                                  |
-| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| <code>schema_migrations</code>   | Immutable record of forward schema migrations applied by this binary.                                                                                                                                                                                                                                    |
-| <code>connection_registry</code> | Opaque connection ID, immutable connector metadata, registration timestamp, and a non-secret Zalo OA, Facebook Page, or WhatsApp Business provider-identity fingerprint when those channels are configured.                                                                                              |
-| <code>inbound_events</code>      | Canonical inbound text-event ledger. Its primary key is <code>(connection_id, provider_event_id)</code>.                                                                                                                                                                                                 |
-| <code>dashboard_sessions</code>  | Optional Phase 4b browser-session metadata: only HMACs of random session/anti-forgery values, principal ID, timestamps, and revocation state. It contains no raw token, password, credential, or inbox membership.                                                                                       |
-| <code>outbound_commands</code>   | Phase 4c immutable source-bound reply intents. It retains a private target derived from canonical inbound `conversation_id`, source message/channel, message text, client operation ID, `queued` state, and timestamps. It has no provider credential, raw payload, attempt, receipt, or delivery state. |
+| Object                           | Purpose                                                                                                                                                                                                                                                                                                                                                                                      |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| <code>schema_migrations</code>   | Immutable record of forward schema migrations applied by this binary.                                                                                                                                                                                                                                                                                                                        |
+| <code>connection_registry</code> | Opaque connection ID, immutable connector metadata, registration timestamp, and a non-secret Zalo OA, Facebook Page, or WhatsApp Business provider-identity fingerprint when those channels are configured.                                                                                                                                                                                  |
+| <code>inbound_events</code>      | Canonical inbound text-event ledger. Its primary key is <code>(connection_id, provider_event_id)</code>.                                                                                                                                                                                                                                                                                     |
+| <code>dashboard_sessions</code>  | Optional Phase 4b browser-session metadata: only HMACs of random session/anti-forgery values, principal ID, timestamps, and revocation state. It contains no raw token, password, credential, or inbox membership.                                                                                                                                                                           |
+| <code>outbound_commands</code>   | Phase 4c immutable source-bound reply intents. It retains a private target derived from canonical inbound `conversation_id`, source message/channel, message text, client operation ID, `queued` state, and timestamps. Phase 4d reads a safe scoped projection of queued rows without changing this table. It has no provider credential, raw payload, attempt, receipt, or delivery state. |
 
 The ledger stores a canonical event ID, channel/type/timestamps, conversation
 and sender/message identifiers, and message text. It intentionally does **not**
@@ -71,6 +71,13 @@ reply target is copied from the source event's canonical conversation inside
 the storage transaction; it is not a request field or public API field. The
 only current state, <code>queued</code>, proves a committed intent only, not
 provider acceptance, a send attempt, delivery, or read receipt.
+
+Phase 4d adds a parameterized, inbox-scoped reader over that same immutable
+table. It selects only queued rows in a fixed command-ID snapshot and projects
+command/source IDs, message text, state, and creation time. It deliberately
+does not select a reply target, source message/channel, client operation ID,
+raw payload, credential, or delivery-attempt data. No migration changes the
+schema: <code>0009_outbound_reply_commands</code> remains the ninth entry.
 
 ## Configure without exposing passwords
 
@@ -163,6 +170,9 @@ different payload under the same operation ID returns `409`; absent and
 out-of-scope sources share `404`; SQL proves that the stored reply target is
 the source conversation. The proof makes no provider request and treats
 `queued` as an unsent intent.
+Phase 4d's candidate extends the same smoke source with queued-history scope,
+safe-projection, continuation, and foreign/malformed-cursor assertions. It
+still makes no provider request and does not turn a queued row into a send.
 
 ## Container and network boundary
 

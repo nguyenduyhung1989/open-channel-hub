@@ -1,4 +1,4 @@
-# Public checkpoint: Phase 4a–4b verified; Phase 4c candidate
+# Public checkpoint: Phase 4a–4b verified; Phase 4c–4d candidates
 
 **Verified scope:** Phase 4a is a configured, read-only aggregate feed across
 an explicit set of existing official connections. It builds on the Telegram
@@ -12,11 +12,12 @@ conversation/thread model, search service, attachment store, outbound queue,
 provider credential manager, real provider test, or production deployment.
 
 **Current candidate scope:** Phase 4c adds a durable, source-bound reply-command
-ledger behind an existing configured inbox bearer. It records only immutable
-`queued` intent. It does not dispatch a provider message, retry, track an
-attempt/receipt, or add a dashboard reply form. Its final local verification,
-synthetic Compose proof, independent security review, and fresh GitHub
-CI/CodeQL evidence are pending for the frozen candidate.
+ledger behind an existing configured inbox bearer. Phase 4d adds a scoped,
+read-only history over those same immutable `queued` intents. Neither candidate
+dispatches a provider message, retries, tracks an attempt/receipt, or adds a
+dashboard reply or history surface. Final local verification, synthetic Compose
+proof, independent security review, and fresh GitHub CI/CodeQL evidence remain
+pending for the frozen Phase 4c–4d candidate.
 
 ## Exact verified history
 
@@ -39,7 +40,7 @@ CI/CodeQL evidence are pending for the frozen candidate.
   security review, a synthetic Compose proof, and fresh GitHub CI/CodeQL for
   exact commit <code>7672be9</code>.
 - Historical evidence proves only those exact revisions. It does not verify any
-  live provider account or the current Phase 4c candidate.
+  live provider account or the current Phase 4c–4d candidate.
 
 ## Verified Phase 4a source
 
@@ -130,7 +131,7 @@ medium-severity issue, and GitHub CI plus CodeQL both succeeded for that exact
 commit. An external TLS proxy, edge rate limit, cookie/header log policy, and
 real public origin remain separate operational proof.
 
-## Current Phase 4c candidate
+## Current Phase 4c–4d candidates
 
 The candidate adds one narrow write capability to a configured inbox bearer:
 
@@ -157,9 +158,28 @@ The candidate adds one narrow write capability to a configured inbox bearer:
   send UI. `queued` proves a database commit only. The legacy Phase 1a Telegram
   direct-send route remains separate compatibility behavior and is not proof
   that all sends are durable.
+- Phase 4d adds `GET /v1/inbox/outbound-commands`. It resolves the existing
+  inbox bearer before application query/cursor validation, accepts only an
+  optional `limit` from 1 through 100 and an opaque cursor, and reads only
+  `queued` rows from that fixed server-side connection scope.
+- Its separate base64url cursor has `orderVersion: 1`, binds the exact inbox ID,
+  a SHA-256 canonical connection-set hash, and a fixed reverse command-ID
+  snapshot. Malformed, foreign-inbox, and changed-scope cursors share generic
+  `400`; a caller cannot use an inbound-event cursor or select a different
+  scope.
+- History returns only `id`, `sourceConnectionId`, `sourceProviderEventId`,
+  recorded `text`, `queued` state, creation time, and optional `nextCursor`.
+  Recorded text is sensitive. The projection omits the private reply target,
+  source message/channel, client operation ID, raw provider data, credentials,
+  attempt data, and delivery/read state. It adds no migration: `0009` remains
+  the ninth immutable migration.
+- There is no dashboard history page, state mutation, provider HTTP call,
+  dispatch worker, retry, attempt, timeout, receipt, delivery/read tracking,
+  provider token/OAuth storage, or browser send UI. The route is a read-only
+  view of durable intent, not a delivery engine.
 
-The candidate must not be described as locally verified until its exact frozen
-revision completes the relevant checks and independent review.
+The candidates must not be described as locally verified until their exact
+frozen revision completes the relevant checks and independent review.
 
 ## Explicitly not proven or not implemented
 
@@ -178,16 +198,17 @@ revision completes the relevant checks and independent review.
 - No dispatch queue/worker, retry, attempt/timeout policy, delivery/read status,
   template, media, OAuth, provider access-token storage, Graph API request,
   Facebook User, Zalo User, or WhatsApp User surface exists. Phase 4c has only
-  an immutable intent ledger, not a delivery engine.
+  an immutable intent ledger and Phase 4d has only its scoped history, not a
+  delivery engine.
 - A `200` from the local synthetic feed or a green test/GitHub check does not
   prove a TLS endpoint, provider eligibility, live message operation, or a
   production-ready access model.
 
 ## Next authorized work
 
-Freeze and verify Phase 4c before claiming it: run the candidate's full local
-checks, synthetic Compose proof, independent security review, and fresh GitHub
-CI/CodeQL. Keep all live provider use separate: require explicit owner
+Freeze and verify Phase 4c–4d before claiming either candidate: run the frozen
+candidate's full local checks, synthetic Compose proof, independent security
+review, and fresh GitHub CI/CodeQL. Keep all live provider use separate: require explicit owner
 authorization before connecting a real account or exposing public TLS. Any later
 full user/organization authorization, conversation model, dispatch engine, or
 dashboard deployment must start with its own bounded design, migration/security

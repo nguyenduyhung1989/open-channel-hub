@@ -7,6 +7,7 @@ import type {
   InboundEventFeedReader,
   InboundEventReader,
   InboundEventStore,
+  OutboundReplyCommandHistoryReader,
   OutboundReplyCommandStore
 } from '@open-channel-hub/domain';
 
@@ -18,6 +19,7 @@ import { PostgresInboundEventStore } from './postgres-inbound-event-store.js';
 import { PostgresInboundEventReader } from './postgres-inbound-event-reader.js';
 import { assertPostgresSchemaCurrent, migratePostgresSchema } from './postgres-migrations.js';
 import { PostgresOutboundReplyCommandStore } from './postgres-outbound-reply-command-store.js';
+import { PostgresOutboundReplyCommandHistoryReader } from './postgres-outbound-reply-command-history-reader.js';
 import type { SqlClient, SqlPool, SqlQueryResult } from './sql.js';
 
 export interface PostgresDatabaseOptions {
@@ -34,6 +36,7 @@ export interface PostgresDatabase {
   readonly inboundEventFeedReader: InboundEventFeedReader;
   readonly inboundEventReader: InboundEventReader;
   readonly inboundEventStore: InboundEventStore;
+  readonly outboundReplyCommandHistoryReader: OutboundReplyCommandHistoryReader;
   readonly outboundReplyCommandStore: OutboundReplyCommandStore;
   checkReadiness(): Promise<void>;
   close(): Promise<void>;
@@ -73,6 +76,7 @@ export const createPostgresDatabase = async (
   const inboundEventReader = new PostgresInboundEventReader(sqlPool);
   const inboundEventStore = new PostgresInboundEventStore(sqlPool);
   const outboundReplyCommandStore = new PostgresOutboundReplyCommandStore(sqlPool);
+  const outboundReplyCommandHistoryReader = new PostgresOutboundReplyCommandHistoryReader(sqlPool);
 
   return Object.freeze({
     connectionRegistry,
@@ -80,6 +84,7 @@ export const createPostgresDatabase = async (
     inboundEventFeedReader,
     inboundEventReader,
     inboundEventStore,
+    outboundReplyCommandHistoryReader,
     outboundReplyCommandStore,
     checkReadiness: async (): Promise<void> => {
       try {

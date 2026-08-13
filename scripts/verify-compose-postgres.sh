@@ -33,6 +33,8 @@ readonly sales_inbox_api_token='synthetic_inbox_sales_token_01234567890123456789
 readonly support_outbound_client_operation_id='synthetic-reply-support-0001'
 readonly support_outbound_text='Synthetic durable reply intent'
 readonly support_outbound_conflicting_text='Synthetic conflicting reply intent'
+readonly support_outbound_history_client_operation_id='synthetic-reply-history-support-0001'
+readonly support_outbound_history_text='Synthetic queued history reply'
 readonly whatsapp_webhook_payload='{"object":"whatsapp_business_account","entry":[{"id":"900000000000000501","changes":[{"field":"messages","value":{"messaging_product":"whatsapp","metadata":{"phone_number_id":"900000000000000601"},"messages":[{"from":"900000000000000701","id":"wamid.synthetic.901","timestamp":"1786492800","type":"text","text":{"body":"Synthetic WhatsApp Business inbound message"}}]}}]},{"id":"900000000000000501","changes":[{"field":"messages","value":{"messaging_product":"whatsapp","metadata":{"phone_number_id":"900000000000000602"},"messages":[{"from":"900000000000000702","id":"wamid.synthetic.901","timestamp":"1786492800","type":"text","text":{"body":"Synthetic WhatsApp Business inbound message"}}]}}]}]}'
 # This loopback-only HTTP smoke intentionally omits the optional browser dashboard.
 # Secure cookies plus the exact external HTTPS origin are exercised by route tests, not by this Compose run.
@@ -282,6 +284,36 @@ post_inbox_outbound_command() {
     "http://127.0.0.1:${api_host_port}/v1/inbox/outbound-commands"
 }
 
+read_inbox_outbound_command_history() {
+  local inbox_api_token=$1
+  local query=${2:-}
+  local url="http://127.0.0.1:${api_host_port}/v1/inbox/outbound-commands"
+
+  if [[ -n "$query" ]]; then
+    url+="?${query}"
+  fi
+
+  curl --fail --silent --show-error --connect-timeout 3 --max-time 10 \
+    --header "authorization: Bearer ${inbox_api_token}" \
+    "$url"
+}
+
+read_inbox_outbound_command_history_status() {
+  local inbox_api_token=$1
+  local query=${2:-}
+  local url="http://127.0.0.1:${api_host_port}/v1/inbox/outbound-commands"
+
+  if [[ -n "$query" ]]; then
+    url+="?${query}"
+  fi
+
+  curl --silent --show-error --connect-timeout 3 --max-time 10 \
+    --header "authorization: Bearer ${inbox_api_token}" \
+    --output /dev/null \
+    --write-out '%{http_code}' \
+    "$url"
+}
+
 outbound_command_request_body() {
   local client_operation_id=$1
   local source_connection_id=$2
@@ -378,10 +410,67 @@ assert_safe_outbound_command_response() {
     "$response" == *'replyTargetId'* ||
     "$response" == *'sourceMessageId'* ||
     "$response" == *'sourceChannel'* ||
+    "$response" == *'clientOperationId'* ||
+    "$response" == *'rawProviderPayload'* ||
+    "$response" == *'"raw"'* ||
+    "$response" == *'"credentials"'* ||
+    "$response" == *'"credential"'* ||
     "$response" == *"${forbidden_text}"* ||
     "$response" == *'-1001234567890'* ||
     "$response" == *'"telegram_bot"'* ]]; then
     printf 'The outbound-command API did not keep its public response safe and source-bound.\n' >&2
+    return 1
+  fi
+}
+
+assert_safe_outbound_command_history_response() {
+  local response=$1
+  local expected_connection_id=$2
+  local expected_provider_event_id=$3
+  local expected_text=$4
+  local forbidden_text=${5:-}
+
+  if [[ "$response" != *'"success":true'* ||
+    "$response" != *'"commands":[{'* ||
+    "$response" != *'"id":"'* ||
+    "$response" != *"\"sourceConnectionId\":\"${expected_connection_id}\""* ||
+    "$response" != *"\"sourceProviderEventId\":\"${expected_provider_event_id}\""* ||
+    "$response" != *"\"text\":\"${expected_text}\""* ||
+    "$response" != *'"state":"queued"'* ||
+    "$response" != *'"createdAt":"'* ||
+    "$response" == *'replyTargetId'* ||
+    "$response" == *'sourceMessageId'* ||
+    "$response" == *'sourceChannel'* ||
+    "$response" == *'clientOperationId'* ||
+    "$response" == *'rawProviderPayload'* ||
+    "$response" == *'"raw"'* ||
+    "$response" == *'"credentials"'* ||
+    "$response" == *'"credential"'* ||
+    "$response" == *'recipientId'* ||
+    "$response" == *'-1001234567890'* ||
+    "$response" == *'"telegram_bot"'* ||
+    (-n "$forbidden_text" && "$response" == *"${forbidden_text}"*) ]]; then
+    printf 'The outbound-command history API did not return the permitted scoped projection.\n' >&2
+    return 1
+  fi
+}
+
+assert_empty_outbound_command_history_response() {
+  local response=$1
+  local forbidden_connection_id=$2
+  local forbidden_text=$3
+
+  if [[ "$response" != *'"success":true'* ||
+    "$response" != *'"commands":[]'* ||
+    "$response" == *"\"sourceConnectionId\":\"${forbidden_connection_id}\""* ||
+    "$response" == *"${forbidden_text}"* ||
+    "$response" == *'replyTargetId'* ||
+    "$response" == *'clientOperationId'* ||
+    "$response" == *'rawProviderPayload'* ||
+    "$response" == *'"raw"'* ||
+    "$response" == *'"credentials"'* ||
+    "$response" == *'"credential"'* ]]; then
+    printf 'The outbound-command history API did not keep the empty inbox scope safe.\n' >&2
     return 1
   fi
 }
@@ -751,10 +840,45 @@ assert_equal \
   "$missing_source_outbound_body" \
   'out-of-scope and missing reply-command source responses'
 
-support_outbound_command_count="$(
-  query_postgres "SELECT COUNT(*) FROM open_channel_hub.outbound_commands WHERE connection_id = 'telegram-bot-support' AND client_operation_id = '${support_outbound_client_operation_id}';"
+support_outbound_history_request_body="$(
+  outbound_command_request_body \
+    "$support_outbound_history_client_operation_id" \
+    'telegram-bot-support' \
+    '9001' \
+    "$support_outbound_history_text"
 )"
-assert_equal '1' "$support_outbound_command_count" 'one stored source-bound reply command after replay and conflict'
+support_outbound_history_created_response="$(
+  post_inbox_outbound_command \
+    "$support_inbox_api_token" \
+    "$support_outbound_history_request_body"
+)"
+support_outbound_history_created_status="$(
+  http_response_status "$support_outbound_history_created_response"
+)"
+support_outbound_history_created_body="$(
+  http_response_body "$support_outbound_history_created_response"
+)"
+assert_equal \
+  '201' \
+  "$support_outbound_history_created_status" \
+  'second source-bound reply-command status for history pagination'
+assert_safe_outbound_command_response \
+  "$support_outbound_history_created_body" \
+  'telegram-bot-support' \
+  '9001' \
+  "$support_outbound_history_text"
+assert_response_contains_no_secret \
+  "$support_outbound_history_created_body" \
+  "$support_inbox_api_token" \
+  "$support_operator_api_token" \
+  "$support_webhook_secret" \
+  "$DATABASE_PASSWORD" \
+  "$POSTGRES_PASSWORD"
+
+support_outbound_command_count="$(
+  query_postgres "SELECT COUNT(*) FROM open_channel_hub.outbound_commands WHERE connection_id = 'telegram-bot-support' AND client_operation_id IN ('${support_outbound_client_operation_id}', '${support_outbound_history_client_operation_id}');"
+)"
+assert_equal '2' "$support_outbound_command_count" 'two stored source-bound reply commands for history pagination'
 
 support_outbound_source_derivation="$(
   query_postgres "SELECT connection_id || ':' || source_provider_event_id || ':' || reply_target_id || ':' || source_message_id || ':' || source_channel || ':' || state FROM open_channel_hub.outbound_commands WHERE connection_id = 'telegram-bot-support' AND client_operation_id = '${support_outbound_client_operation_id}';"
@@ -768,6 +892,83 @@ outbound_command_schema_guards="$(
   query_postgres "SELECT CASE WHEN (SELECT COUNT(*) FROM pg_constraint WHERE conrelid = 'open_channel_hub.outbound_commands'::regclass AND conname IN ('outbound_commands_source_event_fk', 'outbound_commands_connection_client_operation_unique')) = 2 AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'open_channel_hub.outbound_commands'::regclass AND tgname = 'outbound_commands_immutable' AND NOT tgisinternal) THEN 'present' ELSE 'missing' END;"
 )"
 assert_equal 'present' "$outbound_command_schema_guards" 'source foreign key, idempotency constraint, and immutable trigger'
+
+support_outbound_history_queued_rows="$(
+  query_postgres "SELECT CASE WHEN COUNT(*) = 2 AND COUNT(*) FILTER (WHERE state = 'queued') = 2 THEN 'present' ELSE 'missing' END FROM open_channel_hub.outbound_commands WHERE connection_id = 'telegram-bot-support' AND client_operation_id IN ('${support_outbound_client_operation_id}', '${support_outbound_history_client_operation_id}');"
+)"
+assert_equal \
+  'present' \
+  "$support_outbound_history_queued_rows" \
+  'queued outbound-command rows are present in PostgreSQL'
+
+support_outbound_history_first_page_response="$(
+  read_inbox_outbound_command_history "$support_inbox_api_token" 'limit=1'
+)"
+assert_safe_outbound_command_history_response \
+  "$support_outbound_history_first_page_response" \
+  'telegram-bot-support' \
+  '9001' \
+  "$support_outbound_history_text" \
+  "$support_outbound_text"
+support_outbound_history_cursor="$(
+  extract_next_cursor "$support_outbound_history_first_page_response"
+)"
+assert_response_contains_no_secret \
+  "$support_outbound_history_first_page_response" \
+  "$support_inbox_api_token" \
+  "$sales_inbox_api_token" \
+  "$support_operator_api_token" \
+  "$support_webhook_secret" \
+  "$DATABASE_PASSWORD" \
+  "$POSTGRES_PASSWORD"
+
+support_outbound_history_second_page_response="$(
+  read_inbox_outbound_command_history \
+    "$support_inbox_api_token" \
+    "cursor=${support_outbound_history_cursor}"
+)"
+assert_safe_outbound_command_history_response \
+  "$support_outbound_history_second_page_response" \
+  'telegram-bot-support' \
+  '9001' \
+  "$support_outbound_text" \
+  "$support_outbound_history_text"
+assert_response_contains_no_secret \
+  "$support_outbound_history_second_page_response" \
+  "$support_inbox_api_token" \
+  "$sales_inbox_api_token" \
+  "$support_operator_api_token" \
+  "$support_webhook_secret" \
+  "$DATABASE_PASSWORD" \
+  "$POSTGRES_PASSWORD"
+
+sales_outbound_history_response="$(
+  read_inbox_outbound_command_history "$sales_inbox_api_token" 'limit=100'
+)"
+assert_empty_outbound_command_history_response \
+  "$sales_outbound_history_response" \
+  'telegram-bot-support' \
+  "$support_outbound_history_text"
+assert_response_contains_no_secret \
+  "$sales_outbound_history_response" \
+  "$support_inbox_api_token" \
+  "$sales_inbox_api_token" \
+  "$support_operator_api_token" \
+  "$support_webhook_secret" \
+  "$DATABASE_PASSWORD" \
+  "$POSTGRES_PASSWORD"
+assert_equal \
+  '400' \
+  "$(read_inbox_outbound_command_history_status "$sales_inbox_api_token" "cursor=${support_outbound_history_cursor}")" \
+  'cross-inbox outbound-command history cursor rejection'
+assert_equal \
+  '401' \
+  "$(read_inbox_outbound_command_history_status "$support_operator_api_token" 'cursor=not-a-history-cursor')" \
+  'account bearer rejection before outbound-command history cursor validation'
+assert_equal \
+  '400' \
+  "$(read_inbox_outbound_command_history_status "$support_inbox_api_token" 'cursor=not-a-history-cursor')" \
+  'malformed outbound-command history cursor rejection'
 
 assert_equal \
   '401' \

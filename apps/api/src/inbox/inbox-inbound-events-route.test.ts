@@ -1,7 +1,11 @@
 import { createHash } from 'node:crypto';
 
 import type { CanonicalEvent } from '@open-channel-hub/contracts';
-import type { CreateOutboundReplyCommandResult, InboundEventPage } from '@open-channel-hub/domain';
+import type {
+  CreateOutboundReplyCommandResult,
+  InboundEventPage,
+  OutboundReplyCommandHistoryPage
+} from '@open-channel-hub/domain';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { buildApp } from '../app.js';
@@ -227,6 +231,9 @@ const createFeature = (
     ),
     id: 'support',
     readInboundEvents,
+    readOutboundReplyCommandHistory: vi.fn(async (): Promise<OutboundReplyCommandHistoryPage> => ({
+      commands: []
+    })),
     token: SUPPORT_TOKEN,
     ...overrides
   });

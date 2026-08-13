@@ -143,16 +143,18 @@ credential. Connection IDs are canonicalized in ascending order before the
 inbox is used.
 
 An inbox token grants canonical inbound-event reads for its explicit connection
-set through `GET /v1/inbox/inbound-events`, and Phase 4c permits it to record a
-source-bound reply intent through `POST /v1/inbox/outbound-commands`. It is
+set through `GET /v1/inbox/inbound-events`; Phase 4c permits it to record a
+source-bound reply intent through `POST /v1/inbox/outbound-commands`; and Phase
+4d permits it to read those queued intents through the same `GET` path. It is
 distinct from the one-account operator bearer on each connection; neither token
-works for the other's route. The command route accepts no arbitrary recipient
-and makes no provider call: `queued` means only a durable intent. Phase 4a did
-not create a browser UI; Phase 4b adds the separate server-rendered dashboard
-described below, which remains read-only. None creates a full user,
-organization, role, conversation summary, dispatch action, or provider
-credential. See the [Phase 4a inbox-scope guide](unified-inbox-4a.md) and
-[Phase 4c reply-command guide](outbound-reply-commands-4c.md) for the API
+works for the other's route. The write route accepts no arbitrary recipient and
+the history route accepts no caller-selected scope/state: `queued` means only a
+durable intent. Phase 4a did not create a browser UI; Phase 4b adds the separate
+server-rendered dashboard described below, which remains read-only. None
+creates a full user, organization, role, conversation summary, dispatch action,
+or provider credential. See the [Phase 4a inbox-scope guide](unified-inbox-4a.md),
+[Phase 4c reply-command guide](outbound-reply-commands-4c.md), and
+[Phase 4d command-history guide](outbound-command-history-4d.md) for the API
 boundaries.
 
 The root document may additionally include `dashboard`, but only when
@@ -352,6 +354,14 @@ inbox bearer selects its allowed source connections. See the
 [Phase 4c reply-command guide](outbound-reply-commands-4c.md) before using the
 write endpoint.
 
+Phase 4d adds no runtime-secret setting or migration. It reads the same
+`0009_outbound_reply_commands` rows through an inbox-scoped `GET` route that
+projects recorded text with safe command metadata and filters `queued` state
+only. Its independent history cursor binds a command-ID snapshot to the inbox
+ID and canonical connection set; it must not be used as an inbound-event
+cursor. See the [Phase 4d command-history guide](outbound-command-history-4d.md)
+before exposing recorded message text to an operator.
+
 Migration <code>0004_inbound_events_connection_registry_fk</code> is a
 PostgreSQL foreign key marked <code>NOT VALID</code>. New event writes must
 reference a registered connection. Existing Phase 2a event rows can remain
@@ -393,11 +403,12 @@ registry rows and Zalo/Facebook/WhatsApp fingerprint presence without printing
 them, checks Telegram dynamic webhook behavior, proves Zalo raw-byte hashing
 and shared Meta raw-byte HMAC boundaries, checks duplicate idempotency within
 every connection, verifies account and inbox bearer scopes, and rejects both
-cross-account and cross-inbox cursors. It also records one synthetic
-source-bound reply command, proves exact idempotency/conflict/scope behavior,
-and verifies its source-derived private target in PostgreSQL. It deliberately
-omits `dashboard` and does not attempt browser login over HTTP. It makes no
-provider network request and uses no real credential or message.
+cross-account and cross-inbox cursors. It also records synthetic source-bound
+reply commands, proves exact idempotency/conflict/scope behavior, verifies a
+source-derived private target in PostgreSQL, and exercises queued history's safe
+projection/scope/cursor continuation and rejection. It deliberately omits
+`dashboard` and does not attempt browser login over HTTP. It makes no provider
+network request and uses no real credential or message.
 
 Before a real account is used, still complete TLS/proxy, rate limiting,
 monitoring, backup/restore, retention/deletion, secret rotation, access/audit,

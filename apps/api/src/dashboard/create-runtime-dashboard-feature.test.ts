@@ -1,7 +1,8 @@
 import type {
   CreateOutboundReplyCommandResult,
   DashboardSessionStore,
-  InboundEventPage
+  InboundEventPage,
+  OutboundReplyCommandHistoryPage
 } from '@open-channel-hub/domain';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -105,6 +106,9 @@ const inbox = (
       Object.freeze({ kind: 'source_unavailable' }),
     id,
     readInboundEvents,
+    readOutboundReplyCommandHistory: async (): Promise<OutboundReplyCommandHistoryPage> => ({
+      commands: []
+    }),
     token
   });
 

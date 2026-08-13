@@ -27,9 +27,12 @@
 - [Phase 4c durable reply commands](operations/outbound-reply-commands-4c.md):
   source-bound immutable reply-intent ledger, idempotency, and the explicit
   no-dispatch boundary.
-- [Phase 0–4c threat model](security/threat-model.md): assets, trust
+- [Phase 4d queued reply-command history](operations/outbound-command-history-4d.md):
+  inbox-scoped queued-intent history, private-field projection, and independent
+  cursor boundary.
+- [Phase 0–4d threat model](security/threat-model.md): assets, trust
   boundaries, current controls, and planned work.
 - [Open-source readiness](maintainers/oss-readiness.md): an honest operating
   checklist for maintainers.
-- [Phase 4a–4c checkpoint](maintainers/current-phase.md):
+- [Phase 4a–4d checkpoint](maintainers/current-phase.md):
   verified milestones, active code state, risks, and exact next verification.

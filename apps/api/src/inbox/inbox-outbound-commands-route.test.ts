@@ -1,7 +1,8 @@
 import type {
   CreateOutboundReplyCommandResult,
   InboundEventPage,
-  OutboundReplyCommand
+  OutboundReplyCommand,
+  OutboundReplyCommandHistoryPage
 } from '@open-channel-hub/domain';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -272,6 +273,9 @@ const createFeature = (
     createOutboundReplyCommand,
     id: 'support',
     readInboundEvents: vi.fn(async (): Promise<InboundEventPage> => ({ events: [] })),
+    readOutboundReplyCommandHistory: vi.fn(async (): Promise<OutboundReplyCommandHistoryPage> => ({
+      commands: []
+    })),
     token: SUPPORT_TOKEN,
     ...overrides
   });
