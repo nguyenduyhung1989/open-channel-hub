@@ -1,0 +1,109 @@
+# Phase 4e dashboard queued-command history (candidate)
+
+Phase 4e is a candidate for a small server-rendered dashboard page that lets a
+configured, authenticated dashboard principal inspect `queued` reply intents
+for one of that principal's configured inboxes. It does **not** create, send,
+retry, cancel, update, deliver, or mark any message read.
+
+`queued` means PostgreSQL has recorded immutable operator intent. It is not a
+provider acceptance, send attempt, delivery, or read status. This candidate has
+not yet completed final local verification, independent review, or fresh
+GitHub CI/CodeQL evidence; it is not a public-TLS or production claim.
+
+## Prerequisites
+
+- The optional Phase 4b `dashboard` configuration and its configured
+  principals must already be valid. The dashboard needs the exact external
+  HTTPS origin described in the
+  [operator dashboard guide](operator-dashboard-4b.md).
+- The selected dashboard principal must already have at least one configured
+  inbox in its server-side `inboxIds` allow-list.
+- PostgreSQL must have the existing ninth migration,
+  `0009_outbound_reply_commands`, and Phase 4d queued history must be
+  available. No Phase 4e migration or configuration field is added.
+- A Phase 4c reply intent must already exist before the page has an item to
+  display.
+
+Do not configure an inbox bearer in a browser, a URL, a page source, or a
+browser-side request. The dashboard has its own signed session and obtains the
+read capability only inside the server process.
+
+## Open the page
+
+After logging in through `/operator/login`, open:
+
+```text
+https://your-dashboard.example/operator/outbound-commands
+```
+
+The first inbox assigned to the authenticated principal is selected when no
+query is supplied. A principal with more than one allowed inbox can select one
+of its own inboxes using an opaque safe ID:
+
+```text
+https://your-dashboard.example/operator/outbound-commands?inbox=support-inbox
+```
+
+The route accepts only these optional query values:
+
+| Query value | Meaning                                                                                                                                       |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `inbox`     | One safe configured inbox ID already assigned to the authenticated principal. It cannot add a connection or select another principal's inbox. |
+| `cursor`    | A previously rendered opaque Phase 4d history continuation. It is bound to the exact selected inbox and canonical connection set.             |
+
+There is no `limit`, recipient, connection selector, state selector, provider
+filter, command ID, source event ID, send setting, retry setting, or write
+form. The server always reads 50 rows per page.
+
+The dashboard authenticates and touches the browser session before it parses
+these values or contacts the history reader. A missing or invalid session
+redirects to `/operator/login`. A malformed query or cursor receives a generic
+safe `400` page. An inbox outside the principal's configured allow-list
+receives a generic safe `404` page and is not read. Do not try to edit or repair
+a cursor; return to the first page instead.
+
+## What the page displays
+
+The page orders queued commands newest first and renders only:
+
+- the recorded creation time;
+- the static label **Recorded — not sent**;
+- the exact recorded reply text; and
+- the source connection ID.
+
+The reply text is sensitive operational data and untrusted content. The server
+escapes it before rendering, sets `Cache-Control: no-store`, and does not put
+an inbox bearer or credential in the page. Do not copy real text into issue
+threads, screenshots, public logs, or browser-based support tooling without a
+separate data-handling decision.
+
+The page deliberately omits the command ID, provider event ID, private reply
+target, source message ID, source channel, client operation ID, raw provider
+payload, credential, attempt data, receipt, and delivery/read state.
+
+## Stable continuation
+
+When more rows exist, the page links to a continuation using the existing Phase
+4d history cursor. It has `orderVersion: 1`, binds the exact inbox ID and a
+SHA-256 representation of its canonical connection set, and fixes a reverse
+command-ID snapshot. Later queued commands cannot shift or duplicate an
+already-started traversal.
+
+That cursor is neither a credential nor an inbound-event cursor. It binds the
+inbox ID and canonical connection set, not a principal. A principal that is not
+assigned that inbox is rejected before the history reader runs; a different
+inbox, changed scope, malformed value, or inbound-event cursor cannot read
+command history.
+
+## Explicit boundary
+
+This page has no browser JavaScript or API bearer, no command creation form,
+and no provider network operation. The normal dashboard logout form remains a
+session-management control; it is not an outbound action.
+
+Phase 4e does not change `outbound_commands`, the immutable-row trigger, the
+Phase 4d reader, or the provider boundary. The only ordinary write while
+viewing is the dashboard session's existing idle-timeout touch. A later
+dispatcher needs a separate provider-specific design for capabilities,
+authorization, durable attempts, timeout uncertainty, retries, receipts, and
+delivery state.

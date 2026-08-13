@@ -148,6 +148,15 @@ follows [Semantic Versioning](https://semver.org/).
   text, `queued`, and creation time only. It exposes no reply target, source
   message/channel, client operation ID, raw provider data, credential, or
   future attempt/delivery field, and adds no database migration or dispatch.
+- Phase 4e candidate: `GET /operator/outbound-commands`, a server-rendered
+  queued-command history page for an already authenticated dashboard principal.
+  It selects only that principal's configured inbox, uses the existing
+  scope-bound Phase 4d cursor, and fixes the page size at 50.
+- Phase 4e candidate: an intentionally smaller browser projection of queued
+  history. It escapes and renders only creation time, recorded text, source
+  connection ID, and a recorded-not-sent label; it exposes no browser bearer,
+  command/provider-event ID, private target/source metadata, client operation
+  ID, credential, or delivery data.
 
 ### Changed
 
@@ -198,6 +207,9 @@ follows [Semantic Versioning](https://semver.org/).
   scope, safe projection, cursor continuation, and cursor rejection. It does
   not attempt a browser login whose `Secure` cookies and exact origin require
   TLS.
+- Phase 4e remains explicitly a candidate. It has no final local verification,
+  independent review, fresh GitHub CI/CodeQL evidence, public-TLS proof, or
+  production deployment claim.
 
 ### Security
 
@@ -255,6 +267,10 @@ follows [Semantic Versioning](https://semver.org/).
   recorded text only with safe command metadata. Its separate cursor binds the
   inbox/scope/snapshot; private target/source fields, client operation IDs,
   credentials, dispatch behavior, and delivery semantics remain absent.
+- The Phase 4e dashboard-history candidate authenticates and touches the
+  signed browser session before query/cursor processing, then resolves only a
+  configured principal's inbox. It makes no provider request and adds no
+  dashboard write, command mutation, or browser bearer capability.
 - The <code>main</code> branch now blocks force pushes and deletion, including
   for administrators. Required checks and pull-request reviews remain
   intentionally unset for the owner-controlled direct-push workflow.

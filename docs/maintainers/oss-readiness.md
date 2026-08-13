@@ -63,6 +63,23 @@ organization has accepted the project.
   verification, synthetic Compose proof, independent security review, GitHub
   CI, and CodeQL.
 
+## Current candidate, not verified
+
+- Phase 4e is a server-rendered dashboard-history candidate. An authenticated
+  configured dashboard principal can inspect only `queued` command history for
+  an already assigned inbox through `GET /operator/outbound-commands`. The
+  page uses the existing scope-bound Phase 4d cursor, has a fixed 50-row page,
+  and keeps an inbox bearer out of the browser.
+- The candidate renders escaped recorded text, creation time, source connection
+  ID, and a recorded-not-sent label only. It omits command/provider-event IDs,
+  private target/source metadata, client operation IDs, credentials, and
+  delivery data. It adds no migration, command write, browser API bearer,
+  provider request, worker, send, retry, cancel, or delivery state.
+- This candidate has not completed final local verification, independent
+  security review, fresh GitHub CI/CodeQL, public-TLS proof, or production
+  deployment. Do not list it as a verified feature or use it as evidence of
+  provider dispatch.
+
 ## Verified GitHub evidence
 
 - GitHub CI and CodeQL succeeded at commit <code>8b80c3b</code>. This evidence
@@ -113,13 +130,16 @@ organization has accepted the project.
   and operational observability before operating real customer data. Phase 4c
   additionally stores outgoing reply text and private source-derived target
   metadata; Phase 4d returns that recorded text to the authorized scoped inbox
-  bearer. Protect both paths to the same standard and keep messages out of
-  examples, logs, screenshots, and public discussion.
+  bearer. The Phase 4e candidate renders a smaller escaped projection through
+  an authenticated dashboard session. Protect every path to that text to the
+  same standard and keep messages out of examples, logs, screenshots, and
+  public discussion.
 - Do not mistake Phase 4c `queued` intents or Phase 4d history rows for sends.
   A future provider dispatcher needs a separate official-provider policy,
   attempt/timeout/receipt model, migration, review, and verification. The legacy
   Phase 1a Telegram direct-send route is separate compatibility behavior, not
-  evidence that all sends are durable.
+  evidence that all sends are durable. The Phase 4e candidate only renders
+  intent history and does not change that boundary.
 - Keep examples, fixtures, screenshots, logs, and public discussions free of
   user data and secrets.
 - Respond to issues and pull requests, record material decisions, and create

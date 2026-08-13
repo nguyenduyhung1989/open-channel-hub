@@ -1,7 +1,9 @@
 import type {
   DashboardSessionStore,
   InboundEventPage,
-  InboundEventPageCursor
+  InboundEventPageCursor,
+  OutboundReplyCommandHistoryPage,
+  OutboundReplyCommandHistoryPageCursor
 } from '@open-channel-hub/domain';
 
 /** A server-side-only principal selected after password authentication. */
@@ -19,11 +21,20 @@ export interface DashboardInbox {
   readonly connectionIds: readonly string[];
   readonly id: string;
   readonly readInboundEvents: (input: DashboardInboxReadInput) => Promise<InboundEventPage>;
+  readonly readOutboundReplyCommandHistory: (
+    input: DashboardOutboundCommandHistoryReadInput
+  ) => Promise<OutboundReplyCommandHistoryPage>;
 }
 
 /** A dashboard page request whose effective connection scope is immutable. */
 export interface DashboardInboxReadInput {
   readonly cursor?: InboundEventPageCursor;
+  readonly pageSize: number;
+}
+
+/** A dashboard-local history request with no caller-selectable connection scope. */
+export interface DashboardOutboundCommandHistoryReadInput {
+  readonly cursor?: OutboundReplyCommandHistoryPageCursor;
   readonly pageSize: number;
 }
 

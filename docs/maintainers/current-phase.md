@@ -1,4 +1,4 @@
-# Public checkpoint: Phase 4a–4d verified source
+# Public checkpoint: Phase 4a–4d verified; Phase 4e candidate
 
 **Verified scope:** Phase 4a is a configured, read-only aggregate feed across
 an explicit set of existing official connections. It builds on the Telegram
@@ -18,6 +18,13 @@ a provider message, retries, tracks an attempt/receipt, or adds a dashboard
 reply or history surface. Exact commit <code>160414e</code> passed final local
 verification, a synthetic Compose proof, independent security review, and
 GitHub CI/CodeQL.
+
+**Current candidate scope:** Phase 4e adds one server-rendered dashboard page
+for an authenticated configured principal to inspect the Phase 4d queued
+history of one already assigned inbox. It has no browser bearer, command form,
+provider operation, command mutation, migration, or delivery semantics. Its
+final local verification, independent review, and fresh GitHub CI/CodeQL
+evidence are pending.
 
 ## Exact verified history
 
@@ -44,8 +51,8 @@ GitHub CI/CodeQL.
   Compose proof, and fresh GitHub CI/CodeQL for exact commit
   <code>160414e</code>.
 - Historical evidence proves only those exact revisions. It does not verify any
-  live provider account, provider send, public TLS endpoint, or production
-  deployment.
+  live provider account, provider send, public TLS endpoint, production
+  deployment, or the current Phase 4e candidate.
 
 ## Verified Phase 4a source
 
@@ -178,16 +185,49 @@ The verified source adds one narrow write capability to a configured inbox beare
   source message/channel, client operation ID, raw provider data, credentials,
   attempt data, and delivery/read state. It adds no migration: `0009` remains
   the ninth immutable migration.
-- There is no dashboard history page, state mutation, provider HTTP call,
-  dispatch worker, retry, attempt, timeout, receipt, delivery/read tracking,
-  provider token/OAuth storage, or browser send UI. The route is a read-only
-  view of durable intent, not a delivery engine.
+- At the verified Phase 4d revision, there was no dashboard history page,
+  state mutation, provider HTTP call, dispatch worker, retry, attempt, timeout,
+  receipt, delivery/read tracking, provider token/OAuth storage, or browser
+  send UI. The route is a read-only view of durable intent, not a delivery
+  engine. The current Phase 4e candidate is documented separately below.
 
 Exact commit <code>160414e</code> passed formatting, lint, strict type
 checking, 53 test files / 349 tests, build, low-threshold dependency audit,
 secret scan, the synthetic Compose proof, independent security review, and
 GitHub CI/CodeQL. This is source verification only; it is not a provider-send,
 public-TLS, or production claim.
+
+## Current Phase 4e candidate
+
+The candidate adds a narrow browser view without moving an inbox bearer or
+outbound capability into the browser:
+
+- `GET /operator/outbound-commands` appears only with the optional dashboard.
+  It validates and touches the signed dashboard session before it parses a
+  query, decodes a history cursor, or reads storage. A missing session redirects
+  to the login page.
+- The strict query accepts only an optional configured `inbox` ID and an opaque
+  Phase 4d history `cursor`; it fixes page size at 50. The server resolves the
+  inbox only from the authenticated principal's existing allow-list. A URL
+  cannot add a connection or select another principal's inbox.
+- The dashboard capability graph receives only a server-side history-read
+  closure. It never contains an inbox bearer, provider credential, dispatcher,
+  or generic database client. The cursor stays `orderVersion: 1` and binds the
+  exact inbox/scope/snapshot as it does for the API history reader.
+- The HTML renders escaped `createdAt`, recorded `text`, and
+  `sourceConnectionId` with a static recorded-not-sent label. It deliberately
+  omits command ID, provider event ID, private target/source metadata, client
+  operation ID, raw provider data, credential, attempt, receipt, and
+  delivery/read state. Responses remain `no-store` server-rendered pages.
+- There is no migration, runtime-secret change, reply form, recipient picker,
+  command creation/mutation, send/retry/cancel control, worker, provider HTTP
+  request, token/OAuth storage, attempt, timeout policy, receipt, or state
+  transition. A page view only performs the existing dashboard-session touch.
+
+The candidate must not be described as verified until the exact frozen source
+completes focused dashboard-history tests, the relevant local checks,
+independent security review, and fresh GitHub CI/CodeQL evidence. It still does
+not prove external HTTPS/proxy behavior or a production deployment.
 
 ## Explicitly not proven or not implemented
 
@@ -206,16 +246,19 @@ public-TLS, or production claim.
 - No dispatch queue/worker, retry, attempt/timeout policy, delivery/read status,
   template, media, OAuth, provider access-token storage, Graph API request,
   Facebook User, Zalo User, or WhatsApp User surface exists. Phase 4c has only
-  an immutable intent ledger and Phase 4d has only its scoped history, not a
-  delivery engine.
+  an immutable intent ledger, Phase 4d has only its scoped history, and the
+  Phase 4e candidate only renders that history; none is a delivery engine.
 - A `200` from the local synthetic feed or a green test/GitHub check does not
   prove a TLS endpoint, provider eligibility, live message operation, or a
   production-ready access model.
 
 ## Next authorized work
 
-Keep all live provider use separate: require explicit owner authorization before
-connecting a real account or exposing public TLS. Any later full
-user/organization authorization, conversation model, dispatch engine, or
-dashboard deployment must start with its own bounded design, migration/security
-review, and verification criteria.
+Freeze and verify the Phase 4e candidate before making a dashboard-history
+claim: run its focused checks and relevant local gates, complete independent
+security review, and read fresh exact GitHub CI/CodeQL evidence. Keep all live
+provider use separate: require explicit owner authorization before connecting a
+real account or exposing public TLS. Any later full user/organization
+authorization, conversation model, dispatch engine, or dashboard deployment
+must start with its own bounded design, migration/security review, and
+verification criteria.

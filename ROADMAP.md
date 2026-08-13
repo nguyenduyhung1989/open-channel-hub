@@ -369,6 +369,36 @@ the combined Phase 4c–4d revision at exact commit <code>160414e</code>.**
       audit, secret scan, synthetic Compose proof, independent security review,
       and fresh GitHub CI/CodeQL.
 
+### 4e — server-rendered queued reply-command history
+
+**Status: implementation candidate. Final local verification, independent
+security review, and fresh GitHub CI/CodeQL evidence are required before this
+source can be called verified. It is not a public-TLS or production claim.**
+
+- [x] `GET /operator/outbound-commands` uses the existing signed dashboard
+      session and touches it before query parsing, cursor decoding, or history
+      access. It accepts only an optional safe `inbox` ID and the existing
+      opaque queued-history `cursor`; the page size is fixed at 50.
+- [x] The server resolves the selected inbox only from the authenticated
+      principal's configured inbox allow-list. A browser URL cannot add a
+      connection, select another principal's inbox, or use an inbox bearer.
+- [x] The page reuses the Phase 4d history reader and `orderVersion: 1` cursor,
+      including its exact inbox/scope binding and reverse command-ID snapshot.
+      It renders escaped creation time, recorded text, source connection ID,
+      and a clear recorded-not-sent label only.
+- [x] The browser projection omits command and provider-event IDs, private
+      target/source metadata, client operation ID, raw provider data,
+      credential, attempt, receipt, and delivery/read state. It remains
+      server-rendered without browser JavaScript or a browser API bearer.
+- [x] No runtime configuration change, database migration, command mutation,
+      reply form, recipient selector, send/retry/cancel control, worker,
+      provider HTTP request, provider credential/OAuth storage, attempt,
+      timeout policy, receipt, or delivery/read transition is added.
+- [ ] Freeze the candidate, run focused dashboard-history checks and the
+      relevant local gates, complete independent security review, then record
+      fresh exact GitHub CI/CodeQL evidence before describing Phase 4e as
+      verified.
+
 ### Later Phase 4 work
 
 - Full user accounts/organizations, tested RBAC, invitation/password-reset

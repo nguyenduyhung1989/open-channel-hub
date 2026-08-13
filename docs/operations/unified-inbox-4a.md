@@ -1,15 +1,16 @@
-# Phase 4a inbox scope and Phase 4c–4d reply-command boundary
+# Phase 4a inbox scope and Phase 4c–4e reply-command boundary
 
 Phase 4a adds one deliberately small aggregate read API. A configured inbox
 can return canonical inbound events from an explicit set of existing
 connections through one bearer credential. Phase 4a itself did not add an
 outbound message path. Phase 4c now allows that same bearer to record a
 source-bound reply intent and Phase 4d lets it read the same scope's queued
-intent history, but these additions still add no web dashboard send form, user
-account, organization, role model, conversation summary, search, provider
-token, or live-provider operation. The separate Phase 4b dashboard can consume
-only the read path and remains read-only; see the
-[operator dashboard guide](operator-dashboard-4b.md).
+intent history. The Phase 4e candidate adds a server-rendered view of that
+history for a configured dashboard principal, but none of these additions adds
+a dashboard reply form, user account, organization, role model, conversation
+summary, search, provider token, or live-provider operation. See the
+[operator dashboard guide](operator-dashboard-4b.md) and the
+[Phase 4e candidate guide](operator-dashboard-queued-history-4e.md).
 
 The word "inbox" in these phases means a server-selected scope, not a complete
 customer-support product. The PostgreSQL ledger remains the source of the
@@ -175,12 +176,33 @@ The history has no state filter and deliberately lists only `queued` intents;
 it is not a delivery timeline. See the dedicated
 [Phase 4d command-history guide](outbound-command-history-4d.md).
 
-## What remains outside Phase 4d
+## Phase 4e dashboard-history candidate
+
+The Phase 4e candidate adds `GET /operator/outbound-commands` only inside the
+optional server-rendered dashboard. It authenticates and touches the dashboard
+session before query parsing, cursor decoding, or storage access. The route
+selects only an inbox already assigned to the configured principal; it never
+accepts an inbox bearer or caller-selected connection scope.
+
+The page fixes its history read at 50 rows and reuses the Phase 4d
+`orderVersion: 1` cursor, including its exact inbox and connection-set binding.
+It renders only escaped creation time, recorded text, source connection ID, and
+a recorded-not-sent label. It deliberately omits command/provider-event IDs,
+private target/source metadata, client operation ID, credentials, and delivery
+data. It adds no runtime-secret field, migration, command write, provider
+request, worker, send, retry, cancel, or delivery state; a page view only
+performs the existing dashboard-session touch.
+
+This candidate is not yet verified or deployed. It does not change the Phase
+4d inbox-bearer API or make `queued` into a delivery result. See the dedicated
+[Phase 4e dashboard-history guide](operator-dashboard-queued-history-4e.md).
+
+## What remains outside Phase 4e
 
 - No full user identity, organization, role-based access control, invitation
   flow, audit log, public connection administration, or token rotation
-  endpoint. The separate Phase 4b browser dashboard is a configured-local
-  principal view, not a replacement for those capabilities.
+  endpoint. The separate Phase 4b dashboard and Phase 4e candidate are
+  configured-local principal views, not replacements for those capabilities.
 - No conversation aggregation, read/unread state, assignment, labels, search,
   attachment handling, retention/deletion workflow, backup/restore proof, or
   encryption-at-rest assurance.
@@ -194,5 +216,7 @@ it is not a delivery timeline. See the dedicated
 The repository's disposable Compose smoke test exercises multiple synthetic
 connections in two separate configured inboxes, bearer isolation, cursor-scope
 rejection, canonical-only inbound output, and queued-command history scope/safe
-projection. It makes no provider network request and does not prove a live
-account, TLS endpoint, delivery, or production authorization model.
+projection. That verified Phase 4a–4d evidence does not verify the current
+Phase 4e dashboard-history candidate. It makes no provider network request and
+does not prove a live account, TLS endpoint, delivery, or production
+authorization model.

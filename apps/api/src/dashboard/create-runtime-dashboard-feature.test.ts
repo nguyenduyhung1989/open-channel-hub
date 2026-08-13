@@ -19,9 +19,15 @@ const SALES_TOKEN = 'synthetic_inbox_sales_token_01234567890123456789012';
 describe('runtime dashboard feature', () => {
   it('keeps the inbox bearer out of the server-rendering capability graph', async () => {
     const supportRead = vi.fn(async (): Promise<InboundEventPage> => ({ events: [] }));
+    const supportHistoryRead = vi.fn(async (): Promise<OutboundReplyCommandHistoryPage> => ({
+      commands: []
+    }));
     const dashboard = createRuntimeDashboardFeature(
       runtimeDashboard(),
-      [inbox('support-inbox', SUPPORT_TOKEN, supportRead), inbox('sales-inbox', SALES_TOKEN)],
+      [
+        inbox('support-inbox', SUPPORT_TOKEN, supportRead, supportHistoryRead),
+        inbox('sales-inbox', SALES_TOKEN)
+      ],
       sessionStore()
     );
 
@@ -37,10 +43,13 @@ describe('runtime dashboard feature', () => {
     expect(supportInbox).toEqual({
       connectionIds: ['telegram-bot-support'],
       id: 'support-inbox',
-      readInboundEvents: supportRead
+      readInboundEvents: supportRead,
+      readOutboundReplyCommandHistory: supportHistoryRead
     });
     expect(JSON.stringify(supportInbox)).not.toContain(SUPPORT_TOKEN);
     expect(JSON.stringify(dashboard.listInboxes('support-agent'))).not.toContain(SUPPORT_TOKEN);
+    expect(supportInbox).not.toHaveProperty('createOutboundReplyCommand');
+    expect(supportInbox).not.toHaveProperty('token');
     expect(dashboard.findInbox('sales-agent', 'support-inbox')).toBeUndefined();
     expect(dashboard.listInboxes('unknown')).toEqual([]);
   });
@@ -98,6 +107,9 @@ const inbox = (
   token: string,
   readInboundEvents: InboxFeature['readInboundEvents'] = async (): Promise<InboundEventPage> => ({
     events: []
+  }),
+  readOutboundReplyCommandHistory: InboxFeature['readOutboundReplyCommandHistory'] = async (): Promise<OutboundReplyCommandHistoryPage> => ({
+    commands: []
   })
 ): InboxFeature =>
   Object.freeze({
@@ -106,9 +118,7 @@ const inbox = (
       Object.freeze({ kind: 'source_unavailable' }),
     id,
     readInboundEvents,
-    readOutboundReplyCommandHistory: async (): Promise<OutboundReplyCommandHistoryPage> => ({
-      commands: []
-    }),
+    readOutboundReplyCommandHistory,
     token
   });
 

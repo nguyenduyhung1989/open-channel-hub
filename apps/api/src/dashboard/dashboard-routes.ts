@@ -4,9 +4,17 @@ import { z } from 'zod';
 
 import { matchesSecret } from '../http/secret-match.js';
 import { decodeInboxCursor, encodeInboxCursor } from '../inbox/inbox-cursor.js';
+import {
+  decodeInboxOutboundCommandHistoryCursor,
+  encodeInboxOutboundCommandHistoryCursor
+} from '../inbox/inbox-outbound-command-history-cursor.js';
 import { createDashboardLoginThrottle, verifyDashboardPassword } from './dashboard-auth.js';
-import type { DashboardFeature } from './dashboard-feature.js';
-import { renderDashboardLoginPage, renderDashboardPage } from './dashboard-html.js';
+import type { DashboardFeature, DashboardInbox } from './dashboard-feature.js';
+import {
+  renderDashboardLoginPage,
+  renderDashboardOutboundCommandHistoryPage,
+  renderDashboardPage
+} from './dashboard-html.js';
 import {
   createDashboardSessionManager,
   type DashboardSessionManager
@@ -54,6 +62,14 @@ interface AuthenticatedDashboardSession {
   readonly csrfToken: string;
   readonly session: DashboardSession;
   readonly sessionCookieValue: string;
+}
+
+interface ResolvedDashboardPageRequest {
+  readonly authenticated: AuthenticatedDashboardSession;
+  readonly availableInboxes: readonly DashboardInbox[];
+  readonly requestedCursor?: string;
+  readonly selectedInbox: DashboardInbox;
+  readonly selectedInboxId: string;
 }
 
 /**
@@ -159,44 +175,20 @@ export const registerDashboardRoutes = async (
   });
 
   app.get('/operator', async (request, reply) => {
-    let authenticated: AuthenticatedDashboardSession | undefined;
+    const context = await resolveDashboardPageRequest(request, reply, manager, feature);
 
-    try {
-      authenticated = await touchDashboardSession(request, reply, manager);
-    } catch {
-      return sendDashboardFailure(reply.code(500));
+    if (context === undefined) {
+      return;
     }
 
-    if (authenticated === undefined) {
-      clearSessionCookie(reply);
-      return redirectDashboard(reply, '/operator/login');
-    }
-
-    const query = operatorQuerySchema.safeParse(request.query);
-
-    if (!query.success) {
-      return sendDashboardFailure(reply.code(400));
-    }
-
-    const availableInboxes = feature.listInboxes(authenticated.session.principalId);
-    const selectedInboxId = query.data.inbox ?? availableInboxes[0]?.id;
-    const selectedInbox =
-      selectedInboxId === undefined
-        ? undefined
-        : feature.findInbox(authenticated.session.principalId, selectedInboxId);
-
-    if (selectedInboxId === undefined || selectedInbox === undefined) {
-      return sendDashboardFailure(reply.code(404));
-    }
-
-    const cursor = decodeInboxCursor(query.data.cursor, selectedInbox);
+    const cursor = decodeInboxCursor(context.requestedCursor, context.selectedInbox);
 
     if (cursor === null) {
       return sendDashboardFailure(reply.code(400));
     }
 
     try {
-      const page = await selectedInbox.readInboundEvents({
+      const page = await context.selectedInbox.readInboundEvents({
         ...(cursor === undefined ? {} : { cursor }),
         pageSize: DEFAULT_PAGE_SIZE
       });
@@ -204,19 +196,113 @@ export const registerDashboardRoutes = async (
       return sendDashboardHtml(
         reply,
         renderDashboardPage({
-          csrfToken: authenticated.csrfToken,
+          csrfToken: context.authenticated.csrfToken,
           events: page.events,
-          inboxes: availableInboxes,
+          inboxes: context.availableInboxes,
           ...(page.nextCursor === undefined
             ? {}
-            : { nextCursor: encodeInboxCursor(page.nextCursor, selectedInbox) }),
-          principalId: authenticated.session.principalId,
-          selectedInboxId
+            : { nextCursor: encodeInboxCursor(page.nextCursor, context.selectedInbox) }),
+          principalId: context.authenticated.session.principalId,
+          selectedInboxId: context.selectedInboxId
         })
       );
     } catch {
       return sendDashboardFailure(reply.code(500));
     }
+  });
+
+  app.get('/operator/outbound-commands', async (request, reply) => {
+    const context = await resolveDashboardPageRequest(request, reply, manager, feature);
+
+    if (context === undefined) {
+      return;
+    }
+
+    const cursor = decodeInboxOutboundCommandHistoryCursor(
+      context.requestedCursor,
+      context.selectedInbox
+    );
+
+    if (cursor === null) {
+      return sendDashboardFailure(reply.code(400));
+    }
+
+    try {
+      const page = await context.selectedInbox.readOutboundReplyCommandHistory({
+        ...(cursor === undefined ? {} : { cursor }),
+        pageSize: DEFAULT_PAGE_SIZE
+      });
+
+      return sendDashboardHtml(
+        reply,
+        renderDashboardOutboundCommandHistoryPage({
+          commands: page.commands,
+          csrfToken: context.authenticated.csrfToken,
+          inboxes: context.availableInboxes,
+          ...(page.nextCursor === undefined
+            ? {}
+            : {
+                nextCursor: encodeInboxOutboundCommandHistoryCursor(
+                  page.nextCursor,
+                  context.selectedInbox
+                )
+              }),
+          principalId: context.authenticated.session.principalId,
+          selectedInboxId: context.selectedInboxId
+        })
+      );
+    } catch {
+      return sendDashboardFailure(reply.code(500));
+    }
+  });
+};
+
+const resolveDashboardPageRequest = async (
+  request: FastifyRequest,
+  reply: FastifyReply,
+  manager: DashboardSessionManager,
+  feature: DashboardFeature
+): Promise<ResolvedDashboardPageRequest | undefined> => {
+  let authenticated: AuthenticatedDashboardSession | undefined;
+
+  try {
+    authenticated = await touchDashboardSession(request, reply, manager);
+  } catch {
+    sendDashboardFailure(reply.code(500));
+    return undefined;
+  }
+
+  if (authenticated === undefined) {
+    clearSessionCookie(reply);
+    redirectDashboard(reply, '/operator/login');
+    return undefined;
+  }
+
+  const query = operatorQuerySchema.safeParse(request.query);
+
+  if (!query.success) {
+    sendDashboardFailure(reply.code(400));
+    return undefined;
+  }
+
+  const availableInboxes = feature.listInboxes(authenticated.session.principalId);
+  const selectedInboxId = query.data.inbox ?? availableInboxes[0]?.id;
+  const selectedInbox =
+    selectedInboxId === undefined
+      ? undefined
+      : feature.findInbox(authenticated.session.principalId, selectedInboxId);
+
+  if (selectedInboxId === undefined || selectedInbox === undefined) {
+    sendDashboardFailure(reply.code(404));
+    return undefined;
+  }
+
+  return Object.freeze({
+    authenticated,
+    availableInboxes,
+    ...(query.data.cursor === undefined ? {} : { requestedCursor: query.data.cursor }),
+    selectedInbox,
+    selectedInboxId
   });
 };
 

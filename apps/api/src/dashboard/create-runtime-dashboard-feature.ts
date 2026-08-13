@@ -75,7 +75,8 @@ const toInboxSnapshot = (inboxes: readonly InboxFeature[]): ReadonlyMap<string, 
       Object.freeze({
         connectionIds: Object.freeze([...inbox.connectionIds]),
         id: inbox.id,
-        readInboundEvents: inbox.readInboundEvents
+        readInboundEvents: inbox.readInboundEvents,
+        readOutboundReplyCommandHistory: inbox.readOutboundReplyCommandHistory
       })
     );
   }

@@ -6,7 +6,9 @@ import type {
   DashboardSessionRevokeInput,
   DashboardSessionStore,
   DashboardSessionTouchInput,
-  InboundEventPage
+  InboundEventPage,
+  OutboundReplyCommandHistoryEntry,
+  OutboundReplyCommandHistoryPage
 } from '@open-channel-hub/domain';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -32,6 +34,107 @@ describe('dashboard routes', () => {
     const response = await app.inject({ method: 'GET', url: '/operator/login' });
 
     expect(response.statusCode).toBe(404);
+  });
+
+  it('renders only escaped safe queued-command history through the signed dashboard session', async () => {
+    const historyRead = vi.fn(async (): Promise<OutboundReplyCommandHistoryPage> => ({
+      commands: [
+        unsafeHistoryEntry({
+          text: '<script>synthetic history xss must remain text</script>\nsecond line'
+        })
+      ],
+      nextCursor: Object.freeze({ beforeSequence: '8', snapshotMaxSequence: '12' })
+    }));
+    const harness = await createHarness({ historyRead });
+    applications.push(harness.app);
+
+    const unauthenticated = await harness.app.inject({
+      method: 'GET',
+      url: '/operator/outbound-commands?cursor=not-a-cursor%40&connectionId=telegram-bot-sales'
+    });
+
+    expect(unauthenticated.statusCode).toBe(303);
+    expect(unauthenticated.headers.location).toBe('/operator/login');
+    expect(historyRead).not.toHaveBeenCalled();
+
+    const sessionCookie = await loginAndGetSessionCookie(harness.app);
+
+    const response = await harness.app.inject({
+      headers: { cookie: cookiePair(sessionCookie) },
+      method: 'GET',
+      url: '/operator/outbound-commands'
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(response.body).toContain(
+      '&lt;script&gt;synthetic history xss must remain text&lt;/script&gt;'
+    );
+    expect(response.body).not.toContain('<script>');
+    expect(response.body).toContain('ĐÃ GHI, CHƯA GỬI');
+    expect(response.body).toContain('Xem tin nhắn đến');
+    expect(response.body).not.toContain(SUPPORT_INBOX_TOKEN);
+    expect(response.body).not.toContain(SALES_INBOX_TOKEN);
+    expect(response.body).not.toContain('synthetic-private-reply-target');
+    expect(response.body).not.toContain('synthetic-private-source-message');
+    expect(response.body).not.toContain('synthetic-private-source-channel');
+    expect(response.body).not.toContain('synthetic-private-client-operation');
+    expect(response.body).not.toContain('synthetic-provider-event-should-not-render');
+    expect(response.body).not.toContain('name="text"');
+    expect(response.body).not.toContain('name="clientOperationId"');
+    expect(response.body).not.toContain('action="/operator/outbound-commands"');
+    expect(historyRead).toHaveBeenCalledWith({ pageSize: 50 });
+
+    const nextCursor = nextCursorFrom(response.body);
+    const continuation = await harness.app.inject({
+      headers: { cookie: cookiePair(sessionCookie) },
+      method: 'GET',
+      url: `/operator/outbound-commands?cursor=${nextCursor}`
+    });
+
+    expect(continuation.statusCode).toBe(200);
+    expect(historyRead).toHaveBeenLastCalledWith({
+      cursor: { beforeSequence: '8', snapshotMaxSequence: '12' },
+      pageSize: 50
+    });
+
+    const malformed = await harness.app.inject({
+      headers: { cookie: cookiePair(sessionCookie) },
+      method: 'GET',
+      url: '/operator/outbound-commands?cursor=not-a-cursor%40'
+    });
+
+    expect(malformed.statusCode).toBe(400);
+    expect(historyRead).toHaveBeenCalledTimes(2);
+
+    const callerSelectedScope = await harness.app.inject({
+      headers: { cookie: cookiePair(sessionCookie) },
+      method: 'GET',
+      url: '/operator/outbound-commands?connectionId=telegram-bot-sales'
+    });
+
+    expect(callerSelectedScope.statusCode).toBe(400);
+    expect(historyRead).toHaveBeenCalledTimes(2);
+  });
+
+  it('hides queued-history storage failures behind the generic dashboard page', async () => {
+    const historyRead = vi.fn(async (): Promise<OutboundReplyCommandHistoryPage> => {
+      throw new Error('synthetic durable history failure');
+    });
+    const harness = await createHarness({ historyRead });
+    applications.push(harness.app);
+    const sessionCookie = await loginAndGetSessionCookie(harness.app);
+
+    const response = await harness.app.inject({
+      headers: { cookie: cookiePair(sessionCookie) },
+      method: 'GET',
+      url: '/operator/outbound-commands'
+    });
+
+    expect(response.statusCode).toBe(500);
+    expect(response.body).toContain('Yêu cầu không thể xử lý an toàn.');
+    expect(response.body).not.toContain('synthetic durable history failure');
+    expect(historyRead).toHaveBeenCalledWith({ pageSize: 50 });
   });
 
   it('uses signed secure HttpOnly cookies, server-only inbox reads, and escaped HTML', async () => {
@@ -153,6 +256,16 @@ describe('dashboard routes', () => {
     expect(hiddenInbox.statusCode).toBe(404);
     expect(hiddenInbox.body).not.toContain('sales-inbox');
     expect(supportRead).not.toHaveBeenCalled();
+
+    const hiddenHistory = await harness.app.inject({
+      headers: { cookie: cookiePair(sessionCookie) },
+      method: 'GET',
+      url: '/operator/outbound-commands?inbox=sales-inbox'
+    });
+
+    expect(hiddenHistory.statusCode).toBe(404);
+    expect(hiddenHistory.body).not.toContain('sales-inbox');
+    expect(harness.historyRead).not.toHaveBeenCalled();
   });
 
   it('fails fast before Argon2 when a concurrent login burst exceeds the verifier cap', async () => {
@@ -262,11 +375,13 @@ describe('dashboard routes', () => {
 
 const createHarness = async (
   options: Readonly<{
+    historyRead?: ReturnType<typeof vi.fn>;
     supportRead?: ReturnType<typeof vi.fn>;
   }> = {}
 ): Promise<
   Readonly<{
     app: Awaited<ReturnType<typeof buildApp>>;
+    historyRead: ReturnType<typeof vi.fn>;
     store: ReturnType<typeof createSessionStore>;
   }>
 > => {
@@ -278,11 +393,15 @@ const createHarness = async (
   });
   const supportRead =
     options.supportRead ?? vi.fn(async (): Promise<InboundEventPage> => ({ events: [] }));
+  const historyRead =
+    options.historyRead ??
+    vi.fn(async (): Promise<OutboundReplyCommandHistoryPage> => ({ commands: [] }));
   const store = createSessionStore();
   const supportInbox = inbox(
     'support-inbox',
     SUPPORT_CONNECTION_IDS,
-    supportRead as DashboardInbox['readInboundEvents']
+    supportRead as DashboardInbox['readInboundEvents'],
+    historyRead as DashboardInbox['readOutboundReplyCommandHistory']
   );
   const principal: DashboardPrincipal = Object.freeze({
     id: 'support-agent',
@@ -304,14 +423,16 @@ const createHarness = async (
     sessionStore: store
   });
 
-  return Object.freeze({ app: await buildApp({ dashboard: feature }), store });
+  return Object.freeze({ app: await buildApp({ dashboard: feature }), historyRead, store });
 };
 
 const inbox = (
   id: string,
   connectionIds: readonly string[],
-  readInboundEvents: DashboardInbox['readInboundEvents']
-): DashboardInbox => Object.freeze({ connectionIds, id, readInboundEvents });
+  readInboundEvents: DashboardInbox['readInboundEvents'],
+  readOutboundReplyCommandHistory: DashboardInbox['readOutboundReplyCommandHistory']
+): DashboardInbox =>
+  Object.freeze({ connectionIds, id, readInboundEvents, readOutboundReplyCommandHistory });
 
 const createSessionStore = (): DashboardSessionStore &
   Readonly<
@@ -400,6 +521,23 @@ const canonicalEvent = (overrides: Readonly<{ message?: string }> = {}) =>
     providerEventId: 'synthetic-provider-event-101',
     type: 'message.received' as const
   });
+
+/** Deliberately adds forbidden fields to prove the HTML renderer ignores them. */
+const unsafeHistoryEntry = (
+  overrides: Readonly<Partial<Pick<OutboundReplyCommandHistoryEntry, 'text'>>> = {}
+): OutboundReplyCommandHistoryEntry =>
+  Object.freeze({
+    clientOperationId: 'synthetic-private-client-operation',
+    createdAt: '2026-08-13T00:00:00.000Z',
+    id: '42',
+    replyTargetId: 'synthetic-private-reply-target',
+    sourceChannel: 'synthetic-private-source-channel',
+    sourceConnectionId: 'telegram-bot-support',
+    sourceMessageId: 'synthetic-private-source-message',
+    sourceProviderEventId: 'synthetic-provider-event-should-not-render',
+    state: 'queued' as const,
+    text: overrides.text ?? 'Synthetic queued dashboard history'
+  }) as unknown as OutboundReplyCommandHistoryEntry;
 
 const cookieFrom = (
   response: Awaited<ReturnType<Awaited<ReturnType<typeof buildApp>>['inject']>>,

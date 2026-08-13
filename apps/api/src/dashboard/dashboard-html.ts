@@ -1,4 +1,5 @@
 import type { CanonicalEvent } from '@open-channel-hub/contracts';
+import type { OutboundReplyCommandHistoryEntry } from '@open-channel-hub/domain';
 
 export interface DashboardLoginPageInput {
   readonly csrfToken: string;
@@ -8,6 +9,15 @@ export interface DashboardLoginPageInput {
 export interface DashboardPageInput {
   readonly csrfToken: string;
   readonly events: readonly CanonicalEvent[];
+  readonly inboxes: readonly Readonly<{ id: string }>[];
+  readonly nextCursor?: string;
+  readonly principalId: string;
+  readonly selectedInboxId: string;
+}
+
+export interface DashboardOutboundCommandHistoryPageInput {
+  readonly commands: readonly OutboundReplyCommandHistoryEntry[];
+  readonly csrfToken: string;
   readonly inboxes: readonly Readonly<{ id: string }>[];
   readonly nextCursor?: string;
   readonly principalId: string;
@@ -88,6 +98,9 @@ export const renderDashboardPage = (input: DashboardPageInput): string => {
             <select id="inbox" name="inbox">${inboxOptions}</select>
             <button class="quiet-button" type="submit">Đổi phạm vi</button>
           </form>
+          <a class="quiet-link" href="/operator/outbound-commands?inbox=${encodeURIComponent(
+            input.selectedInboxId
+          )}">Ý định trả lời đang chờ</a>
           <p>Người vận hành: <strong>${escapeHtml(input.principalId)}</strong></p>
         </section>
         <section class="ledger" aria-labelledby="ledger-title">
@@ -96,6 +109,67 @@ export const renderDashboardPage = (input: DashboardPageInput): string => {
             <h2 id="ledger-title">${escapeHtml(input.selectedInboxId)}</h2>
           </div>
           ${eventRows}
+          ${nextPage}
+        </section>
+      </main>`
+  });
+};
+
+/** Renders queued reply intents without adding a browser write or bearer surface. */
+export const renderDashboardOutboundCommandHistoryPage = (
+  input: DashboardOutboundCommandHistoryPageInput
+): string => {
+  const inboxLinks = input.inboxes
+    .map(
+      (inbox) =>
+        `<a class="scope-link" href="/operator/outbound-commands?inbox=${encodeURIComponent(
+          inbox.id
+        )}"${inbox.id === input.selectedInboxId ? ' aria-current="page"' : ''}>${escapeHtml(
+          inbox.id
+        )}</a>`
+    )
+    .join('');
+  const commandRows =
+    input.commands.length === 0
+      ? '<p class="empty-state">Chưa có ý định trả lời nào đang chờ trong phạm vi này.</p>'
+      : `<ol class="command-list">${input.commands.map(renderOutboundCommand).join('')}</ol>`;
+  const nextPage =
+    input.nextCursor === undefined
+      ? ''
+      : `<a class="next-page" href="/operator/outbound-commands?inbox=${encodeURIComponent(
+          input.selectedInboxId
+        )}&cursor=${encodeURIComponent(input.nextCursor)}">Xem trang tiếp theo</a>`;
+
+  return renderDocument({
+    body: `
+      <main class="dashboard-shell" aria-labelledby="dashboard-title">
+        <header class="dashboard-header">
+          <div>
+            <p class="eyebrow">OPEN CHANNEL HUB / READ ONLY</p>
+            <h1 id="dashboard-title">Bảng tín hiệu</h1>
+          </div>
+          <form action="/operator/logout" method="post">
+            <input type="hidden" name="csrf" value="${escapeAttribute(input.csrfToken)}">
+            <button class="quiet-button" type="submit">Đăng xuất</button>
+          </form>
+        </header>
+        <section class="scope-bar" aria-label="Phạm vi hộp thư">
+          <nav class="scope-links" aria-label="Chọn hộp thư">
+            <span class="scope-label">Hộp thư</span>
+            ${inboxLinks}
+          </nav>
+          <a class="quiet-link" href="/operator?inbox=${encodeURIComponent(
+            input.selectedInboxId
+          )}">Xem tin nhắn đến</a>
+          <p>Người vận hành: <strong>${escapeHtml(input.principalId)}</strong></p>
+        </section>
+        <section class="ledger" aria-labelledby="ledger-title">
+          <div class="ledger-heading">
+            <p class="eyebrow">Ý ĐỊNH TRẢ LỜI / MỚI NHẤT TRƯỚC</p>
+            <h2 id="ledger-title">${escapeHtml(input.selectedInboxId)}</h2>
+            <p class="ledger-note">Các mục này mới chỉ được ghi nhận; chưa có tin nào được gửi đến nhà cung cấp.</p>
+          </div>
+          ${commandRows}
           ${nextPage}
         </section>
       </main>`
@@ -113,6 +187,18 @@ const renderEvent = (event: CanonicalEvent): string => `
       <div><dt>Kết nối</dt><dd>${escapeHtml(event.connectionId)}</dd></div>
       <div><dt>Hội thoại</dt><dd>${escapeHtml(event.message.conversationId)}</dd></div>
       <div><dt>Người gửi</dt><dd>${escapeHtml(event.message.senderId)}</dd></div>
+    </dl>
+  </li>`;
+
+const renderOutboundCommand = (command: OutboundReplyCommandHistoryEntry): string => `
+  <li class="command-card">
+    <div class="event-meta">
+      <span>ĐÃ GHI, CHƯA GỬI</span>
+      <time datetime="${escapeAttribute(command.createdAt)}">${escapeHtml(command.createdAt)}</time>
+    </div>
+    <p class="event-message">${escapeHtml(command.text)}</p>
+    <dl>
+      <div><dt>Kết nối</dt><dd>${escapeHtml(command.sourceConnectionId)}</dd></div>
     </dl>
   </li>`;
 

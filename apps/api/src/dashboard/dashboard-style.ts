@@ -35,11 +35,19 @@ input, select { background: #08101a; border: 1px solid var(--line); border-radiu
 .dashboard-header { border-bottom: 1px solid var(--line); padding-bottom: 1.25rem; }
 .scope-bar { margin: 1rem 0; padding: 1rem; }
 .scope-bar form { align-items: end; display: grid; gap: .55rem; grid-template-columns: 1fr; }
-.quiet-button { background: transparent; border: 1px solid var(--line); color: var(--ink); }
+.quiet-button, .quiet-link { background: transparent; border: 1px solid var(--line); color: var(--ink); }
+.quiet-link { border-radius: .45rem; font-weight: 750; padding: .72rem 1rem; text-decoration: none; }
+.quiet-link:hover, .quiet-link:focus-visible { outline: .16rem solid #d9fff1; outline-offset: .15rem; }
+.scope-links { align-items: center; display: flex; flex-wrap: wrap; gap: .45rem; }
+.scope-label { color: var(--muted); font-weight: 700; margin-right: .15rem; }
+.scope-link { border: 1px solid var(--line); border-radius: 999px; color: var(--ink); font-size: .88rem; font-weight: 700; padding: .4rem .65rem; text-decoration: none; }
+.scope-link[aria-current="page"] { background: var(--signal); border-color: var(--signal); color: var(--signal-ink); }
+.scope-link:hover, .scope-link:focus-visible { outline: .16rem solid #d9fff1; outline-offset: .15rem; }
 .ledger { padding: 1rem; }
 .ledger-heading { border-bottom: 1px solid var(--line); padding-bottom: .9rem; }
-.event-list { display: grid; gap: .75rem; list-style: none; margin: 1rem 0; padding: 0; }
-.event-card { background: #0b121d; border: 1px solid #243347; border-radius: .55rem; padding: 1rem; }
+.ledger-note { color: var(--muted); line-height: 1.5; margin: .65rem 0 0; }
+.event-list, .command-list { display: grid; gap: .75rem; list-style: none; margin: 1rem 0; padding: 0; }
+.event-card, .command-card { background: #0b121d; border: 1px solid #243347; border-radius: .55rem; padding: 1rem; }
 .event-meta { color: var(--muted); display: flex; flex-wrap: wrap; font-size: .78rem; font-weight: 700; gap: .5rem 1rem; text-transform: uppercase; }
 .event-message { line-height: 1.55; margin: .85rem 0; overflow-wrap: anywhere; white-space: pre-wrap; }
 dl { color: var(--muted); display: grid; gap: .45rem; margin: 0; }

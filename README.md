@@ -2,14 +2,14 @@
 
 > A self-hosted, official-first multichannel messaging hub.
 
-**Status: Phase 4d alpha.** The repository contains a durable
+**Status: Phase 4e alpha candidate.** The repository contains a durable
 PostgreSQL inbound-event ledger, account-scoped operator read APIs, a
 configured multi-connection inbox API, an optional server-rendered read-only
 operator dashboard, a durable source-bound reply-command ledger, a scoped
-queued-command history API, secret-backed runtime configuration for official
-accounts, and narrow official Zalo Official Account (OA), Facebook Page, and
-WhatsApp Business signed inbound-text boundaries. Phase 4a passed final local
-checks,
+queued-command history API, a candidate server-rendered queued-command history
+page, secret-backed runtime configuration for official accounts, and narrow
+official Zalo Official Account (OA), Facebook Page, and WhatsApp Business
+signed inbound-text boundaries. Phase 4a passed final local checks,
 independent review, a synthetic Docker proof, and GitHub CI/CodeQL for exact
 commit <code>705db0a</code>. Phase 4b passed the same local verification,
 independent review, synthetic Docker proof, and GitHub CI/CodeQL for exact
@@ -17,7 +17,9 @@ commit <code>7672be9</code>. It still does not prove a TLS proxy or production
 browser deployment. Phases 4c–4d passed the same local verification,
 independent review, synthetic Docker proof, and GitHub CI/CodeQL for exact
 commit <code>160414e</code>; they still record and list intent only, never send
-a provider message. Phase 1a remains
+a provider message. The Phase 4e dashboard-history source is a candidate:
+final local verification, independent review, and fresh GitHub CI/CodeQL
+evidence are pending. Phase 1a remains
 incomplete until an owner-authorized Telegram test bot works through public
 TLS; Phases 3a, 3b, and 3c likewise have no owner-authorized real provider
 proof.
@@ -140,6 +142,18 @@ ID plus configured connection set. No migration is added: the ninth
 <code>0009_outbound_reply_commands</code> migration remains unchanged. This is
 a history of durable intent, not delivery status or provider activity.
 
+The Phase 4e candidate adds
+<code>GET /operator/outbound-commands</code> to the existing server-rendered
+dashboard. After the dashboard authenticates its configured local principal,
+it can render only that principal's configured inbox history through a
+server-side read closure. The page has a fixed 50-row scope-bound continuation
+and renders escaped creation time, text, source connection, and a recorded-not-
+sent label. It exposes no browser bearer, command/source IDs, private target or
+source metadata, client operation ID, or delivery data; it adds no outbound
+command form, command mutation, migration, worker, provider call, retry, or
+send action. The existing logout form remains session management only.
+This candidate is not yet verified or deployed.
+
 Multi-connection IDs are opaque safe route labels; <code>.</code> and
 <code>..</code> are rejected because webhook ingress places the ID in a dynamic
 path. This restriction does not rewrite a historical legacy one-Bot environment
@@ -178,7 +192,9 @@ CAPTCHA bypass, fingerprint spoofing, session theft, or bulk-spam capabilities.
   dispatch a provider message.
 - An optional server-rendered, no-JavaScript, read-only operator dashboard.
   It uses local configured password principals and browser session cookies;
-  it never exposes an inbox bearer or provider credential to the browser.
+  it never exposes an inbox bearer or provider credential to the browser. The
+  Phase 4e candidate adds a principal-scoped queued-command history page, not
+  an outbound action.
 - Dynamic multi-connection webhook ingress that resolves the account server
   side, uses a separate webhook secret, and gives unknown account IDs and wrong
   secrets the same <code>401</code> response.
@@ -215,7 +231,8 @@ The following remain plans or explicitly incomplete operational work:
   to provide those capabilities.
 - Redis, a dispatch queue/worker, provider delivery, retries, attempts,
   delivery/read status, and a provider-specific outbox policy. Phase 4c–4d
-  store and list immutable reply intent only.
+  store and list immutable reply intent only; the Phase 4e candidate only
+  renders that history through the dashboard.
 - User accounts, role-based access control, multiple
   organizations, webhook administration, public connection management, or a
   connection listing API.
@@ -337,6 +354,7 @@ front of Compose, keep the operator API on loopback, and follow the
 [Phase 3c WhatsApp Business guide](docs/operations/whatsapp-business-3c.md), or
 [Phase 4a unified inbox guide](docs/operations/unified-inbox-4a.md), or
 [Phase 4d queued command-history guide](docs/operations/outbound-command-history-4d.md), or
+[Phase 4e dashboard queued-command history guide](docs/operations/operator-dashboard-queued-history-4e.md), or
 [Phase 4b operator dashboard guide](docs/operations/operator-dashboard-4b.md), or
 [Phase 1a legacy guide](docs/operations/telegram-bot-1a.md) only after an
 authorized test is agreed. Starting Compose does not provide TLS or register a
@@ -404,17 +422,20 @@ one or two unique cookie-signing keys, a separate session HMAC pepper, and one
 or more configured principals scoped to existing inboxes. Password values are
 stored only as exact-profile Argon2id PHC hashes.
 
-Its read-only HTML pages are `/operator/login` and `/operator`; the CSS is
-same-origin at `/operator/assets/dashboard.css`. Login and logout require the
-configured browser origin and anti-forgery tokens. Sessions expire after 30
-minutes idle or eight hours absolute. The supplied Compose smoke deliberately
-does not submit a dashboard login through HTTP; that would not prove the
-required HTTPS cookie behavior.
+Its read-only HTML pages are `/operator/login` and `/operator`; the Phase 4e
+candidate also adds `/operator/outbound-commands` for queued command history.
+The CSS is same-origin at `/operator/assets/dashboard.css`. Login and logout
+require the configured browser origin and anti-forgery tokens. Sessions expire
+after 30 minutes idle or eight hours absolute. The supplied Compose smoke
+deliberately does not submit a dashboard login through HTTP; that would not
+prove the required HTTPS cookie behavior.
 
 Read [the Phase 4b operator dashboard guide](docs/operations/operator-dashboard-4b.md)
 before configuring a proxy, password hash, or session-key rotation. It records
 the current limits: no self-service accounts, role model, audit trail,
-production TLS proof, cross-instance rate-limit proof, or outbound action.
+production TLS proof, cross-instance rate-limit proof, or outbound action. The
+[Phase 4e dashboard queued-command history guide](docs/operations/operator-dashboard-queued-history-4e.md)
+records the candidate's separate no-send/history boundary.
 
 ## Corresponding-source offer
 
