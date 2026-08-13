@@ -4,8 +4,9 @@
 source-bound reply-command ledger, and synthetic Docker proof source are
 implemented. The verified Phase 4e server-rendered queued-history source and
 verified Phase 4f dashboard reply-intent source add no schema change. The
-Phase 4g append-only delivery-evidence migration is a candidate; it has no
-provider dispatch or production verification claim. Phase 4e's final local
+Phase 4g append-only delivery-evidence migration is a verified source at exact
+commit <code>6444699</code>; it has no provider dispatch or production
+verification claim. Phase 4e's final local
 verification includes a synthetic Compose proof, but that loopback HTTP proof
 does not establish external HTTPS cookie behavior. Phase 4f source verification
 at `74fca30` likewise does not prove a production deployment, a backup/restore
@@ -33,8 +34,8 @@ application schema contains:
 | <code>inbound_events</code>                     | Canonical inbound text-event ledger. Its primary key is <code>(connection_id, provider_event_id)</code>.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | <code>dashboard_sessions</code>                 | Optional Phase 4b browser-session metadata: only HMACs of random session/anti-forgery values, principal ID, timestamps, and revocation state. It contains no raw token, password, credential, or inbox membership.                                                                                                                                                                                                                                                                                                                                                                                        |
 | <code>outbound_commands</code>                  | Phase 4c immutable source-bound reply intents. It retains a private target derived from canonical inbound `conversation_id`, source message/channel, message text, client operation ID, `queued` state, and timestamps. Phase 4d reads a safe scoped projection of queued rows without changing this table; the Phase 4e source reuses that reader for a smaller server-rendered dashboard projection. The verified Phase 4f source reuses the existing source-bound store through an explicitly granted dashboard form. It has no provider credential, raw payload, attempt, receipt, or delivery state. |
-| <code>outbound_delivery_attempts</code>         | Phase 4g candidate append-only evidence that one command has a durable local attempt fact. One command can have at most one such row. It contains no target, message text, credential, provider response, HTTP detail, retry field, or mutable delivery state.                                                                                                                                                                                                                                                                                                                                            |
-| <code>outbound_delivery_attempt_receipts</code> | Phase 4g candidate append-only recorded-outcome evidence for one stored attempt. Its constraint permits exactly `provider_accepted`, `provider_rejected`, or `outcome_unknown`; only acceptance has a provider message ID. It proves neither network delivery nor read status.                                                                                                                                                                                                                                                                                                                            |
+| <code>outbound_delivery_attempts</code>         | Verified Phase 4g append-only evidence that one command has a durable local attempt fact. One command can have at most one such row. It contains no target, message text, credential, provider response, HTTP detail, retry field, or mutable delivery state.                                                                                                                                                                                                                                                                                                                                             |
+| <code>outbound_delivery_attempt_receipts</code> | Verified Phase 4g append-only recorded-outcome evidence for one stored attempt. Its constraint permits exactly `provider_accepted`, `provider_rejected`, or `outcome_unknown`; only acceptance has a provider message ID. It proves neither network delivery nor read status.                                                                                                                                                                                                                                                                                                                             |
 
 The ledger stores a canonical event ID, channel/type/timestamps, conversation
 and sender/message identifiers, and message text. It intentionally does **not**
@@ -106,7 +107,7 @@ target from the durable inbound source. No migration, table, index, trigger,
 or command state changes. Its local per-principal write guard is in process;
 it is not a database or distributed rate-limit mechanism.
 
-The Phase 4g candidate adds forward migration
+The verified Phase 4g source adds forward migration
 <code>0010_outbound_delivery_attempt_receipts</code>. It leaves
 <code>outbound_commands</code> immutable and `queued`, then adds an optional
 immutable attempt row for a command and an optional immutable receipt row for
@@ -119,7 +120,7 @@ ID; <code>provider_rejected</code> and <code>outcome_unknown</code> require no
 provider message ID. Absence of a durable attempt row supports only a derived
 <code>not_attempted</code>-in-this-ledger label, not proof that an external
 provider call never happened. A durable attempt without a receipt is
-conservatively unknown. This candidate adds no route, reader, dashboard result,
+conservatively unknown. This verified source adds no route, reader, dashboard result,
 worker, provider HTTP request, credential, retry policy, or command state
 transition. See the dedicated
 [Phase 4g delivery-evidence guide](outbound-delivery-evidence-4g.md).
@@ -231,11 +232,20 @@ and fresh GitHub checks are recorded in the Phase 4f operations guide. That
 evidence still does not prove an external HTTPS proxy, provider send, or
 production authorization model.
 
-The Phase 4g candidate advances the migration count to ten. Its Compose smoke
-candidate checks structural evidence only: the new tables, foreign keys,
-outcome constraint, provider-message-ID constraint, and immutable triggers. It
-does not insert an attempt or receipt, run a worker, make a provider request,
-or demonstrate delivery semantics.
+The verified Phase 4g source advances the migration count to ten. Its Compose
+smoke checks structural evidence only: the new tables, foreign keys, unique
+command binding, receipt primary key, outcome/provider-message-ID constraints,
+and immutable triggers. It does not insert an attempt or receipt, run a worker,
+make a provider request, or demonstrate delivery semantics.
+
+Exact commit <code>6444699</code> passed <code>npm run check</code> (54 test
+files / 358 tests and build), <code>npm audit --audit-level=low</code> with
+zero findings, Gitleaks with no secrets, <code>git diff --check</code>, a
+synthetic Compose smoke with cleanup, an independent security audit APPROVE
+with zero high/medium findings, and GitHub checks <code>Verify Node 24.18.1</code>
+and <code>Analyze JavaScript and TypeScript</code>. This verifies frozen source
+and synthetic local evidence only; it does not prove public TLS, live provider
+I/O, provider acceptance, delivery, read status, or production deployment.
 
 ## Container and network boundary
 
@@ -282,7 +292,7 @@ any data you need to keep.
 - No encryption-at-rest claim for the Docker volume or host disk.
 - No dispatch worker, provider send/receipt path, retry policy, public
   TLS/proxy, real Telegram, Zalo OA, Facebook Page, or WhatsApp Business
-  confirmation, or production monitoring. The Phase 4g candidate stores only
+  confirmation, or production monitoring. The verified Phase 4g source stores only
   a narrow append-only evidence foundation; it is not a dispatcher or delivery
   feature. The Phase 4e source renders queued intent through an authenticated
   dashboard session, and the Phase 4f source can record that existing

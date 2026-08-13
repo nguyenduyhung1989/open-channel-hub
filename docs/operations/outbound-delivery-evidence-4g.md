@@ -1,9 +1,14 @@
 # Phase 4g append-only outbound delivery evidence
 
-**Status: candidate source.** This document describes the Phase 4g migration
-candidate only. It does not claim final local verification, GitHub checks,
-public TLS, a provider request, provider acceptance, delivery, read status, or
-production deployment.
+**Status: source verified at exact commit <code>6444699</code>.** It passed
+<code>npm run check</code> (54 test files / 358 tests and build),
+<code>npm audit --audit-level=low</code> with zero findings, Gitleaks with no
+secrets, <code>git diff --check</code>, a synthetic Compose smoke with cleanup,
+an independent security audit APPROVE with zero high/medium findings, and
+GitHub checks <code>Verify Node 24.18.1</code> and
+<code>Analyze JavaScript and TypeScript</code>. This verifies frozen source and
+synthetic local evidence only; it does not prove public TLS, live provider I/O,
+provider acceptance, delivery, read status, or production deployment.
 
 Phase 4g adds a durable evidence foundation for a future outbound dispatcher.
 It does **not** send a message. The existing Phase 4c command remains an
@@ -70,7 +75,7 @@ docker compose exec postgres psql --username=postgres --dbname=open_channel_hub 
 ```
 
 The disposable Compose smoke test checks that all ten migrations apply and that
-the candidate tables, foreign keys, attempt uniqueness, receipt primary key,
+the Phase 4g tables, foreign keys, attempt uniqueness, receipt primary key,
 outcome constraints, and immutable triggers exist. It deliberately does not
 insert an attempt or receipt, start a worker, or contact a provider.
 

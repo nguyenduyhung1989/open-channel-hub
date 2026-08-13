@@ -105,8 +105,8 @@ event.
   process can create provider-side effects through this feature.
 - `queued` remains an intent label. A recorded `provider_accepted` receipt is
   stronger ledger evidence than `queued`, but it still is not sent, delivered,
-  or read status and does not establish a live provider result in this
-  candidate.
+  or read status and does not establish a live provider result in this verified
+  source.
 - A future dispatcher must write an attempt fact before or with a carefully
   designed provider boundary, handle an absent receipt as unknown, and receive
   a separate security/provider review before any retry behavior exists.

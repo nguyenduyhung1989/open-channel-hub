@@ -169,13 +169,13 @@ follows [Semantic Versioning](https://semver.org/).
   20-attempt-per-principal rolling-minute guard, and no browser bearer,
   recipient field, provider request, worker, dispatch, retry, delivery state,
   command mutation, migration, or Compose change.
-- Phase 4g candidate: forward migration
+- Phase 4g: forward migration
   <code>0010_outbound_delivery_attempt_receipts</code> with append-only
   `outbound_delivery_attempts` and `outbound_delivery_attempt_receipts` tables.
   They record at most one durable attempt fact per command and one optional
   receipt per attempt; they add no provider I/O, worker, retry, route, browser
   result, command mutation, or delivery/read claim.
-- Phase 4g candidate: the receipt constraint permits exactly
+- Phase 4g: the receipt constraint permits exactly
   `provider_accepted`, `provider_rejected`, or `outcome_unknown`. Only
   `provider_accepted` has a provider message ID. Absence of a durable attempt
   row supports a derived `not_attempted`-in-this-ledger label only; it never
@@ -226,7 +226,7 @@ follows [Semantic Versioning](https://semver.org/).
   sequence rather than a text alias; callers must restart from page one after
   upgrading so a mixed ordering cannot silently skip events.
 - The supplied loopback-only HTTP Compose smoke remains intentionally dashboard
-  free. The Phase 4g candidate advances it to ten immutable schema migrations
+  free. The verified Phase 4g source advances it to ten immutable schema migrations
   and adds structural checks for delivery-evidence tables, foreign keys,
   outcome/provider-ID constraints, and immutable triggers. It still verifies
   source-bound reply-command idempotency/target derivation plus queued-history
@@ -249,6 +249,15 @@ follows [Semantic Versioning](https://semver.org/).
   <code>Analyze JavaScript and TypeScript</code> succeeded for that exact
   commit. This remains no public-TLS, live-provider, provider-send, or
   production-deployment claim.
+- Exact commit <code>6444699</code> completed Phase 4g source verification:
+  <code>npm run check</code> (54 test files / 358 tests and build),
+  <code>npm audit --audit-level=low</code> with zero findings, Gitleaks with no
+  secrets, <code>git diff --check</code>, a synthetic Compose smoke with
+  cleanup, and an independent security audit APPROVE with zero high/medium
+  findings. GitHub checks <code>Verify Node 24.18.1</code> and
+  <code>Analyze JavaScript and TypeScript</code> succeeded for that exact
+  commit. This remains no public-TLS, live-provider-I/O, provider-acceptance,
+  delivery, read-status, or production-deployment claim.
 
 ### Security
 

@@ -37,10 +37,10 @@
   verified opt-in, source-bound durable intent recording through a
   server-rendered form; no provider send or browser bearer.
 - [Phase 4g outbound delivery evidence](operations/outbound-delivery-evidence-4g.md):
-  candidate append-only attempt/receipt evidence with no provider dispatch.
+  verified append-only attempt/receipt evidence with no provider dispatch.
 - [Phase 0–4g threat model](security/threat-model.md): assets, trust
   boundaries, current controls, and planned work.
 - [Open-source readiness](maintainers/oss-readiness.md): an honest operating
   checklist for maintainers.
 - [Phase 4a–4g checkpoint](maintainers/current-phase.md): verified milestones,
-  the Phase 4g candidate boundary, risks, and next design work.
+  the Phase 4g verified-source boundary, risks, and next design work.

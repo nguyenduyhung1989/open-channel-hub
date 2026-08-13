@@ -446,9 +446,16 @@ production deployment.**
 
 ### 4g — append-only outbound delivery evidence
 
-**Status: candidate.** This storage-only migration is not verified source
-evidence, provider dispatch, provider acceptance, delivery, or production
-evidence.
+**Status: source verified at exact commit <code>6444699</code>.** It passed
+<code>npm run check</code> (54 test files / 358 tests and build),
+<code>npm audit --audit-level=low</code> with zero findings, Gitleaks with no
+secrets, <code>git diff --check</code>, a synthetic Compose smoke with cleanup,
+an independent security audit APPROVE with zero high/medium findings, and
+GitHub checks <code>Verify Node 24.18.1</code> and
+<code>Analyze JavaScript and TypeScript</code>. This verifies frozen source and
+synthetic local evidence only; it does not prove provider dispatch, live
+provider I/O, provider acceptance, delivery, public TLS, or production
+deployment.
 
 - [x] Forward migration
       <code>0010_outbound_delivery_attempt_receipts</code> creates immutable
@@ -467,8 +474,9 @@ evidence.
       updates and deletes. No route, reader, dashboard result, provider HTTP
       request, credential, worker, queue, retry, command mutation, or delivery/
       read state is introduced.
-- [ ] Final local verification, independent security review, synthetic Compose
-      proof, and fresh GitHub CI/CodeQL for the exact candidate commit.
+- [x] Final local verification, independent security review, synthetic Compose
+      proof with cleanup, and fresh GitHub CI/CodeQL for exact commit
+      <code>6444699</code>.
 
 ### Later Phase 4 work
 

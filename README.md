@@ -2,7 +2,7 @@
 
 > A self-hosted, official-first multichannel messaging hub.
 
-**Status: Phase 4g alpha source candidate; Phase 4f source verified.** The repository contains a durable
+**Status: Phase 4g alpha source verified.** The repository contains a durable
 PostgreSQL inbound-event ledger, account-scoped operator read APIs, a
 configured multi-connection inbox API, an optional server-rendered read-only
 operator dashboard, a durable source-bound reply-command ledger, a scoped
@@ -32,10 +32,11 @@ incomplete until an owner-authorized Telegram test bot works through public
 TLS; Phases 3a, 3b, and 3c likewise have no owner-authorized real provider
 proof.
 
-Phase 4g is present only as a candidate migration with no final verification
-claim. It records narrow append-only local evidence for a future dispatcher;
-it does not create a provider request, provider acceptance, delivery, or read
-result.
+The Phase 4g append-only delivery-evidence source passed final local checks,
+independent security review, synthetic Compose smoke, and GitHub CI/CodeQL for
+exact commit <code>6444699</code>. It records narrow local evidence for a
+future dispatcher; it does not create a provider request, provider acceptance,
+delivery, or read result.
 
 The official Telegram Bot HTTP transport is wired for a deliberately narrow
 legacy text send/receive slice. Legacy mode uses <code>OPERATOR_API_TOKEN</code>;
@@ -196,16 +197,24 @@ checks <code>Verify Node 24.18.1</code> and <code>Analyze JavaScript and
 TypeScript</code>. This source verification is not public-TLS, live-provider,
 or production evidence.
 
-Phase 4g is a candidate append-only delivery-evidence foundation. Migration
+Phase 4g is a verified source append-only delivery-evidence foundation. Migration
 <code>0010_outbound_delivery_attempt_receipts</code> adds at most one durable
 attempt fact per command and at most one optional receipt per attempt. A receipt
 can be <code>provider_accepted</code> only with a provider message ID,
 <code>provider_rejected</code>, or <code>outcome_unknown</code>. Absence of a
 durable attempt row supports a derived <code>not_attempted</code>-in-this-ledger
 label only; it does not prove no provider call ever happened. An attempt with
-no receipt is conservatively unknown. This candidate adds no route, dashboard
-result, worker, provider request, provider credential, retry, command mutation,
-delivery/read state, or provider proof.
+no receipt is conservatively unknown. It adds no route, dashboard result,
+worker, provider request, provider credential, retry, command mutation,
+delivery/read state, or provider proof. Exact commit <code>6444699</code>
+passed <code>npm run check</code> (54 test files / 358 tests and build),
+<code>npm audit --audit-level=low</code> with zero findings, Gitleaks with no
+secrets, <code>git diff --check</code>, a synthetic Compose smoke with cleanup,
+an independent security audit APPROVE with zero high/medium findings, and
+GitHub checks <code>Verify Node 24.18.1</code> and
+<code>Analyze JavaScript and TypeScript</code>. This verifies the frozen source
+and synthetic local path only; it does not prove public TLS, live provider I/O,
+provider acceptance, delivery, read status, or production deployment.
 
 Multi-connection IDs are opaque safe route labels; <code>.</code> and
 <code>..</code> are rejected because webhook ingress places the ID in a dynamic
@@ -507,7 +516,7 @@ records the verified source's separate no-send/history boundary. The
 [Phase 4f dashboard reply-intent guide](docs/operations/operator-dashboard-reply-intents-4f.md)
 records the verified source's explicit opt-in write scope, per-principal local rate
 guard, and no-send boundary. The [Phase 4g delivery-evidence guide](docs/operations/outbound-delivery-evidence-4g.md)
-records the separate candidate attempt/receipt foundation; it adds no dashboard
+records the separate verified source attempt/receipt foundation; it adds no dashboard
 delivery result or provider action.
 
 ## Corresponding-source offer

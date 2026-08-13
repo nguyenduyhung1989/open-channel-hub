@@ -20,7 +20,7 @@ records through the existing Phase 4c command boundary only after an explicit
 per-principal inbox grant; it does not alter this history API, its cursor, or
 its `queued`-only projection. See the
 [Phase 4f reply-intent guide](operator-dashboard-reply-intents-4f.md).
-Phase 4g is a separate candidate append-only storage foundation; it does not
+Phase 4g is a separate verified-source append-only storage foundation; it does not
 alter this history API or expose attempt/receipt data. See the
 [Phase 4g delivery-evidence guide](outbound-delivery-evidence-4g.md).
 
@@ -28,7 +28,7 @@ alter this history API or expose attempt/receipt data. See the
 
 - PostgreSQL must be available with `0009_outbound_reply_commands`. It was the
   ninth migration at the verified Phase 4d revision; a current installation
-  also applies later forward migrations such as the Phase 4g candidate
+  also applies later forward migrations such as the verified Phase 4g source
   `0010_outbound_delivery_attempt_receipts`.
 - The version-1 runtime secret document must configure an `inboxes` entry.
   Its bearer selects a fixed server-side set of existing connections.

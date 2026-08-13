@@ -62,7 +62,7 @@ organization has accepted the project.
   send/history UI. Exact commit <code>160414e</code> passed final local
   verification, synthetic Compose proof, independent security review, GitHub
   CI, and CodeQL.
-- Phase 4g is a candidate forward migration only. It adds append-only
+- Phase 4g is a verified source forward migration only. It adds append-only
   `outbound_delivery_attempts` and `outbound_delivery_attempt_receipts` tables
   without a route, provider request, provider credential, worker, retry, or
   delivery/read state. An absent attempt row supports only a derived
@@ -123,19 +123,24 @@ organization has accepted the project.
   prove the required HTTPS dashboard boundary, public TLS, live provider
   operation, or production deployment.
 
-## Phase 4g candidate delivery evidence
+## Verified Phase 4g source delivery evidence
 
 - Migration `0010_outbound_delivery_attempt_receipts` adds one immutable
   attempt fact at most per command and one optional immutable receipt at most
   per attempt. Both tables have their own update/delete-rejection trigger.
 - The receipt constraint permits only `provider_accepted`,
   `provider_rejected`, and `outcome_unknown`. A recorded acceptance receipt
-  requires a provider message ID; neither the schema nor the candidate proves
-  a live provider acknowledgement, delivery, display, or read.
-- Phase 4g is not verified source evidence yet. It still needs focused local
-  checks, an independent security review, synthetic Compose structural proof,
-  and fresh exact GitHub CI/CodeQL before any source-verification claim. It
-  still cannot authorize provider I/O or public TLS.
+  requires a provider message ID; neither the schema nor the verified source
+  proves a live provider acknowledgement, delivery, display, or read.
+- Exact commit <code>6444699</code> passed <code>npm run check</code> (54 test
+  files / 358 tests and build), <code>npm audit --audit-level=low</code> with
+  zero findings, Gitleaks with no secrets, <code>git diff --check</code>, a
+  synthetic Compose smoke with cleanup, an independent security audit APPROVE
+  with zero high/medium findings, and GitHub checks <code>Verify Node 24.18.1</code>
+  and <code>Analyze JavaScript and TypeScript</code>. It is a verified source
+  feature, not public-TLS, live-provider-I/O, provider-acceptance, delivery,
+  read-status, or production evidence; it still cannot authorize provider I/O
+  or public TLS.
 
 ## Verified GitHub evidence
 
@@ -197,8 +202,8 @@ organization has accepted the project.
   hidden source transport values and user-entered reply text through that same
   authenticated boundary. Protect every path to that text to the same standard
   and keep messages out of examples, logs, screenshots, and public discussion.
-- Do not mistake Phase 4c `queued` intents, Phase 4d history rows, or Phase 4g
-  candidate evidence for sends. A future provider dispatcher still needs a
+- Do not mistake Phase 4c `queued` intents, Phase 4d history rows, or verified
+  Phase 4g evidence for sends. A future provider dispatcher still needs a
   separate official-provider policy, attempt-write ordering, timeout/receipt
   model, retry decision, review, and verification. The legacy Phase 1a Telegram
   direct-send route is separate compatibility behavior, not evidence that all

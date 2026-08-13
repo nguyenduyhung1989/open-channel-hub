@@ -30,7 +30,7 @@ or production claim.
 - PostgreSQL must have `0009_outbound_reply_commands` and Phase 4d queued
   history available. It was the ninth migration at the verified Phase 4e
   revision; current installations also apply later forward migrations such as
-  the Phase 4g candidate `0010_outbound_delivery_attempt_receipts`. No Phase
+  the verified Phase 4g source `0010_outbound_delivery_attempt_receipts`. No Phase
   4e migration or configuration field was added.
 - A Phase 4c reply intent must already exist before the page has an item to
   display.

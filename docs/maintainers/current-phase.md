@@ -1,4 +1,4 @@
-# Public checkpoint: Phase 4a–4f verified source and Phase 4g candidate
+# Public checkpoint: Phase 4a–4g verified source
 
 **Verified scope:** Phase 4a is a configured, read-only aggregate feed across
 an explicit set of existing official connections. It builds on the Telegram
@@ -49,7 +49,7 @@ GitHub checks <code>Verify Node 24.18.1</code> and <code>Analyze JavaScript and
 TypeScript</code>. This source evidence is not public TLS, live-provider, or
 production evidence.
 
-**Phase 4g candidate scope:** Phase 4g adds one forward-only, append-only
+**Verified Phase 4g source scope:** Phase 4g adds one forward-only, append-only
 PostgreSQL evidence migration. It can record at most one durable local attempt
 fact per existing command and at most one optional known-outcome receipt for
 that attempt. Its exact receipt outcomes are `provider_accepted`,
@@ -57,10 +57,17 @@ that attempt. Its exact receipt outcomes are `provider_accepted`,
 message ID. Absence of a durable attempt row supports only a derived
 `not_attempted`-in-this-ledger label, never proof that an external call could
 not have happened. A recorded attempt without a receipt is conservatively
-unknown. The candidate
-adds no route, dashboard projection, provider HTTP request, provider
+unknown. It adds no route, dashboard projection, provider HTTP request, provider
 credential, worker, retry, command mutation, delivery/read state, live-provider
-test, or production claim.
+test, or production claim. Exact commit <code>6444699</code> passed
+<code>npm run check</code> (54 test files / 358 tests and build),
+<code>npm audit --audit-level=low</code> with zero findings, Gitleaks with no
+secrets, <code>git diff --check</code>, a synthetic Compose smoke with cleanup,
+an independent security audit APPROVE with zero high/medium findings, and
+GitHub checks <code>Verify Node 24.18.1</code> and
+<code>Analyze JavaScript and TypeScript</code>. This verifies frozen source and
+synthetic local evidence only; it does not prove public TLS, live provider I/O,
+provider acceptance, delivery, read status, or production deployment.
 
 ## Exact verified history
 
@@ -93,11 +100,14 @@ test, or production claim.
 - Phase 4f's server-rendered source-bound reply-intent form passed final local
   evidence, independent security review, a synthetic Compose smoke with
   cleanup, and fresh GitHub checks for exact commit <code>74fca30</code>.
+- Phase 4g's append-only delivery-evidence migration passed final local
+  evidence, independent security review, a synthetic Compose smoke with
+  cleanup, and fresh GitHub checks for exact commit <code>6444699</code>.
 - Historical evidence proves only those exact revisions. It does not verify any
   live provider account, provider send, public TLS endpoint, production
-  deployment, or the Phase 4f source beyond its exact verified commit.
+  deployment, or any Phase 4g provider result beyond its exact verified commit.
 
-## Phase 4g candidate
+## Verified Phase 4g source
 
 Migration `0010_outbound_delivery_attempt_receipts` adds
 `outbound_delivery_attempts` and `outbound_delivery_attempt_receipts` without
@@ -119,11 +129,16 @@ delivered, displayed, or read. `provider_rejected` is not automatic-retry author
 unknown. Absence of an attempt row supports only `not_attempted` in this ledger;
 that derived label does not prove a provider call never happened.
 
-The candidate still needs final local verification, independent security
-review, a synthetic Compose structural proof, and fresh GitHub CI/CodeQL on its
-exact commit. None of that future evidence can substitute for separate owner
-authorization and a provider-specific design before any real provider call or
-public TLS exposure.
+Exact commit <code>6444699</code> completed final local verification:
+<code>npm run check</code> (54 test files / 358 tests and build),
+<code>npm audit --audit-level=low</code> with zero findings, Gitleaks with no
+secrets, <code>git diff --check</code>, and a synthetic Compose structural smoke
+with cleanup. The independent security audit returned APPROVE with zero
+high/medium findings, and both GitHub checks succeeded. This source verification
+does not substitute for separate owner authorization and a provider-specific
+design before any real provider call or public TLS exposure; it proves no live
+provider I/O, provider acceptance, delivery, read status, or production
+deployment.
 
 ## Verified Phase 4a source
 
@@ -376,12 +391,10 @@ public TLS, a real provider send, or production deployment.
 
 ## Next authorized work
 
-Keep the verified Phase 4e and Phase 4f evidence frozen at
-<code>465186e</code> and <code>74fca30</code>. Finalize the Phase 4g candidate
-only with focused checks, independent security review, one synthetic Compose
-structural proof, and fresh exact CI evidence. Keep all live provider use
-separate: require explicit owner authorization before connecting a real account
-or exposing public TLS. Any later full user/organization authorization,
-conversation model, dispatcher, retry policy, or dashboard deployment must
-start with its own bounded design, migration/security review, and verification
-criteria.
+Keep the verified Phase 4e, Phase 4f, and Phase 4g evidence frozen at
+<code>465186e</code>, <code>74fca30</code>, and <code>6444699</code>. Keep all
+live provider use separate: require explicit owner authorization before
+connecting a real account or exposing public TLS. Any later full
+user/organization authorization, conversation model, dispatcher, retry policy,
+or dashboard deployment must start with its own bounded design,
+migration/security review, and verification criteria.
