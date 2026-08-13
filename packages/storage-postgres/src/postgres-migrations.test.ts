@@ -86,13 +86,68 @@ describe('PostgreSQL migrations', () => {
     expect(sql).toContain('CREATE FUNCTION open_channel_hub.reject_outbound_command_mutation()');
     expect(sql).toContain('CREATE TRIGGER outbound_commands_immutable');
     expect(sql).toContain('BEFORE UPDATE OR DELETE ON open_channel_hub.outbound_commands');
+    expect(sql).toContain('CREATE TABLE open_channel_hub.outbound_delivery_attempts');
+    expect(sql).toContain('attempt_id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY');
+    expect(sql).toContain('command_id bigint NOT NULL UNIQUE');
+    expect(sql).toContain('recorded_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP');
+    expect(sql).toContain('REFERENCES open_channel_hub.outbound_commands (command_id)');
+    expect(sql).toContain('CREATE TABLE open_channel_hub.outbound_delivery_attempt_receipts');
+    expect(sql).toContain('attempt_id bigint PRIMARY KEY');
+    expect(sql).toContain('outcome text NOT NULL');
+    expect(sql).toContain('provider_message_id text');
+    expect(sql).toContain('observed_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP');
+    expect(sql).toContain(
+      "outcome IN ('provider_accepted', 'provider_rejected', 'outcome_unknown')"
+    );
+    expect(sql).toContain('char_length(provider_message_id) BETWEEN 1 AND 512');
+    expect(sql).toContain("provider_message_id ~ '^[!-~]+$'");
+    expect(sql).toContain("outcome = 'provider_accepted' AND provider_message_id IS NOT NULL");
+    expect(sql).toMatch(
+      /outcome IN \('provider_rejected', 'outcome_unknown'\)\s+AND provider_message_id IS NULL/
+    );
+    expect(sql).toContain('REFERENCES open_channel_hub.outbound_delivery_attempts (attempt_id)');
+    expect(sql).toContain(
+      'CREATE FUNCTION open_channel_hub.reject_outbound_delivery_attempt_mutation()'
+    );
+    expect(sql).toContain(
+      'CREATE FUNCTION open_channel_hub.reject_outbound_delivery_attempt_receipt_mutation()'
+    );
+    expect(sql).toContain('CREATE TRIGGER outbound_delivery_attempts_immutable');
+    expect(sql).toContain('CREATE TRIGGER outbound_delivery_attempt_receipts_immutable');
+    expect(sql).toContain('BEFORE UPDATE OR DELETE ON open_channel_hub.outbound_delivery_attempts');
+    expect(sql).toContain(
+      'BEFORE UPDATE OR DELETE ON open_channel_hub.outbound_delivery_attempt_receipts'
+    );
+    const deliveryAttemptStart = sql.indexOf(
+      'CREATE TABLE open_channel_hub.outbound_delivery_attempts'
+    );
+    const deliveryReceiptStart = sql.indexOf(
+      'CREATE TABLE open_channel_hub.outbound_delivery_attempt_receipts'
+    );
+    const deliveryAttemptSql = sql.slice(deliveryAttemptStart, deliveryReceiptStart);
+    const deliveryReceiptSql = sql.slice(deliveryReceiptStart);
+
+    for (const forbiddenField of [
+      'reply_target_id',
+      'message_text',
+      'credential',
+      'raw_response',
+      'error_reason',
+      'retry_count',
+      'state',
+      'http_url'
+    ]) {
+      expect(deliveryAttemptSql).not.toContain(forbiddenField);
+      expect(deliveryReceiptSql).not.toContain(forbiddenField);
+    }
     expect(sql).toContain('INSERT INTO open_channel_hub.schema_migrations');
     expect(sql).not.toContain('public.');
-    expect(
-      pool.queries
-        .filter((query) => query.sql.includes('INSERT INTO open_channel_hub.schema_migrations'))
-        .map((query) => query.values[0])
-    ).toEqual([
+    const recordedMigrationIds = pool.queries
+      .filter((query) => query.sql.includes('INSERT INTO open_channel_hub.schema_migrations'))
+      .map((query) => query.values[0]);
+
+    expect(recordedMigrationIds).toHaveLength(10);
+    expect(recordedMigrationIds).toEqual([
       '0001_inbound_event_ledger',
       '0002_inbound_event_ledger_sequence',
       '0003_connection_registry',
@@ -101,7 +156,8 @@ describe('PostgreSQL migrations', () => {
       '0006_connection_registry_facebook_page_provider_identity',
       '0007_connection_registry_whatsapp_business_provider_identity',
       '0008_dashboard_sessions',
-      '0009_outbound_reply_commands'
+      '0009_outbound_reply_commands',
+      '0010_outbound_delivery_attempt_receipts'
     ]);
     expect(pool.releaseCount).toBe(1);
   });
@@ -137,6 +193,20 @@ describe('PostgreSQL migrations', () => {
       'CREATE FUNCTION open_channel_hub.reject_outbound_command_mutation()'
     );
     expect(secondRunSql).not.toContain('CREATE TRIGGER outbound_commands_immutable');
+    expect(secondRunSql).not.toContain('CREATE TABLE open_channel_hub.outbound_delivery_attempts');
+    expect(secondRunSql).not.toContain(
+      'CREATE TABLE open_channel_hub.outbound_delivery_attempt_receipts'
+    );
+    expect(secondRunSql).not.toContain(
+      'CREATE FUNCTION open_channel_hub.reject_outbound_delivery_attempt_mutation()'
+    );
+    expect(secondRunSql).not.toContain(
+      'CREATE FUNCTION open_channel_hub.reject_outbound_delivery_attempt_receipt_mutation()'
+    );
+    expect(secondRunSql).not.toContain('CREATE TRIGGER outbound_delivery_attempts_immutable');
+    expect(secondRunSql).not.toContain(
+      'CREATE TRIGGER outbound_delivery_attempt_receipts_immutable'
+    );
     expect(secondRunSql).not.toContain('INSERT INTO open_channel_hub.schema_migrations');
     expect(pool.releaseCount).toBe(2);
   });

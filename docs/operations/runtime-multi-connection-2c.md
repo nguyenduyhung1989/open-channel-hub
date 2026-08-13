@@ -413,7 +413,9 @@ The repository's disposable Compose smoke test uses two synthetic Telegram Bot
 connections, two synthetic Zalo OA connections, two synthetic Facebook Pages,
 and two synthetic WhatsApp business phones on one fake shared Meta App. It also
 configures separate support and sales inboxes, each spanning four of those
-accounts. It migrates the nine immutable schema entries twice, verifies
+accounts. The Phase 4g candidate migrates all ten immutable schema entries
+twice, verifies the delivery-evidence schema structurally without inserting an
+attempt or receipt, then verifies
 registry rows and Zalo/Facebook/WhatsApp fingerprint presence without printing
 them, checks Telegram dynamic webhook behavior, proves Zalo raw-byte hashing
 and shared Meta raw-byte HMAC boundaries, checks duplicate idempotency within

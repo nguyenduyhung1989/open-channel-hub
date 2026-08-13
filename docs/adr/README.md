@@ -21,6 +21,7 @@ it does not mean a feature is complete.
 | [0013](0013-scoped-queued-reply-command-history.md)    | accepted | Scoped queued reply-command history without delivery semantics  |
 | [0014](0014-server-rendered-queued-command-history.md) | accepted | Server-rendered queued command history for dashboard principals |
 | [0015](0015-opt-in-dashboard-reply-intents.md)         | accepted | Opt-in source-bound dashboard reply-intent recording            |
+| [0016](0016-append-only-outbound-delivery-evidence.md) | accepted | Append-only outbound delivery evidence before provider dispatch |
 
 Template for a new ADR:
 

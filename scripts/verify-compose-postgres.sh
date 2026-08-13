@@ -603,7 +603,7 @@ assert_equal \
 migration_count="$(
   query_postgres "SELECT COUNT(*) FROM open_channel_hub.schema_migrations;"
 )"
-assert_equal '9' "$migration_count" 'immutable migration ledger entry count'
+assert_equal '10' "$migration_count" 'immutable migration ledger entry count'
 
 connection_registry_records="$(
   query_postgres "SELECT connection_id || ':' || connector_id || ':' || channel || ':' || tier FROM open_channel_hub.connection_registry ORDER BY connection_id;"
@@ -892,6 +892,14 @@ outbound_command_schema_guards="$(
   query_postgres "SELECT CASE WHEN (SELECT COUNT(*) FROM pg_constraint WHERE conrelid = 'open_channel_hub.outbound_commands'::regclass AND conname IN ('outbound_commands_source_event_fk', 'outbound_commands_connection_client_operation_unique')) = 2 AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'open_channel_hub.outbound_commands'::regclass AND tgname = 'outbound_commands_immutable' AND NOT tgisinternal) THEN 'present' ELSE 'missing' END;"
 )"
 assert_equal 'present' "$outbound_command_schema_guards" 'source foreign key, idempotency constraint, and immutable trigger'
+
+outbound_delivery_evidence_schema_guards="$(
+  query_postgres "SELECT CASE WHEN to_regclass('open_channel_hub.outbound_delivery_attempts') IS NOT NULL AND to_regclass('open_channel_hub.outbound_delivery_attempt_receipts') IS NOT NULL AND (SELECT COUNT(*) FROM pg_constraint WHERE conrelid = 'open_channel_hub.outbound_delivery_attempts'::regclass AND conname = 'outbound_delivery_attempts_command_fk') = 1 AND (SELECT COUNT(*) FROM pg_constraint WHERE conrelid = 'open_channel_hub.outbound_delivery_attempts'::regclass AND contype = 'u' AND conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'open_channel_hub.outbound_delivery_attempts'::regclass AND attname = 'command_id' AND NOT attisdropped)]) = 1 AND (SELECT COUNT(*) FROM pg_constraint WHERE conrelid = 'open_channel_hub.outbound_delivery_attempt_receipts'::regclass AND conname IN ('outbound_delivery_attempt_receipts_attempt_fk', 'outbound_delivery_attempt_receipts_outcome_known', 'outbound_delivery_attempt_receipts_provider_message_id_format', 'outbound_delivery_attempt_receipts_provider_message_id_outcome')) = 4 AND (SELECT COUNT(*) FROM pg_constraint WHERE conrelid = 'open_channel_hub.outbound_delivery_attempt_receipts'::regclass AND contype = 'p' AND conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'open_channel_hub.outbound_delivery_attempt_receipts'::regclass AND attname = 'attempt_id' AND NOT attisdropped)]) = 1 AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'open_channel_hub.outbound_delivery_attempts'::regclass AND tgname = 'outbound_delivery_attempts_immutable' AND NOT tgisinternal) AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'open_channel_hub.outbound_delivery_attempt_receipts'::regclass AND tgname = 'outbound_delivery_attempt_receipts_immutable' AND NOT tgisinternal) THEN 'present' ELSE 'missing' END;"
+)"
+assert_equal \
+  'present' \
+  "$outbound_delivery_evidence_schema_guards" \
+  'Phase 4g delivery-evidence tables, constraints, and immutable triggers'
 
 support_outbound_history_queued_rows="$(
   query_postgres "SELECT CASE WHEN COUNT(*) = 2 AND COUNT(*) FILTER (WHERE state = 'queued') = 2 THEN 'present' ELSE 'missing' END FROM open_channel_hub.outbound_commands WHERE connection_id = 'telegram-bot-support' AND client_operation_id IN ('${support_outbound_client_operation_id}', '${support_outbound_history_client_operation_id}');"

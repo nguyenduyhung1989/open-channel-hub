@@ -62,8 +62,8 @@ duplicate an already started traversal.
 
 The reader filters `state = 'queued'` explicitly, even though the current
 immutable schema permits no other state. This makes the current contract clear:
-history is not a delivery timeline. No migration is added in Phase 4d;
-`0009_outbound_reply_commands` remains the ninth immutable migration.
+history is not a delivery timeline. No migration was added in Phase 4d; at that
+revision, `0009_outbound_reply_commands` was the ninth immutable migration.
 
 ## Options considered
 

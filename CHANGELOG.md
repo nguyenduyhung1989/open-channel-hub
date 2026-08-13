@@ -169,6 +169,18 @@ follows [Semantic Versioning](https://semver.org/).
   20-attempt-per-principal rolling-minute guard, and no browser bearer,
   recipient field, provider request, worker, dispatch, retry, delivery state,
   command mutation, migration, or Compose change.
+- Phase 4g candidate: forward migration
+  <code>0010_outbound_delivery_attempt_receipts</code> with append-only
+  `outbound_delivery_attempts` and `outbound_delivery_attempt_receipts` tables.
+  They record at most one durable attempt fact per command and one optional
+  receipt per attempt; they add no provider I/O, worker, retry, route, browser
+  result, command mutation, or delivery/read claim.
+- Phase 4g candidate: the receipt constraint permits exactly
+  `provider_accepted`, `provider_rejected`, or `outcome_unknown`. Only
+  `provider_accepted` has a provider message ID. Absence of a durable attempt
+  row supports a derived `not_attempted`-in-this-ledger label only; it never
+  proves no external call happened. A stored attempt with no receipt is
+  conservatively unknown.
 
 ### Changed
 
@@ -214,11 +226,13 @@ follows [Semantic Versioning](https://semver.org/).
   sequence rather than a text alias; callers must restart from page one after
   upgrading so a mixed ordering cannot silently skip events.
 - The supplied loopback-only HTTP Compose smoke remains intentionally dashboard
-  free. It retains all nine immutable schema migrations and now verifies
+  free. The Phase 4g candidate advances it to ten immutable schema migrations
+  and adds structural checks for delivery-evidence tables, foreign keys,
+  outcome/provider-ID constraints, and immutable triggers. It still verifies
   source-bound reply-command idempotency/target derivation plus queued-history
   scope, safe projection, cursor continuation, and cursor rejection. It does
-  not attempt a browser login whose `Secure` cookies and exact origin require
-  TLS.
+  not insert an attempt/receipt, attempt a browser login whose `Secure` cookies
+  and exact origin require TLS, or contact a provider.
 - Exact commit <code>465186e</code> completed Phase 4e local verification:
   formatting, lint, strict type checking, 53 test files / 351 tests, build,
   low-threshold dependency audit, secret scan, diff check, and synthetic

@@ -1,4 +1,4 @@
-# Public checkpoint: Phase 4a–4f verified source
+# Public checkpoint: Phase 4a–4f verified source and Phase 4g candidate
 
 **Verified scope:** Phase 4a is a configured, read-only aggregate feed across
 an explicit set of existing official connections. It builds on the Telegram
@@ -49,6 +49,19 @@ GitHub checks <code>Verify Node 24.18.1</code> and <code>Analyze JavaScript and
 TypeScript</code>. This source evidence is not public TLS, live-provider, or
 production evidence.
 
+**Phase 4g candidate scope:** Phase 4g adds one forward-only, append-only
+PostgreSQL evidence migration. It can record at most one durable local attempt
+fact per existing command and at most one optional known-outcome receipt for
+that attempt. Its exact receipt outcomes are `provider_accepted`,
+`provider_rejected`, and `outcome_unknown`; only acceptance has a provider
+message ID. Absence of a durable attempt row supports only a derived
+`not_attempted`-in-this-ledger label, never proof that an external call could
+not have happened. A recorded attempt without a receipt is conservatively
+unknown. The candidate
+adds no route, dashboard projection, provider HTTP request, provider
+credential, worker, retry, command mutation, delivery/read state, live-provider
+test, or production claim.
+
 ## Exact verified history
 
 - GitHub CI and CodeQL succeeded for the Phase 0 commit <code>8b80c3b</code>,
@@ -83,6 +96,34 @@ production evidence.
 - Historical evidence proves only those exact revisions. It does not verify any
   live provider account, provider send, public TLS endpoint, production
   deployment, or the Phase 4f source beyond its exact verified commit.
+
+## Phase 4g candidate
+
+Migration `0010_outbound_delivery_attempt_receipts` adds
+`outbound_delivery_attempts` and `outbound_delivery_attempt_receipts` without
+changing `outbound_commands`. The attempt table has one immutable row at most
+per command; the receipt table has one immutable row at most per attempt. Their
+foreign keys keep the evidence source-bound, and their update/delete-rejection
+triggers keep it append-only.
+
+The receipt table contains only its attempt reference, exact outcome, optional
+provider message ID, and observed time. It rejects a provider message ID unless
+the outcome is `provider_accepted`, and it requires one for acceptance. It does
+not store target, text, credential, raw provider response, error/reason, HTTP
+detail, URL, retry setting, or mutable delivery state.
+
+This is deliberately not a delivery timeline. `provider_accepted` is a recorded
+provider-acknowledgement receipt with a provider message ID, not sent,
+delivered, displayed, or read. `provider_rejected` is not automatic-retry authorization.
+`outcome_unknown`, including a stored attempt with no receipt, must remain
+unknown. Absence of an attempt row supports only `not_attempted` in this ledger;
+that derived label does not prove a provider call never happened.
+
+The candidate still needs final local verification, independent security
+review, a synthetic Compose structural proof, and fresh GitHub CI/CodeQL on its
+exact commit. None of that future evidence can substitute for separate owner
+authorization and a provider-specific design before any real provider call or
+public TLS exposure.
 
 ## Verified Phase 4a source
 
@@ -213,8 +254,8 @@ The verified source adds one narrow write capability to a configured inbox beare
   recorded `text`, `queued` state, creation time, and optional `nextCursor`.
   Recorded text is sensitive. The projection omits the private reply target,
   source message/channel, client operation ID, raw provider data, credentials,
-  attempt data, and delivery/read state. It adds no migration: `0009` remains
-  the ninth immutable migration.
+  attempt data, and delivery/read state. Phase 4d added no migration: at that
+  revision, `0009` was the ninth immutable migration.
 - At the verified Phase 4d revision, there was no dashboard history page,
   state mutation, provider HTTP call, dispatch worker, retry, attempt, timeout,
   receipt, delivery/read tracking, provider token/OAuth storage, or browser
@@ -322,13 +363,13 @@ public TLS, a real provider send, or production deployment.
   attachment, retention/deletion workflow, backup/restore proof,
   encryption-at-rest assurance, rate-limit, structured observability,
   alerting, or production deployment exists.
-- No dispatch queue/worker, retry, attempt/timeout policy, delivery/read status,
+- No dispatch queue/worker, retry or timeout policy, delivery/read status,
   template, media, OAuth, provider access-token storage, Graph API request,
-  Facebook User, Zalo User, or WhatsApp User surface exists. Phase 4c has only
-  an immutable intent ledger, Phase 4d has only its scoped history, Phase 4e
-  renders that history, and the verified Phase 4f source can record the same
-  source-bound intent through an explicit dashboard write grant; none is a
-  delivery engine.
+  Facebook User, Zalo User, or WhatsApp User surface exists. Phase 4g has only
+  append-only delivery evidence and is not a delivery engine. Phase 4c has an
+  immutable intent ledger, Phase 4d has scoped history, Phase 4e renders that
+  history, and the verified Phase 4f source can record the same source-bound
+  intent through an explicit dashboard write grant.
 - A `200` from the local synthetic feed or a green test/GitHub check does not
   prove a TLS endpoint, provider eligibility, live message operation, or a
   production-ready access model.
@@ -336,11 +377,11 @@ public TLS, a real provider send, or production deployment.
 ## Next authorized work
 
 Keep the verified Phase 4e and Phase 4f evidence frozen at
-<code>465186e</code> and <code>74fca30</code>. Any change to their dashboard
-history/form, session/scope boundary, or browser projection must start as a new
-candidate with focused checks, independent security review, and fresh exact CI
-evidence. Keep all live provider use separate: require explicit owner
-authorization before connecting a real account or exposing public TLS. Any
-later full user/organization authorization, conversation model, dispatch
-engine, or dashboard deployment must start with its own bounded design,
-migration/security review, and verification criteria.
+<code>465186e</code> and <code>74fca30</code>. Finalize the Phase 4g candidate
+only with focused checks, independent security review, one synthetic Compose
+structural proof, and fresh exact CI evidence. Keep all live provider use
+separate: require explicit owner authorization before connecting a real account
+or exposing public TLS. Any later full user/organization authorization,
+conversation model, dispatcher, retry policy, or dashboard deployment must
+start with its own bounded design, migration/security review, and verification
+criteria.

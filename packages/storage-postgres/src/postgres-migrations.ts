@@ -336,6 +336,87 @@ EXECUTE FUNCTION ${POSTGRES_SCHEMA}.reject_outbound_command_mutation()
 `
 ]);
 
+/**
+ * An outbound command can gain at most one immutable delivery-attempt fact.
+ * A separate receipt is optional because a recorded attempt without one is
+ * conservatively outcome_unknown. Absence of an attempt row can only support
+ * a derived “not_attempted in this ledger” label; it never proves a provider
+ * call did not occur. This foundation records neither dispatch inputs nor a
+ * mutable delivery state.
+ */
+const OUTBOUND_DELIVERY_ATTEMPT_RECEIPTS_ID = '0010_outbound_delivery_attempt_receipts';
+
+const OUTBOUND_DELIVERY_ATTEMPT_RECEIPTS_STATEMENTS = Object.freeze([
+  `
+CREATE TABLE ${POSTGRES_SCHEMA}.outbound_delivery_attempts (
+  attempt_id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  command_id bigint NOT NULL UNIQUE,
+  recorded_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT outbound_delivery_attempts_command_fk FOREIGN KEY (command_id)
+    REFERENCES ${POSTGRES_SCHEMA}.outbound_commands (command_id)
+)
+`,
+  `
+CREATE TABLE ${POSTGRES_SCHEMA}.outbound_delivery_attempt_receipts (
+  attempt_id bigint PRIMARY KEY,
+  outcome text NOT NULL,
+  provider_message_id text,
+  observed_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT outbound_delivery_attempt_receipts_attempt_fk FOREIGN KEY (attempt_id)
+    REFERENCES ${POSTGRES_SCHEMA}.outbound_delivery_attempts (attempt_id),
+  CONSTRAINT outbound_delivery_attempt_receipts_outcome_known CHECK (
+    outcome IN ('provider_accepted', 'provider_rejected', 'outcome_unknown')
+  ),
+  CONSTRAINT outbound_delivery_attempt_receipts_provider_message_id_format CHECK (
+    provider_message_id IS NULL
+    OR (
+      char_length(provider_message_id) BETWEEN 1 AND 512
+      AND provider_message_id ~ '^[!-~]+$'
+    )
+  ),
+  CONSTRAINT outbound_delivery_attempt_receipts_provider_message_id_outcome CHECK (
+    (outcome = 'provider_accepted' AND provider_message_id IS NOT NULL)
+    OR (
+      outcome IN ('provider_rejected', 'outcome_unknown')
+      AND provider_message_id IS NULL
+    )
+  )
+)
+`,
+  `
+CREATE FUNCTION ${POSTGRES_SCHEMA}.reject_outbound_delivery_attempt_mutation()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RAISE EXCEPTION 'Outbound delivery attempts are immutable.';
+END;
+$$
+`,
+  `
+CREATE TRIGGER outbound_delivery_attempts_immutable
+BEFORE UPDATE OR DELETE ON ${POSTGRES_SCHEMA}.outbound_delivery_attempts
+FOR EACH ROW
+EXECUTE FUNCTION ${POSTGRES_SCHEMA}.reject_outbound_delivery_attempt_mutation()
+`,
+  `
+CREATE FUNCTION ${POSTGRES_SCHEMA}.reject_outbound_delivery_attempt_receipt_mutation()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RAISE EXCEPTION 'Outbound delivery attempt receipts are immutable.';
+END;
+$$
+`,
+  `
+CREATE TRIGGER outbound_delivery_attempt_receipts_immutable
+BEFORE UPDATE OR DELETE ON ${POSTGRES_SCHEMA}.outbound_delivery_attempt_receipts
+FOR EACH ROW
+EXECUTE FUNCTION ${POSTGRES_SCHEMA}.reject_outbound_delivery_attempt_receipt_mutation()
+`
+]);
+
 const MIGRATIONS = Object.freeze([
   Object.freeze({
     id: INBOUND_EVENT_LEDGER_ID,
@@ -396,6 +477,14 @@ const MIGRATIONS = Object.freeze([
     id: OUTBOUND_REPLY_COMMANDS_ID,
     checksum: checksumFor(OUTBOUND_REPLY_COMMANDS_ID, OUTBOUND_REPLY_COMMANDS_STATEMENTS),
     statements: OUTBOUND_REPLY_COMMANDS_STATEMENTS
+  }),
+  Object.freeze({
+    id: OUTBOUND_DELIVERY_ATTEMPT_RECEIPTS_ID,
+    checksum: checksumFor(
+      OUTBOUND_DELIVERY_ATTEMPT_RECEIPTS_ID,
+      OUTBOUND_DELIVERY_ATTEMPT_RECEIPTS_STATEMENTS
+    ),
+    statements: OUTBOUND_DELIVERY_ATTEMPT_RECEIPTS_STATEMENTS
   })
 ]);
 

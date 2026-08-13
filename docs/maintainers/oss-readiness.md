@@ -62,6 +62,12 @@ organization has accepted the project.
   send/history UI. Exact commit <code>160414e</code> passed final local
   verification, synthetic Compose proof, independent security review, GitHub
   CI, and CodeQL.
+- Phase 4g is a candidate forward migration only. It adds append-only
+  `outbound_delivery_attempts` and `outbound_delivery_attempt_receipts` tables
+  without a route, provider request, provider credential, worker, retry, or
+  delivery/read state. An absent attempt row supports only a derived
+  `not_attempted`-in-this-ledger label; it never proves no external call
+  happened. A stored attempt without a receipt remains unknown.
 
 ## Verified Phase 4e source
 
@@ -116,6 +122,20 @@ organization has accepted the project.
   <code>Analyze JavaScript and TypeScript</code>. This source evidence does not
   prove the required HTTPS dashboard boundary, public TLS, live provider
   operation, or production deployment.
+
+## Phase 4g candidate delivery evidence
+
+- Migration `0010_outbound_delivery_attempt_receipts` adds one immutable
+  attempt fact at most per command and one optional immutable receipt at most
+  per attempt. Both tables have their own update/delete-rejection trigger.
+- The receipt constraint permits only `provider_accepted`,
+  `provider_rejected`, and `outcome_unknown`. A recorded acceptance receipt
+  requires a provider message ID; neither the schema nor the candidate proves
+  a live provider acknowledgement, delivery, display, or read.
+- Phase 4g is not verified source evidence yet. It still needs focused local
+  checks, an independent security review, synthetic Compose structural proof,
+  and fresh exact GitHub CI/CodeQL before any source-verification claim. It
+  still cannot authorize provider I/O or public TLS.
 
 ## Verified GitHub evidence
 
@@ -177,13 +197,14 @@ organization has accepted the project.
   hidden source transport values and user-entered reply text through that same
   authenticated boundary. Protect every path to that text to the same standard
   and keep messages out of examples, logs, screenshots, and public discussion.
-- Do not mistake Phase 4c `queued` intents or Phase 4d history rows for sends.
-  A future provider dispatcher needs a separate official-provider policy,
-  attempt/timeout/receipt model, migration, review, and verification. The legacy
-  Phase 1a Telegram direct-send route is separate compatibility behavior, not
-  evidence that all sends are durable. Phase 4e renders intent history and the
-  verified Phase 4f source can record the existing source-bound intent; neither
-  changes that boundary.
+- Do not mistake Phase 4c `queued` intents, Phase 4d history rows, or Phase 4g
+  candidate evidence for sends. A future provider dispatcher still needs a
+  separate official-provider policy, attempt-write ordering, timeout/receipt
+  model, retry decision, review, and verification. The legacy Phase 1a Telegram
+  direct-send route is separate compatibility behavior, not evidence that all
+  sends are durable. Phase 4e renders intent history and the verified Phase 4f
+  source can record the existing source-bound intent; neither changes that
+  boundary.
 - Keep examples, fixtures, screenshots, logs, and public discussions free of
   user data and secrets.
 - Respond to issues and pull requests, record material decisions, and create

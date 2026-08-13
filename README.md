@@ -2,7 +2,7 @@
 
 > A self-hosted, official-first multichannel messaging hub.
 
-**Status: Phase 4f alpha source verified.** The repository contains a durable
+**Status: Phase 4g alpha source candidate; Phase 4f source verified.** The repository contains a durable
 PostgreSQL inbound-event ledger, account-scoped operator read APIs, a
 configured multi-connection inbox API, an optional server-rendered read-only
 operator dashboard, a durable source-bound reply-command ledger, a scoped
@@ -31,6 +31,11 @@ TLS proxy, a live provider operation, or production browser deployment. Phase
 incomplete until an owner-authorized Telegram test bot works through public
 TLS; Phases 3a, 3b, and 3c likewise have no owner-authorized real provider
 proof.
+
+Phase 4g is present only as a candidate migration with no final verification
+claim. It records narrow append-only local evidence for a future dispatcher;
+it does not create a provider request, provider acceptance, delivery, or read
+result.
 
 The official Telegram Bot HTTP transport is wired for a deliberately narrow
 legacy text send/receive slice. Legacy mode uses <code>OPERATOR_API_TOKEN</code>;
@@ -146,9 +151,10 @@ The response includes the recorded text, command/source identifiers,
 <code>queued</code>, timestamp, and an optional opaque cursor; it omits the
 private reply target, source message/channel, client operation ID, raw provider
 data, and credentials. Its cursor has its own version and binds the exact inbox
-ID plus configured connection set. No migration is added: the ninth
-<code>0009_outbound_reply_commands</code> migration remains unchanged. This is
-a history of durable intent, not delivery status or provider activity.
+ID plus configured connection set. Phase 4d added no migration; at that
+revision, <code>0009_outbound_reply_commands</code> was the ninth immutable
+migration. This is a history of durable intent, not delivery status or provider
+activity.
 
 Phase 4e adds
 <code>GET /operator/outbound-commands</code> to the existing server-rendered
@@ -189,6 +195,17 @@ independent security audit APPROVE with zero high/medium findings, and GitHub
 checks <code>Verify Node 24.18.1</code> and <code>Analyze JavaScript and
 TypeScript</code>. This source verification is not public-TLS, live-provider,
 or production evidence.
+
+Phase 4g is a candidate append-only delivery-evidence foundation. Migration
+<code>0010_outbound_delivery_attempt_receipts</code> adds at most one durable
+attempt fact per command and at most one optional receipt per attempt. A receipt
+can be <code>provider_accepted</code> only with a provider message ID,
+<code>provider_rejected</code>, or <code>outcome_unknown</code>. Absence of a
+durable attempt row supports a derived <code>not_attempted</code>-in-this-ledger
+label only; it does not prove no provider call ever happened. An attempt with
+no receipt is conservatively unknown. This candidate adds no route, dashboard
+result, worker, provider request, provider credential, retry, command mutation,
+delivery/read state, or provider proof.
 
 Multi-connection IDs are opaque safe route labels; <code>.</code> and
 <code>..</code> are rejected because webhook ingress places the ID in a dynamic
@@ -266,11 +283,12 @@ The following remain plans or explicitly incomplete operational work:
   storage, search, retention/deletion policy, backups, restore drills, or
   encryption-at-rest assurance. The narrow Phase 4b dashboard is not a claim
   to provide those capabilities.
-- Redis, a dispatch queue/worker, provider delivery, retries, attempts,
-  delivery/read status, and a provider-specific outbox policy. Phase 4c–4d
-  store and list immutable reply intent only; Phase 4e renders that history
-  through the dashboard and the verified Phase 4f source can record it through a
-  narrower dashboard form.
+- Redis, a dispatch queue/worker, provider delivery, retries, delivery/read
+  status, and a provider-specific outbox policy. Phase 4g adds only immutable
+  attempt/receipt evidence with no dispatcher: it must not be mistaken for
+  provider I/O or delivery. Phase 4c–4d store and list immutable reply intent
+  only; Phase 4e renders that history through the dashboard and the verified
+  Phase 4f source can record it through a narrower dashboard form.
 - User accounts, role-based access control, multiple
   organizations, webhook administration, public connection management, or a
   connection listing API.
@@ -395,6 +413,7 @@ front of Compose, keep the operator API on loopback, and follow the
 [Phase 4d queued command-history guide](docs/operations/outbound-command-history-4d.md), or
 [Phase 4e dashboard queued-command history guide](docs/operations/operator-dashboard-queued-history-4e.md), or
 [Phase 4f dashboard reply-intent guide](docs/operations/operator-dashboard-reply-intents-4f.md), or
+[Phase 4g delivery-evidence guide](docs/operations/outbound-delivery-evidence-4g.md), or
 [Phase 4b operator dashboard guide](docs/operations/operator-dashboard-4b.md), or
 [Phase 1a legacy guide](docs/operations/telegram-bot-1a.md) only after an
 authorized test is agreed. Starting Compose does not provide TLS or register a
@@ -487,7 +506,9 @@ The
 records the verified source's separate no-send/history boundary. The
 [Phase 4f dashboard reply-intent guide](docs/operations/operator-dashboard-reply-intents-4f.md)
 records the verified source's explicit opt-in write scope, per-principal local rate
-guard, and no-send boundary.
+guard, and no-send boundary. The [Phase 4g delivery-evidence guide](docs/operations/outbound-delivery-evidence-4g.md)
+records the separate candidate attempt/receipt foundation; it adds no dashboard
+delivery result or provider action.
 
 ## Corresponding-source offer
 

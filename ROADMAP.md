@@ -358,9 +358,10 @@ the combined Phase 4c–4d revision at exact commit <code>160414e</code>.**
       ID and SHA-256 canonical connection set, and freezes a command-ID
       snapshot. Foreign, changed-scope, malformed, unversioned, and unsupported
       cursors return generic <code>400</code> before storage access.
-- [x] No database migration or state transition is added. Migration
-      <code>0009_outbound_reply_commands</code> remains the ninth immutable
-      migration, and the history reader explicitly filters `queued` rows only.
+- [x] No database migration or state transition was added in Phase 4d. At that
+      revision, <code>0009_outbound_reply_commands</code> was the ninth
+      immutable migration, and the history reader explicitly filters `queued`
+      rows only.
 - [x] No dashboard history UI, worker, dispatch, provider HTTP call, token/OAuth
       storage, retry, attempt, timeout policy, receipt, delivery/read state, or
       command mutation is part of this phase.
@@ -443,6 +444,32 @@ production deployment.**
       delivery/read state, command mutation, database migration, table, index,
       trigger, or Compose service is part of this phase.
 
+### 4g — append-only outbound delivery evidence
+
+**Status: candidate.** This storage-only migration is not verified source
+evidence, provider dispatch, provider acceptance, delivery, or production
+evidence.
+
+- [x] Forward migration
+      <code>0010_outbound_delivery_attempt_receipts</code> creates immutable
+      `outbound_delivery_attempts` and
+      `outbound_delivery_attempt_receipts` tables. A command has at most one
+      attempt row; an attempt has at most one receipt row.
+- [x] The receipt constraint permits exactly `provider_accepted`,
+      `provider_rejected`, and `outcome_unknown`. A recorded
+      `provider_accepted` receipt requires a printable provider message ID; the
+      other outcomes forbid it.
+- [x] Absence of a durable attempt row supports `not_attempted` only as a
+      derived current-ledger label. It never proves that no external provider
+      event occurred. A durable attempt without a receipt is conservatively
+      unknown.
+- [x] The command remains immutable and `queued`; both evidence tables reject
+      updates and deletes. No route, reader, dashboard result, provider HTTP
+      request, credential, worker, queue, retry, command mutation, or delivery/
+      read state is introduced.
+- [ ] Final local verification, independent security review, synthetic Compose
+      proof, and fresh GitHub CI/CodeQL for the exact candidate commit.
+
 ### Later Phase 4 work
 
 - Full user accounts/organizations, tested RBAC, invitation/password-reset
@@ -450,10 +477,10 @@ production deployment.**
 - Conversation summaries, read/unread state, assignment, labels, search,
   attachments, retention/deletion, backups/restore, and encryption-at-rest
   assurance.
-- Provider-specific dispatch policy/capabilities, durable attempts, timeout
-  uncertainty, delivery/read status, and retries only after official provider
-  review and a separate security boundary. The Phase 4c command ledger is not
-  any of those delivery capabilities.
+- Provider-specific dispatch policy/capabilities, timeout uncertainty,
+  delivery/read status, and retries only after official provider review and a
+  separate security boundary. Phase 4g evidence is not any of those delivery
+  capabilities.
 
 ## Phase 5 — experimental connectors, only with evidence
 

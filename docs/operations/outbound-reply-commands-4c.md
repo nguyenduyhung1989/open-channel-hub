@@ -11,6 +11,11 @@ made by this route. The separate verified Phase 4f source may call this same
 source-bound capability through an explicitly granted server-rendered dashboard
 form; it does not change this API's provider boundary.
 
+The separate Phase 4g candidate adds only append-only local attempt/receipt
+evidence in PostgreSQL. It does not add a writer to this route, a provider
+request, or a result field; see the
+[Phase 4g delivery-evidence guide](outbound-delivery-evidence-4g.md).
+
 ## Prerequisites
 
 - PostgreSQL and migration `0009_outbound_reply_commands` must be available.
@@ -115,12 +120,15 @@ source renders a smaller escaped dashboard projection through a signed
 session, not a browser bearer; see the
 [queued command-history guide](outbound-command-history-4d.md) and
 [Phase 4e guide](operator-dashboard-queued-history-4e.md) and the verified
-[Phase 4f guide](operator-dashboard-reply-intents-4f.md).
+[Phase 4f guide](operator-dashboard-reply-intents-4f.md) and the candidate
+[Phase 4g guide](outbound-delivery-evidence-4g.md).
 
 ## What this deliberately does not do
 
 - No provider dispatch, HTTP client, provider token, OAuth, template, media,
-  attachment, delivery/read receipt, attempt record, retry, or timeout policy.
+  attachment, delivery/read receipt, retry, or timeout policy. Phase 4g's
+  separate candidate tables still add no provider action or writer to this
+  route.
 - No mutation of the command after `queued`; no claim that it was sent.
 - No recipient, send, retry, cancellation, or provider action. The Phase 4e
   source only renders queued-history text and source connection IDs. The
@@ -137,6 +145,7 @@ not evidence that every provider send is durable. Do not use its existence to
 infer delivery behavior for a Phase 4c command.
 
 Before a dispatcher can exist, define and independently review provider
-capabilities, authorization, credential handling, delivery receipts, timeout
-uncertainty, retry safety, audit/retention behavior, and a new migration/state
-model.
+capabilities, authorization, credential handling, attempt-write ordering,
+delivery receipts, timeout uncertainty, retry safety, audit/retention behavior,
+and a provider-specific dispatch model. The Phase 4g candidate evidence schema
+does not remove any of those requirements.

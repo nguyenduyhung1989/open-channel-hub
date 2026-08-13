@@ -3,11 +3,13 @@
 **Status:** the durable inbound-event ledger, connection registry, immutable
 source-bound reply-command ledger, and synthetic Docker proof source are
 implemented. The verified Phase 4e server-rendered queued-history source and
-the verified Phase 4f dashboard reply-intent source add no schema change. Phase 4e's
-final local verification includes a synthetic Compose proof, but that loopback
-HTTP proof does not establish external HTTPS cookie behavior. Phase 4f source
-verification at `74fca30` likewise does not prove a production deployment, a
-backup/restore solution, or a real provider verification.
+verified Phase 4f dashboard reply-intent source add no schema change. The
+Phase 4g append-only delivery-evidence migration is a candidate; it has no
+provider dispatch or production verification claim. Phase 4e's final local
+verification includes a synthetic Compose proof, but that loopback HTTP proof
+does not establish external HTTPS cookie behavior. Phase 4f source verification
+at `74fca30` likewise does not prove a production deployment, a backup/restore
+solution, or a real provider verification.
 
 ## What this stack creates
 
@@ -24,13 +26,15 @@ The supplied Compose stack creates three services:
 The database and schema are both named <code>open_channel_hub</code>. The
 application schema contains:
 
-| Object                           | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| <code>schema_migrations</code>   | Immutable record of forward schema migrations applied by this binary.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| <code>connection_registry</code> | Opaque connection ID, immutable connector metadata, registration timestamp, and a non-secret Zalo OA, Facebook Page, or WhatsApp Business provider-identity fingerprint when those channels are configured.                                                                                                                                                                                                                                                                                                                                                                                               |
-| <code>inbound_events</code>      | Canonical inbound text-event ledger. Its primary key is <code>(connection_id, provider_event_id)</code>.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| <code>dashboard_sessions</code>  | Optional Phase 4b browser-session metadata: only HMACs of random session/anti-forgery values, principal ID, timestamps, and revocation state. It contains no raw token, password, credential, or inbox membership.                                                                                                                                                                                                                                                                                                                                                                                        |
-| <code>outbound_commands</code>   | Phase 4c immutable source-bound reply intents. It retains a private target derived from canonical inbound `conversation_id`, source message/channel, message text, client operation ID, `queued` state, and timestamps. Phase 4d reads a safe scoped projection of queued rows without changing this table; the Phase 4e source reuses that reader for a smaller server-rendered dashboard projection. The verified Phase 4f source reuses the existing source-bound store through an explicitly granted dashboard form. It has no provider credential, raw payload, attempt, receipt, or delivery state. |
+| Object                                          | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| <code>schema_migrations</code>                  | Immutable record of forward schema migrations applied by this binary.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| <code>connection_registry</code>                | Opaque connection ID, immutable connector metadata, registration timestamp, and a non-secret Zalo OA, Facebook Page, or WhatsApp Business provider-identity fingerprint when those channels are configured.                                                                                                                                                                                                                                                                                                                                                                                               |
+| <code>inbound_events</code>                     | Canonical inbound text-event ledger. Its primary key is <code>(connection_id, provider_event_id)</code>.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| <code>dashboard_sessions</code>                 | Optional Phase 4b browser-session metadata: only HMACs of random session/anti-forgery values, principal ID, timestamps, and revocation state. It contains no raw token, password, credential, or inbox membership.                                                                                                                                                                                                                                                                                                                                                                                        |
+| <code>outbound_commands</code>                  | Phase 4c immutable source-bound reply intents. It retains a private target derived from canonical inbound `conversation_id`, source message/channel, message text, client operation ID, `queued` state, and timestamps. Phase 4d reads a safe scoped projection of queued rows without changing this table; the Phase 4e source reuses that reader for a smaller server-rendered dashboard projection. The verified Phase 4f source reuses the existing source-bound store through an explicitly granted dashboard form. It has no provider credential, raw payload, attempt, receipt, or delivery state. |
+| <code>outbound_delivery_attempts</code>         | Phase 4g candidate append-only evidence that one command has a durable local attempt fact. One command can have at most one such row. It contains no target, message text, credential, provider response, HTTP detail, retry field, or mutable delivery state.                                                                                                                                                                                                                                                                                                                                            |
+| <code>outbound_delivery_attempt_receipts</code> | Phase 4g candidate append-only recorded-outcome evidence for one stored attempt. Its constraint permits exactly `provider_accepted`, `provider_rejected`, or `outcome_unknown`; only acceptance has a provider message ID. It proves neither network delivery nor read status.                                                                                                                                                                                                                                                                                                                            |
 
 The ledger stores a canonical event ID, channel/type/timestamps, conversation
 and sender/message identifiers, and message text. It intentionally does **not**
@@ -80,8 +84,9 @@ Phase 4d adds a parameterized, inbox-scoped reader over that same immutable
 table. It selects only queued rows in a fixed command-ID snapshot and projects
 command/source IDs, message text, state, and creation time. It deliberately
 does not select a reply target, source message/channel, client operation ID,
-raw payload, credential, or delivery-attempt data. No migration changes the
-schema: <code>0009_outbound_reply_commands</code> remains the ninth entry.
+raw payload, credential, or delivery-attempt data. Phase 4d made no migration;
+at that revision, <code>0009_outbound_reply_commands</code> was the ninth
+entry.
 
 The Phase 4e source does not query the database from the browser or add a
 new storage path. After the existing dashboard session is authenticated, its
@@ -100,6 +105,24 @@ explicit write-scope checks, a narrow server closure calls the existing Phase
 target from the durable inbound source. No migration, table, index, trigger,
 or command state changes. Its local per-principal write guard is in process;
 it is not a database or distributed rate-limit mechanism.
+
+The Phase 4g candidate adds forward migration
+<code>0010_outbound_delivery_attempt_receipts</code>. It leaves
+<code>outbound_commands</code> immutable and `queued`, then adds an optional
+immutable attempt row for a command and an optional immutable receipt row for
+that attempt. `command_id` is unique in the attempt table, and `attempt_id` is
+the receipt primary key, so this bounded foundation has at most one durable
+attempt fact per command and at most one receipt per attempt. Both tables have
+their own update/delete-rejection trigger. A receipt may be
+<code>provider_accepted</code> only with a non-empty printable provider message
+ID; <code>provider_rejected</code> and <code>outcome_unknown</code> require no
+provider message ID. Absence of a durable attempt row supports only a derived
+<code>not_attempted</code>-in-this-ledger label, not proof that an external
+provider call never happened. A durable attempt without a receipt is
+conservatively unknown. This candidate adds no route, reader, dashboard result,
+worker, provider HTTP request, credential, retry policy, or command state
+transition. See the dedicated
+[Phase 4g delivery-evidence guide](outbound-delivery-evidence-4g.md).
 
 ## Configure without exposing passwords
 
@@ -208,6 +231,12 @@ and fresh GitHub checks are recorded in the Phase 4f operations guide. That
 evidence still does not prove an external HTTPS proxy, provider send, or
 production authorization model.
 
+The Phase 4g candidate advances the migration count to ten. Its Compose smoke
+candidate checks structural evidence only: the new tables, foreign keys,
+outcome constraint, provider-message-ID constraint, and immutable triggers. It
+does not insert an attempt or receipt, run a worker, make a provider request,
+or demonstrate delivery semantics.
+
 ## Container and network boundary
 
 PostgreSQL is reachable only from services on the internal
@@ -253,9 +282,10 @@ any data you need to keep.
 - No encryption-at-rest claim for the Docker volume or host disk.
 - No dispatch worker, provider send/receipt path, retry policy, public
   TLS/proxy, real Telegram, Zalo OA, Facebook Page, or WhatsApp Business
-  confirmation, or production monitoring. The Phase 4e source renders queued
-  intent through an authenticated dashboard session, and the Phase 4f
-  candidate can record that existing source-bound intent through an explicit
-  dashboard grant; neither is a dispatcher or delivery feature.
+  confirmation, or production monitoring. The Phase 4g candidate stores only
+  a narrow append-only evidence foundation; it is not a dispatcher or delivery
+  feature. The Phase 4e source renders queued intent through an authenticated
+  dashboard session, and the Phase 4f source can record that existing
+  source-bound intent through an explicit dashboard grant.
 
 These gaps are intentionally left visible in the roadmap and threat model.

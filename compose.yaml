@@ -11,8 +11,9 @@ name: open-channel-hub
 # PostgreSQL is initialized for this hub only: database `open_channel_hub`, schema `open_channel_hub`, and a non-superuser
 # application role. The migration service applies idempotent schema changes before the API starts. This stack still does not provide
 # Redis, a dispatch queue/worker, provider delivery, TLS, a public proxy,
-# backups, or a production deployment. Phase 4c records and Phase 4d lists
-# source-bound `queued` intent only; neither makes a provider request.
+# backups, or a production deployment. Phase 4g adds only an append-only
+# migration foundation for future delivery evidence; no phase makes a provider
+# request through this Compose stack.
 services:
   postgres:
     image: postgres:18.4-alpine3.24
