@@ -1,19 +1,25 @@
 # Phase 3b Facebook Page: signed inbound text only
 
-**Status:** source implementation and synthetic verification only. This guide
-does not authorize a real Meta App, Facebook Page, webhook registration, Graph
-API call, OAuth flow, Page access-token storage, or outbound message.
+**Status:** final local verification, synthetic Docker proof, independent
+review, GitHub CI, and CodeQL passed for exact commit `c933102`; live-provider
+proof remains separate. This guide does not authorize a real Meta App, Facebook
+Page, webhook registration, Graph API call, OAuth flow, Page access-token
+storage, or outbound message.
 
 ## Exact boundary
 
 The official Facebook Page connector accepts only customer-originated text
 messages from a signed Messenger Platform Page webhook. It does not implement
 Facebook User, attachments, postbacks, delivery/read events, sends, access
-tokens, OAuth, or Graph API calls.
+tokens, OAuth, or Graph API calls. The product-specific
+`/v1/webhooks/facebook-page` callback remains valid for an App used only by
+Facebook Page. If that same Meta App also configures WhatsApp Business, both
+products must use the common `/v1/webhooks/meta` callback; see the
+[Phase 3c WhatsApp Business guide](whatsapp-business-3c.md).
 
 | Concern        | Current behavior                                                                                                                                                                                                                                                                          |
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Ingress        | `GET` and `POST /v1/webhooks/facebook-page` with `Content-Type: application/json` for event notifications.                                                                                                                                                                                |
+| Ingress        | A Facebook-only Meta App uses `GET` and `POST /v1/webhooks/facebook-page`. An App configured for both Facebook Page and WhatsApp Business uses the one shared `GET` and `POST /v1/webhooks/meta` callback. Event notifications use `Content-Type: application/json`.                      |
 | Verification   | `GET` accepts `hub.mode=subscribe` only when `hub.verify_token` matches a configured App token, then returns the exact `hub.challenge` with `200`. Invalid verification returns `403`.                                                                                                    |
 | Routing        | The POST body carries `object: "page"` and one or more `entry[].id` Page IDs, not an App ID. The service maps every Page ID to configuration internally and requires the whole batch to belong to exactly one configured App before selecting its secret.                                 |
 | Signature      | `X-Hub-Signature-256` must be `sha256=<lowercase hex>` for HMAC-SHA256 of the untouched raw request bytes with that App's `appSecret`. JSON is never reconstructed before comparison: whitespace and escaped Unicode are significant.                                                     |
@@ -31,8 +37,8 @@ only, so those provider-facing conditions remain live-test work.
 ## Configure a secret document
 
 Use the existing version-1 runtime connection document. It may contain
-Telegram Bot, Zalo OA, Facebook Page, or a permitted mixture of those official
-entries. A Facebook Page entry has this shape:
+Telegram Bot, Zalo OA, Facebook Page, WhatsApp Business, or a permitted mixture
+of those official entries. A Facebook Page entry has this shape:
 
 ```json
 {
@@ -59,6 +65,14 @@ of 32–512 characters. A Page ID and operator bearer must be unique globally.
 Multiple Pages may share one App only when their `appSecret` and
 `webhookVerifyToken` are exactly the same. A token or secret cannot be reused
 for another App, another role, Telegram, or Zalo OA credential.
+
+The optional `webhookUrl` may be
+`https://your-public-host/v1/webhooks/facebook-page` or the shared
+`https://your-public-host/v1/webhooks/meta`, with no username, password, query,
+fragment, or secret. If the App also has WhatsApp Business entries, every
+declared callback URL for that App must be the identical `/v1/webhooks/meta`
+URL. The POST payload selects configured Pages server side; an HTTP caller never
+chooses an internal connection ID.
 
 On startup, Phase 3b derives a domain-separated SHA-256 fingerprint from each
 configured `(appId, pageId)` pair and stores only that opaque value beside the
@@ -87,10 +101,11 @@ Before a real Page is ever used, the owner must explicitly authorize the
 provider test and public exposure. Then, separately:
 
 1. Create the Meta App and attach it to the intended Page using Meta's official
-   flow. Configure the fixed public HTTPS callback
-   `/v1/webhooks/facebook-page` and the same verify token as the runtime
-   document. Meta requires a valid public TLS certificate; self-signed
-   certificates are not supported.
+   flow. For an App used only by Facebook Page, configure the public HTTPS
+   callback `/v1/webhooks/facebook-page`. For an App also used by WhatsApp
+   Business, configure the one common `/v1/webhooks/meta` callback and the same
+   verify token as the runtime document. Meta requires a valid public TLS
+   certificate; self-signed certificates are not supported.
 2. Subscribe only to the required `messages` webhook field. Meta's official
    Page subscription flow requires an appropriate Page access token plus
    `pages_messaging` and `pages_manage_metadata`; this Phase stores none of
@@ -98,7 +113,7 @@ provider test and public exposure. Then, separately:
 3. For real non-role customers, obtain the relevant Meta Advanced Access before
    treating message delivery as available. Standard Access is not proof that
    customer traffic works.
-4. Put a TLS reverse proxy in front of the fixed path. Keep operator APIs
+4. Put a TLS reverse proxy in front of the configured callback path. Keep operator APIs
    loopback-only and ensure the proxy does not log authorization headers,
    `X-Hub-Signature-256`, or request bodies.
 5. Deliver one owner-authorized harmless text message, then verify only the
@@ -111,18 +126,19 @@ backup/restore, data retention, or production readiness.
 
 ## Synthetic Compose proof
 
-`scripts/verify-compose-postgres.sh` never contacts Meta, Facebook, Zalo, or
-Telegram. It starts a disposable local stack with six fake connections (two
-Telegram Bots, two Zalo OAs, and two Facebook Pages on one fake App), runs six
-forward migrations twice, then proves:
+`scripts/verify-compose-postgres.sh` never contacts Meta, Facebook, WhatsApp,
+Zalo, or Telegram. It starts a disposable local stack with eight fake
+connections: two Telegram Bots, two Zalo OAs, two Facebook Pages, and two
+WhatsApp business phones on one fake shared Meta App. It runs seven forward
+migrations twice, then proves:
 
-- Facebook verification returns its synthetic challenge only for the configured
-  verify token.
+- The common Meta callback returns its synthetic challenge only for the
+  configured verify token.
 - The HMAC covers the original request bytes: a one-byte-different body with
   the original signature receives `401`.
 - One signed multi-Page payload dispatches canonical text to each configured
-  Page. Repeating it is idempotent inside each Page, while the same provider
-  `mid` can exist in another Page connection.
+  Page through the common callback. Repeating it is idempotent inside each
+  Page, while the same provider `mid` can exist in another Page connection.
 - Every Facebook registry row has an opaque 64-character identity fingerprint;
   the proof does not print it, a Page ID, a secret, or a raw provider payload.
 - Each Facebook bearer reads only its assigned Page, and a cursor from one Page

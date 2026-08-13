@@ -8,7 +8,7 @@
 Open Channel Hub needs another official channel without turning a first inbound
 slice into an OAuth client, a send engine, or an unbounded raw-payload archive.
 Facebook Page Messenger webhooks differ materially from Telegram and Zalo OA:
-Meta first verifies one fixed callback through a GET challenge, then signs POST
+Meta first verifies one App callback through a GET challenge, then signs POST
 bodies with HMAC-SHA256 of the exact raw request bytes using an App secret. A
 single App can serve multiple Pages, while the POST envelope identifies Page
 IDs but does not include the App ID.
@@ -25,14 +25,18 @@ Phase 3b adds a receive-only `facebook_page` connector and keeps all Meta
 network operations outside this slice.
 
 - Runtime entries contain opaque `id`, decimal `appId` and `pageId`, `appSecret`,
-  `webhookVerifyToken`, unique `operatorApiToken`, and optional fixed public
-  `/v1/webhooks/facebook-page` URL. The document allows several Pages for one
-  App only when the App secret and verify token match exactly.
-- `GET /v1/webhooks/facebook-page` validates `hub.mode=subscribe` and the
-  configured verify token, then returns `hub.challenge`. `POST` receives a
-  raw Buffer in its own Fastify child scope. It parses only enough untrusted
-  JSON to collect every Page ID, requires all Pages to resolve to one configured
-  App, and only then verifies `X-Hub-Signature-256` against the untouched bytes.
+  `webhookVerifyToken`, unique `operatorApiToken`, and optional public
+  `/v1/webhooks/facebook-page` or shared `/v1/webhooks/meta` URL. The document
+  allows several Pages for one App only when the App secret and verify token
+  match exactly. If that App also configures WhatsApp Business, every declared
+  callback URL is the exact common `/v1/webhooks/meta` URL.
+- A Facebook-only App uses `GET`/`POST /v1/webhooks/facebook-page`; an App
+  shared with WhatsApp Business uses `GET`/`POST /v1/webhooks/meta`. GET
+  validates `hub.mode=subscribe` and the configured verify token, then returns
+  `hub.challenge`. POST receives a raw Buffer in its own Fastify child scope.
+  It parses only enough untrusted JSON to collect every Page ID, requires all
+  Pages to resolve to one configured App, and only then verifies
+  `X-Hub-Signature-256` against the untouched bytes.
 - A cross-App, unknown, malformed, or invalid-signature batch returns generic
   `401` before normalization or storage. Signed supported text becomes a
   canonical event; signed unsupported items receive `200` without storage;
@@ -79,7 +83,8 @@ internal selection/normalization.
   messages.
 - A single App can serve several configured Pages while each Page has an
   isolated operator bearer, ledger connection, cursor, and durable identity
-  fingerprint.
+  fingerprint. If that App also serves WhatsApp Business, both products use one
+  explicit Meta callback rather than conflicting provider configuration.
 - Real Meta App/Page configuration, public TLS, permissions, Advanced Access,
   operational response timing, and a harmless live test remain explicit owner
   actions outside source implementation.

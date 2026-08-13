@@ -1,15 +1,17 @@
 # Runtime multi-connection configuration
 
 This guide configures the current alpha's official Telegram Bot, Zalo Official
-Account (OA), and Facebook Page entries. It does not create a dashboard, user login,
-organization, public connection API, or permission model. It has not been
+Account (OA), Facebook Page, and WhatsApp Business entries. It does not create
+a dashboard, user login, organization, public connection API, or permission
+model. It has not been
 verified with a real provider account or public TLS endpoint.
 
 ## What is configured
 
 One secret JSON document can configure one to one hundred Telegram Bot, Zalo
-OA, and Facebook Page connections. It contains credentials, so treat the entire document as a
-secret even though the connection IDs are opaque internal labels.
+OA, Facebook Page, and WhatsApp Business connections. It contains credentials,
+so treat the entire document as a secret even though the connection IDs are
+opaque internal labels.
 
 The strict document shape is:
 
@@ -77,13 +79,42 @@ The same version-1 document also accepts a Facebook Page entry:
 ```
 
 For a Facebook Page entry, `appId` and `pageId` are decimal identifiers and an
-optional `webhookUrl` must be the exact public HTTPS path
-`/v1/webhooks/facebook-page`, without user info, query, or fragment. Page IDs
-and operator tokens are unique. Several Pages may share one App only when their
-32–512-character `appSecret` and `webhookVerifyToken` are exactly identical;
-those credentials cannot collide with another role, App, Telegram, or Zalo OA
-credential. See the [Phase 3b Facebook Page guide](facebook-page-3b.md) for
-Meta verification, raw-byte HMAC, and live-test boundaries.
+optional `webhookUrl` may be the exact public HTTPS path
+`/v1/webhooks/facebook-page` or `/v1/webhooks/meta`, without user info, query,
+or fragment. Page IDs and operator tokens are unique. Several Pages may share
+one App only when their 32–512-character `appSecret` and
+`webhookVerifyToken` are exactly identical; those credentials cannot collide
+with another role, App, Telegram, or Zalo OA credential. See the
+[Phase 3b Facebook Page guide](facebook-page-3b.md) for Meta verification,
+raw-byte HMAC, and live-test boundaries.
+
+The same version-1 document also accepts a WhatsApp Business entry:
+
+```json
+{
+  "id": "whatsapp-business-support",
+  "type": "whatsapp_business",
+  "appId": "...",
+  "wabaId": "...",
+  "phoneNumberId": "...",
+  "appSecret": "...",
+  "webhookVerifyToken": "...",
+  "operatorApiToken": "...",
+  "webhookUrl": "https://your-public-host/v1/webhooks/whatsapp-business"
+}
+```
+
+For a WhatsApp Business entry, `appId`, `wabaId`, and `phoneNumberId` are
+decimal identifiers. The optional `webhookUrl` may be the exact public HTTPS
+path `/v1/webhooks/whatsapp-business` or `/v1/webhooks/meta`, without user
+info, query, or fragment. Business phone IDs and operator tokens are unique;
+one WABA maps to one configured App. Several business phones or WABAs may share
+an App only with identical App credentials. If a Meta App is configured for
+both Facebook Page and WhatsApp Business, every declared callback URL for that
+App must be the same public `/v1/webhooks/meta` URL; a product-specific URL is
+valid only when that App does not configure the other product. See the
+[Phase 3c WhatsApp Business guide](whatsapp-business-3c.md) for WABA/phone
+selection, raw-byte HMAC, and live-test boundaries.
 
 Do not paste a real document in a terminal command, issue, pull request,
 screenshot, log, or repository file. The samples above contain placeholders,
@@ -161,16 +192,19 @@ token, webhook secret, or webhook URL. The temporary
 
 ## Routes and account isolation
 
-| Purpose                   | Multi-connection route                                    | How the account is selected                                                                                                                                                                                 |
-| ------------------------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Telegram webhook ingress  | <code>POST /v1/webhooks/telegram-bot/:connectionId</code> | The path resolves a configured connection, then its webhook secret must match. Unknown ID and wrong secret both return <code>401</code>.                                                                    |
-| Send text                 | <code>POST /v1/telegram-bot/messages</code>               | The unique <code>Authorization: Bearer</code> value maps to exactly one configured connection.                                                                                                              |
-| Read canonical events     | <code>GET /v1/telegram-bot/inbound-events</code>          | The same bearer token maps to exactly one configured connection. Cursor continuation is bound to that connection.                                                                                           |
-| Zalo OA webhook ingress   | <code>POST /v1/webhooks/zalo-oa</code>                    | The exact signed JSON identifies the configured <code>(appId, oaId)</code>; the route then checks that entry's OA secret. Unknown identity and invalid signature both return <code>401</code>.              |
-| Read Zalo OA events       | <code>GET /v1/zalo-oa/inbound-events</code>               | The unique <code>Authorization: Bearer</code> value maps to exactly one configured OA. Cursor continuation is bound to that connection.                                                                     |
-| Facebook verification     | <code>GET /v1/webhooks/facebook-page</code>               | `hub.verify_token` must match one configured App before the exact `hub.challenge` is returned.                                                                                                              |
-| Facebook Page ingress     | <code>POST /v1/webhooks/facebook-page</code>              | Every untrusted batch Page ID must resolve to one configured App before its `X-Hub-Signature-256` HMAC is checked over raw bytes. Unknown/cross-App identity and invalid signature return <code>401</code>. |
-| Read Facebook Page events | <code>GET /v1/facebook-page/inbound-events</code>         | The unique <code>Authorization: Bearer</code> value maps to exactly one configured Page. Cursor continuation is bound to that connection.                                                                   |
+| Purpose                   | Multi-connection route                                                             | How the account is selected                                                                                                                                                                                                                                             |
+| ------------------------- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Telegram webhook ingress  | <code>POST /v1/webhooks/telegram-bot/:connectionId</code>                          | The path resolves a configured connection, then its webhook secret must match. Unknown ID and wrong secret both return <code>401</code>.                                                                                                                                |
+| Send text                 | <code>POST /v1/telegram-bot/messages</code>                                        | The unique <code>Authorization: Bearer</code> value maps to exactly one configured connection.                                                                                                                                                                          |
+| Read canonical events     | <code>GET /v1/telegram-bot/inbound-events</code>                                   | The same bearer token maps to exactly one configured connection. Cursor continuation is bound to that connection.                                                                                                                                                       |
+| Zalo OA webhook ingress   | <code>POST /v1/webhooks/zalo-oa</code>                                             | The exact signed JSON identifies the configured <code>(appId, oaId)</code>; the route then checks that entry's OA secret. Unknown identity and invalid signature both return <code>401</code>.                                                                          |
+| Read Zalo OA events       | <code>GET /v1/zalo-oa/inbound-events</code>                                        | The unique <code>Authorization: Bearer</code> value maps to exactly one configured OA. Cursor continuation is bound to that connection.                                                                                                                                 |
+| Facebook verification     | <code>GET /v1/webhooks/facebook-page</code> or <code>/v1/webhooks/meta</code>      | The product-specific route is for an App used only by Facebook Page. A shared Facebook/WhatsApp App uses `/meta`; its `hub.verify_token` must match one configured App before the exact `hub.challenge` is returned.                                                    |
+| Facebook Page ingress     | <code>POST /v1/webhooks/facebook-page</code> or <code>/v1/webhooks/meta</code>     | Every untrusted batch Page ID must resolve to one configured App before raw-byte `X-Hub-Signature-256` HMAC is checked. A shared App selects the product from the signed envelope at `/meta`; unknown/cross-App identity and invalid signature return <code>401</code>. |
+| Read Facebook Page events | <code>GET /v1/facebook-page/inbound-events</code>                                  | The unique <code>Authorization: Bearer</code> value maps to exactly one configured Page. Cursor continuation is bound to that connection.                                                                                                                               |
+| WhatsApp verification     | <code>GET /v1/webhooks/whatsapp-business</code> or <code>/v1/webhooks/meta</code>  | The product-specific route is for an App used only by WhatsApp. A shared Facebook/WhatsApp App uses `/meta`; its `hub.verify_token` must match one configured App before the exact `hub.challenge` is returned.                                                         |
+| WhatsApp Business ingress | <code>POST /v1/webhooks/whatsapp-business</code> or <code>/v1/webhooks/meta</code> | Every untrusted WABA ID must resolve to one configured App before raw-byte `X-Hub-Signature-256` HMAC is checked. A shared App selects the product from the signed envelope at `/meta`; unknown/cross-App identity and invalid signature return <code>401</code>.       |
+| Read WhatsApp events      | <code>GET /v1/whatsapp-business/inbound-events</code>                              | The unique <code>Authorization: Bearer</code> value maps to exactly one configured business phone. Cursor continuation is bound to that connection.                                                                                                                     |
 
 The caller cannot select a connection ID on either operator route. A cursor
 from one account is rejected when presented with another account's bearer
@@ -207,6 +241,14 @@ from `(appId, pageId)`, never stores raw identifiers or a credential, rejects a
 changed pair for an existing Page ID, and refuses a first Page binding when
 pre-registry history already uses that internal connection ID.
 
+For WhatsApp Business, migration
+<code>0007_connection_registry_whatsapp_business_provider_identity</code>
+requires the same opaque fingerprint field for every `whatsapp_business` row.
+It derives from `(appId, wabaId, phoneNumberId)`, never stores raw identifiers
+or a credential, rejects a changed triple for an existing business-phone ID,
+and refuses a first WhatsApp binding when pre-registry history already uses that
+internal connection ID.
+
 Migration <code>0004_inbound_events_connection_registry_fk</code> is a
 PostgreSQL foreign key marked <code>NOT VALID</code>. New event writes must
 reference a registered connection. Existing Phase 2a event rows can remain
@@ -240,13 +282,14 @@ account isolation, durable storage, or production readiness.
 ## Safe local proof
 
 The repository's disposable Compose smoke test uses two synthetic Telegram Bot
-connections, two synthetic Zalo OA connections, and two synthetic Facebook
-Pages on one fake App. It migrates the six immutable schema entries twice,
-verifies registry rows and Zalo/Facebook fingerprint presence without printing
-them, checks Telegram dynamic webhook behavior, proves Zalo raw-byte hashing
-and Facebook raw-byte HMAC boundaries, checks duplicate idempotency within every
-connection, verifies bearer-scoped reads, and rejects cross-account cursors. It
-makes no provider network request and uses no real credential or message.
+connections, two synthetic Zalo OA connections, two synthetic Facebook Pages,
+and two synthetic WhatsApp business phones on one fake shared Meta App. It
+migrates the seven immutable schema entries twice, verifies registry rows and
+Zalo/Facebook/WhatsApp fingerprint presence without printing them, checks
+Telegram dynamic webhook behavior, proves Zalo raw-byte hashing and shared Meta
+raw-byte HMAC boundaries, checks duplicate idempotency within every connection,
+verifies bearer-scoped reads, and rejects cross-account cursors. It makes no
+provider network request and uses no real credential or message.
 
 Before a real account is used, still complete TLS/proxy, rate limiting,
 monitoring, backup/restore, retention/deletion, secret rotation, access/audit,

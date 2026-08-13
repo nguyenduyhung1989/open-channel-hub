@@ -26,7 +26,10 @@ readonly facebook_webhook_verify_token='synthetic-facebook-verify-token-01234567
 readonly facebook_support_operator_api_token='synthetic_facebook_operator_support_012345678901234567'
 readonly facebook_sales_operator_api_token='synthetic_facebook_operator_sales_0123456789012345678'
 readonly facebook_webhook_payload='{"object":"page","entry":[{"id":"900000000000000301","messaging":[{"sender":{"id":"900000000000000401"},"recipient":{"id":"900000000000000301"},"timestamp":1786492800000,"message":{"mid":"facebook-message-901","text":"Synthetic Facebook Page inbound message"}}]},{"id":"900000000000000302","messaging":[{"sender":{"id":"900000000000000402"},"recipient":{"id":"900000000000000302"},"timestamp":1786492800000,"message":{"mid":"facebook-message-901","text":"Synthetic Facebook Page inbound message"}}]}]}'
-readonly runtime_connections_configuration='{"version":1,"connections":[{"id":"telegram-bot-support","type":"telegram_bot","botToken":"synthetic-bot-token-support","operatorApiToken":"synthetic_operator_support_01234567890123456789","webhookSecret":"synthetic_support_webhook_secret_0123456789","webhookUrl":"https://example.test/v1/webhooks/telegram-bot/telegram-bot-support"},{"id":"telegram-bot-sales","type":"telegram_bot","botToken":"synthetic-bot-token-sales","operatorApiToken":"synthetic_operator_sales_0123456789012345678901","webhookSecret":"synthetic_sales_webhook_secret_01234567890123456789","webhookUrl":"https://example.test/v1/webhooks/telegram-bot/telegram-bot-sales"},{"id":"zalo-oa-support","type":"zalo_oa","appId":"900000000000000001","oaId":"900000000000000101","oaSecretKey":"synthetic-zalo-oa-support-secret-$-key","operatorApiToken":"synthetic_zalo_operator_support_012345678901234567","webhookUrl":"https://example.test/v1/webhooks/zalo-oa"},{"id":"zalo-oa-sales","type":"zalo_oa","appId":"900000000000000002","oaId":"900000000000000102","oaSecretKey":"synthetic-zalo-oa-sales-secret-$-key","operatorApiToken":"synthetic_zalo_operator_sales_0123456789012345678","webhookUrl":"https://example.test/v1/webhooks/zalo-oa"},{"id":"facebook-page-support","type":"facebook_page","appId":"900000000000000003","pageId":"900000000000000301","appSecret":"synthetic-facebook-app-secret-$-value-01234567890","webhookVerifyToken":"synthetic-facebook-verify-token-012345678901234567","operatorApiToken":"synthetic_facebook_operator_support_012345678901234567","webhookUrl":"https://example.test/v1/webhooks/facebook-page"},{"id":"facebook-page-sales","type":"facebook_page","appId":"900000000000000003","pageId":"900000000000000302","appSecret":"synthetic-facebook-app-secret-$-value-01234567890","webhookVerifyToken":"synthetic-facebook-verify-token-012345678901234567","operatorApiToken":"synthetic_facebook_operator_sales_0123456789012345678","webhookUrl":"https://example.test/v1/webhooks/facebook-page"}]}'
+readonly whatsapp_support_operator_api_token='synthetic_whatsapp_operator_support_012345678901234567'
+readonly whatsapp_sales_operator_api_token='synthetic_whatsapp_operator_sales_0123456789012345678'
+readonly whatsapp_webhook_payload='{"object":"whatsapp_business_account","entry":[{"id":"900000000000000501","changes":[{"field":"messages","value":{"messaging_product":"whatsapp","metadata":{"phone_number_id":"900000000000000601"},"messages":[{"from":"900000000000000701","id":"wamid.synthetic.901","timestamp":"1786492800","type":"text","text":{"body":"Synthetic WhatsApp Business inbound message"}}]}}]},{"id":"900000000000000501","changes":[{"field":"messages","value":{"messaging_product":"whatsapp","metadata":{"phone_number_id":"900000000000000602"},"messages":[{"from":"900000000000000702","id":"wamid.synthetic.901","timestamp":"1786492800","type":"text","text":{"body":"Synthetic WhatsApp Business inbound message"}}]}}]}]}'
+readonly runtime_connections_configuration='{"version":1,"connections":[{"id":"telegram-bot-support","type":"telegram_bot","botToken":"synthetic-bot-token-support","operatorApiToken":"synthetic_operator_support_01234567890123456789","webhookSecret":"synthetic_support_webhook_secret_0123456789","webhookUrl":"https://example.test/v1/webhooks/telegram-bot/telegram-bot-support"},{"id":"telegram-bot-sales","type":"telegram_bot","botToken":"synthetic-bot-token-sales","operatorApiToken":"synthetic_operator_sales_0123456789012345678901","webhookSecret":"synthetic_sales_webhook_secret_01234567890123456789","webhookUrl":"https://example.test/v1/webhooks/telegram-bot/telegram-bot-sales"},{"id":"zalo-oa-support","type":"zalo_oa","appId":"900000000000000001","oaId":"900000000000000101","oaSecretKey":"synthetic-zalo-oa-support-secret-$-key","operatorApiToken":"synthetic_zalo_operator_support_012345678901234567","webhookUrl":"https://example.test/v1/webhooks/zalo-oa"},{"id":"zalo-oa-sales","type":"zalo_oa","appId":"900000000000000002","oaId":"900000000000000102","oaSecretKey":"synthetic-zalo-oa-sales-secret-$-key","operatorApiToken":"synthetic_zalo_operator_sales_0123456789012345678","webhookUrl":"https://example.test/v1/webhooks/zalo-oa"},{"id":"facebook-page-support","type":"facebook_page","appId":"900000000000000003","pageId":"900000000000000301","appSecret":"synthetic-facebook-app-secret-$-value-01234567890","webhookVerifyToken":"synthetic-facebook-verify-token-012345678901234567","operatorApiToken":"synthetic_facebook_operator_support_012345678901234567","webhookUrl":"https://example.test/v1/webhooks/meta"},{"id":"facebook-page-sales","type":"facebook_page","appId":"900000000000000003","pageId":"900000000000000302","appSecret":"synthetic-facebook-app-secret-$-value-01234567890","webhookVerifyToken":"synthetic-facebook-verify-token-012345678901234567","operatorApiToken":"synthetic_facebook_operator_sales_0123456789012345678","webhookUrl":"https://example.test/v1/webhooks/meta"},{"id":"whatsapp-business-support","type":"whatsapp_business","appId":"900000000000000003","wabaId":"900000000000000501","phoneNumberId":"900000000000000601","appSecret":"synthetic-facebook-app-secret-$-value-01234567890","webhookVerifyToken":"synthetic-facebook-verify-token-012345678901234567","operatorApiToken":"synthetic_whatsapp_operator_support_012345678901234567","webhookUrl":"https://example.test/v1/webhooks/meta"},{"id":"whatsapp-business-sales","type":"whatsapp_business","appId":"900000000000000003","wabaId":"900000000000000501","phoneNumberId":"900000000000000602","appSecret":"synthetic-facebook-app-secret-$-value-01234567890","webhookVerifyToken":"synthetic-facebook-verify-token-012345678901234567","operatorApiToken":"synthetic_whatsapp_operator_sales_0123456789012345678","webhookUrl":"https://example.test/v1/webhooks/meta"}]}'
 
 compose=(docker compose --project-name "$project_name" --file compose.yaml)
 
@@ -163,7 +166,7 @@ read_zalo_oa_inbound_events_status() {
     "http://127.0.0.1:${api_host_port}/v1/zalo-oa/inbound-events?cursor=${cursor}"
 }
 
-facebook_webhook_signature() {
+meta_webhook_signature() {
   local app_secret=$1
   local raw_json=$2
 
@@ -172,7 +175,7 @@ facebook_webhook_signature() {
     | awk '{print $2}'
 }
 
-post_facebook_page_webhook() {
+post_meta_webhook() {
   local raw_json=$1
   local signature=$2
 
@@ -183,12 +186,12 @@ post_facebook_page_webhook() {
     --output /dev/null \
     --request POST \
     --write-out '%{http_code}' \
-    "http://127.0.0.1:${api_host_port}/v1/webhooks/facebook-page"
+    "http://127.0.0.1:${api_host_port}/v1/webhooks/meta"
 }
 
-verify_facebook_page_webhook() {
+verify_meta_webhook() {
   curl --fail --silent --show-error --connect-timeout 3 --max-time 10 \
-    "http://127.0.0.1:${api_host_port}/v1/webhooks/facebook-page?hub.mode=subscribe&hub.verify_token=${facebook_webhook_verify_token}&hub.challenge=synthetic-facebook-challenge"
+    "http://127.0.0.1:${api_host_port}/v1/webhooks/meta?hub.mode=subscribe&hub.verify_token=${facebook_webhook_verify_token}&hub.challenge=synthetic-meta-challenge"
 }
 
 read_facebook_page_inbound_events() {
@@ -208,6 +211,25 @@ read_facebook_page_inbound_events_status() {
     --output /dev/null \
     --write-out '%{http_code}' \
     "http://127.0.0.1:${api_host_port}/v1/facebook-page/inbound-events?cursor=${cursor}"
+}
+
+read_whatsapp_business_inbound_events() {
+  local operator_api_token=$1
+
+  curl --fail --silent --show-error --connect-timeout 3 --max-time 10 \
+    --header "authorization: Bearer ${operator_api_token}" \
+    "http://127.0.0.1:${api_host_port}/v1/whatsapp-business/inbound-events"
+}
+
+read_whatsapp_business_inbound_events_status() {
+  local operator_api_token=$1
+  local cursor=$2
+
+  curl --silent --show-error --connect-timeout 3 --max-time 10 \
+    --header "authorization: Bearer ${operator_api_token}" \
+    --output /dev/null \
+    --write-out '%{http_code}' \
+    "http://127.0.0.1:${api_host_port}/v1/whatsapp-business/inbound-events?cursor=${cursor}"
 }
 
 query_postgres() {
@@ -291,50 +313,65 @@ assert_equal \
   'Zalo OA sales webhook status with the same provider message id'
 
 assert_equal \
-  'synthetic-facebook-challenge' \
-  "$(verify_facebook_page_webhook)" \
-  'Facebook Page webhook verification challenge'
-facebook_signature="$(facebook_webhook_signature "$facebook_app_secret" "$facebook_webhook_payload")"
+  'synthetic-meta-challenge' \
+  "$(verify_meta_webhook)" \
+  'shared Meta webhook verification challenge'
+facebook_signature="$(meta_webhook_signature "$facebook_app_secret" "$facebook_webhook_payload")"
 facebook_changed_webhook_payload="${facebook_webhook_payload/Synthetic Facebook Page inbound message/Synthetic  Facebook Page inbound message}"
 assert_equal \
   '401' \
-  "$(post_facebook_page_webhook "$facebook_changed_webhook_payload" "$facebook_signature")" \
-  'Facebook Page one-byte-different raw JSON rejection'
+  "$(post_meta_webhook "$facebook_changed_webhook_payload" "$facebook_signature")" \
+  'shared Meta Facebook Page one-byte-different raw JSON rejection'
 assert_equal \
   '200' \
-  "$(post_facebook_page_webhook "$facebook_webhook_payload" "$facebook_signature")" \
-  'first Facebook Page multi-Page webhook status'
+  "$(post_meta_webhook "$facebook_webhook_payload" "$facebook_signature")" \
+  'first shared Meta Facebook Page multi-Page webhook status'
 assert_equal \
   '200' \
-  "$(post_facebook_page_webhook "$facebook_webhook_payload" "$facebook_signature")" \
-  'duplicate Facebook Page multi-Page webhook status'
+  "$(post_meta_webhook "$facebook_webhook_payload" "$facebook_signature")" \
+  'duplicate shared Meta Facebook Page multi-Page webhook status'
+
+whatsapp_signature="$(meta_webhook_signature "$facebook_app_secret" "$whatsapp_webhook_payload")"
+whatsapp_changed_webhook_payload="${whatsapp_webhook_payload/Synthetic WhatsApp Business inbound message/Synthetic  WhatsApp Business inbound message}"
+assert_equal \
+  '401' \
+  "$(post_meta_webhook "$whatsapp_changed_webhook_payload" "$whatsapp_signature")" \
+  'shared Meta WhatsApp Business one-byte-different raw JSON rejection'
+assert_equal \
+  '200' \
+  "$(post_meta_webhook "$whatsapp_webhook_payload" "$whatsapp_signature")" \
+  'first shared Meta WhatsApp Business multi-phone webhook status'
+assert_equal \
+  '200' \
+  "$(post_meta_webhook "$whatsapp_webhook_payload" "$whatsapp_signature")" \
+  'duplicate shared Meta WhatsApp Business multi-phone webhook status'
 
 event_records="$(
   query_postgres "SELECT connection_id || ':' || provider_event_id || ':' || canonical_event_id || ':' || message_text FROM open_channel_hub.inbound_events ORDER BY connection_id;"
 )"
 assert_equal \
-  $'facebook-page-sales:facebook-message-901:facebook-page:facebook-page-sales:event:facebook-message-901:Synthetic Facebook Page inbound message\nfacebook-page-support:facebook-message-901:facebook-page:facebook-page-support:event:facebook-message-901:Synthetic Facebook Page inbound message\ntelegram-bot-sales:9001:telegram:event:9001:Synthetic inbound message\ntelegram-bot-support:9001:telegram:event:9001:Synthetic inbound message\nzalo-oa-sales:zalo-message-901:zalo-oa:zalo-oa-sales:event:zalo-message-901:Synthetic Zalo OA inbound message\nzalo-oa-support:zalo-message-901:zalo-oa:zalo-oa-support:event:zalo-message-901:Synthetic Zalo OA inbound message' \
+  $'facebook-page-sales:facebook-message-901:facebook-page:facebook-page-sales:event:facebook-message-901:Synthetic Facebook Page inbound message\nfacebook-page-support:facebook-message-901:facebook-page:facebook-page-support:event:facebook-message-901:Synthetic Facebook Page inbound message\ntelegram-bot-sales:9001:telegram:event:9001:Synthetic inbound message\ntelegram-bot-support:9001:telegram:event:9001:Synthetic inbound message\nwhatsapp-business-sales:wamid.synthetic.901:whatsapp-business:whatsapp-business-sales:event:wamid.synthetic.901:Synthetic WhatsApp Business inbound message\nwhatsapp-business-support:wamid.synthetic.901:whatsapp-business:whatsapp-business-support:event:wamid.synthetic.901:Synthetic WhatsApp Business inbound message\nzalo-oa-sales:zalo-message-901:zalo-oa:zalo-oa-sales:event:zalo-message-901:Synthetic Zalo OA inbound message\nzalo-oa-support:zalo-message-901:zalo-oa:zalo-oa-support:event:zalo-message-901:Synthetic Zalo OA inbound message' \
   "$event_records" \
-  'six connection-scoped normalized events with repeated provider event ids'
+  'eight connection-scoped normalized events with repeated provider event ids'
 
 per_connection_event_counts="$(
   query_postgres "SELECT connection_id || ':' || COUNT(*) FROM open_channel_hub.inbound_events GROUP BY connection_id ORDER BY connection_id;"
 )"
 assert_equal \
-  $'facebook-page-sales:1\nfacebook-page-support:1\ntelegram-bot-sales:1\ntelegram-bot-support:1\nzalo-oa-sales:1\nzalo-oa-support:1' \
+  $'facebook-page-sales:1\nfacebook-page-support:1\ntelegram-bot-sales:1\ntelegram-bot-support:1\nwhatsapp-business-sales:1\nwhatsapp-business-support:1\nzalo-oa-sales:1\nzalo-oa-support:1' \
   "$per_connection_event_counts" \
   'duplicate event idempotency within every connection'
 
 migration_count="$(
   query_postgres "SELECT COUNT(*) FROM open_channel_hub.schema_migrations;"
 )"
-assert_equal '6' "$migration_count" 'immutable migration ledger entry count'
+assert_equal '7' "$migration_count" 'immutable migration ledger entry count'
 
 connection_registry_records="$(
   query_postgres "SELECT connection_id || ':' || connector_id || ':' || channel || ':' || tier FROM open_channel_hub.connection_registry ORDER BY connection_id;"
 )"
 assert_equal \
-  $'facebook-page-sales:facebook-page:facebook_page:OFFICIAL\nfacebook-page-support:facebook-page:facebook_page:OFFICIAL\ntelegram-bot-sales:telegram-bot:telegram_bot:OFFICIAL\ntelegram-bot-support:telegram-bot:telegram_bot:OFFICIAL\nzalo-oa-sales:zalo-oa:zalo_oa:OFFICIAL\nzalo-oa-support:zalo-oa:zalo_oa:OFFICIAL' \
+  $'facebook-page-sales:facebook-page:facebook_page:OFFICIAL\nfacebook-page-support:facebook-page:facebook_page:OFFICIAL\ntelegram-bot-sales:telegram-bot:telegram_bot:OFFICIAL\ntelegram-bot-support:telegram-bot:telegram_bot:OFFICIAL\nwhatsapp-business-sales:whatsapp-business:whatsapp_business:OFFICIAL\nwhatsapp-business-support:whatsapp-business:whatsapp_business:OFFICIAL\nzalo-oa-sales:zalo-oa:zalo_oa:OFFICIAL\nzalo-oa-support:zalo-oa:zalo_oa:OFFICIAL' \
   "$connection_registry_records" \
   'registered official connection identity records'
 
@@ -353,6 +390,14 @@ assert_equal \
   $'facebook-page-sales:present\nfacebook-page-support:present' \
   "$facebook_provider_identity_fingerprints" \
   'non-secret Facebook Page provider identity fingerprints'
+
+whatsapp_provider_identity_fingerprints="$(
+  query_postgres "SELECT connection_id || ':' || CASE WHEN provider_identity_fingerprint ~ '^[a-f0-9]{64}$' THEN 'present' ELSE 'missing' END FROM open_channel_hub.connection_registry WHERE channel = 'whatsapp_business' ORDER BY connection_id;"
+)"
+assert_equal \
+  $'whatsapp-business-sales:present\nwhatsapp-business-support:present' \
+  "$whatsapp_provider_identity_fingerprints" \
+  'non-secret WhatsApp Business provider identity fingerprints'
 
 telegram_provider_identity_fingerprints="$(
   query_postgres "SELECT connection_id || ':' || CASE WHEN provider_identity_fingerprint IS NULL THEN 'absent' ELSE 'unexpected' END FROM open_channel_hub.connection_registry WHERE channel = 'telegram_bot' ORDER BY connection_id;"
@@ -402,6 +447,22 @@ assert_scoped_event_response \
   'facebook-page-sales' \
   'facebook-page-support'
 
+whatsapp_support_inbound_events_response="$(
+  read_whatsapp_business_inbound_events "$whatsapp_support_operator_api_token"
+)"
+whatsapp_sales_inbound_events_response="$(
+  read_whatsapp_business_inbound_events "$whatsapp_sales_operator_api_token"
+)"
+
+assert_scoped_event_response \
+  "$whatsapp_support_inbound_events_response" \
+  'whatsapp-business-support' \
+  'whatsapp-business-sales'
+assert_scoped_event_response \
+  "$whatsapp_sales_inbound_events_response" \
+  'whatsapp-business-sales' \
+  'whatsapp-business-support'
+
 cross_connection_cursor="$(
   printf '%s' '{"beforeSequence":"1","connectionId":"telegram-bot-support","snapshotMaxSequence":"1"}' \
     | base64 \
@@ -434,6 +495,17 @@ assert_equal \
   '400' \
   "$(read_facebook_page_inbound_events_status "$facebook_sales_operator_api_token" "$facebook_cross_connection_cursor")" \
   'Facebook Page cross-connection cursor rejection'
+
+whatsapp_cross_connection_cursor="$(
+  printf '%s' '{"beforeSequence":"1","connectionId":"whatsapp-business-support","snapshotMaxSequence":"1"}' \
+    | base64 \
+    | tr '+/' '-_' \
+    | tr -d '=\n'
+)"
+assert_equal \
+  '400' \
+  "$(read_whatsapp_business_inbound_events_status "$whatsapp_sales_operator_api_token" "$whatsapp_cross_connection_cursor")" \
+  'WhatsApp Business cross-connection cursor rejection'
 
 runtime_connection_secret_permissions="$(
   "${compose[@]}" exec -T api stat -c '%u:%g:%a' /run/secrets/runtime_connections_base64

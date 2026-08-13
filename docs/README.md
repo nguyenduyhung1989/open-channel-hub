@@ -15,9 +15,12 @@
 - [Phase 3b Facebook Page inbound text](operations/facebook-page-3b.md):
   official GET verification, raw-byte HMAC ingress, Page isolation, and the
   intentionally excluded Meta surface.
-- [Phase 0–3b threat model](security/threat-model.md): assets, trust
+- [Phase 3c WhatsApp Business inbound text](operations/whatsapp-business-3c.md):
+  official GET verification, raw-byte HMAC ingress, business-phone isolation,
+  and the intentionally excluded WhatsApp surface.
+- [Phase 0–3c threat model](security/threat-model.md): assets, trust
   boundaries, current controls, and planned work.
 - [Open-source readiness](maintainers/oss-readiness.md): an honest operating
   checklist for maintainers.
-- [Phase 3b checkpoint](maintainers/current-phase.md): verified milestones,
+- [Phase 3c checkpoint](maintainers/current-phase.md): verified milestones,
   code state, risks, and exact next verification.

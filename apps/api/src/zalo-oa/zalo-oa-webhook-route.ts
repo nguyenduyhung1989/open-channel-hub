@@ -2,6 +2,7 @@ import { toZaloOaWebhookIdentity } from '@open-channel-hub/connector-zalo-oa';
 import type { FastifyInstance } from 'fastify';
 
 import { apiFailure } from '../http/api-response.js';
+import { parseRawJson, toRawUtf8Json } from '../http/raw-json.js';
 
 import type { ZaloOaFeatureCatalog } from './zalo-oa-feature-catalog.js';
 import { matchesZaloOaWebhookSignature } from './zalo-oa-signature.js';
@@ -25,7 +26,7 @@ export const registerZaloOaWebhookRoute = async (
 
     webhookApp.post<{ Body: Buffer }>('/v1/webhooks/zalo-oa', async (request, reply) => {
       const rawJson = toRawUtf8Json(request.body);
-      const rawEvent = rawJson === undefined ? undefined : parseJson(rawJson);
+      const rawEvent = rawJson === undefined ? undefined : parseRawJson(rawJson);
       const identity = toZaloOaWebhookIdentity(rawEvent);
       const feature =
         identity === undefined
@@ -62,22 +63,4 @@ export const registerZaloOaWebhookRoute = async (
 
     done();
   });
-};
-
-const toRawUtf8Json = (value: unknown): string | undefined => {
-  if (!Buffer.isBuffer(value)) {
-    return undefined;
-  }
-
-  const decoded = value.toString('utf8');
-
-  return Buffer.from(decoded, 'utf8').equals(value) ? decoded : undefined;
-};
-
-const parseJson = (value: string): unknown => {
-  try {
-    return JSON.parse(value);
-  } catch {
-    return undefined;
-  }
 };

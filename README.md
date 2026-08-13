@@ -2,15 +2,16 @@
 
 > A self-hosted, official-first multichannel messaging hub.
 
-**Status: Phase 3b alpha.** The repository contains a durable PostgreSQL
+**Status: Phase 3c alpha.** The repository contains a durable PostgreSQL
 inbound-event ledger, account-scoped operator read APIs, secret-backed runtime
 configuration for several official accounts, and narrow official Zalo Official
-Account (OA) and Facebook Page signed inbound-text boundaries. GitHub CI and
-CodeQL succeeded for exact Phase 3a commit <code>b930d29</code>. The current
-Phase 3b source still needs its own final local and GitHub verification. Phase
+Account (OA), Facebook Page, and WhatsApp Business signed inbound-text
+boundaries. GitHub CI and CodeQL succeeded for exact Phase 3a commit
+<code>b930d29</code> and Phase 3b commit <code>c933102</code>. The current
+Phase 3c source still needs its own final local and GitHub verification. Phase
 1a remains incomplete until an owner-authorized Telegram test bot works through
-public TLS; Phase 3a and 3b likewise have no owner-authorized real provider
-proof.
+public TLS; Phases 3a, 3b, and 3c likewise have no owner-authorized real
+provider proof.
 
 The official Telegram Bot HTTP transport is wired for a deliberately narrow
 text send/receive slice. Legacy mode uses <code>OPERATOR_API_TOKEN</code>;
@@ -47,14 +48,15 @@ bearer exposes only that OA's canonical events at
 storage, outbound Zalo message, attachment, Zalo User, live provider call, or
 automatic webhook registration.
 
-For Zalo OA and Facebook Page, the registry also stores a domain-separated SHA-256
+For Zalo OA, Facebook Page, and WhatsApp Business, the registry also stores a domain-separated SHA-256
 fingerprint of the configured <code>(appId, oaId)</code> pair. It is not the
 plain provider identity or a credential; it prevents an opaque Zalo connection
 ID with durable history from silently being reused for a different OA. Facebook
 Page uses the same mechanism for its configured <code>(appId, pageId)</code>
-pair. Telegram does not yet have an equivalent non-secret provider-account
-identity in this configuration, so its registry binding remains
-connector/channel/tier only.
+pair. WhatsApp Business uses it for its configured
+<code>(appId, wabaId, phoneNumberId)</code> triple. Telegram does not yet have
+an equivalent non-secret provider-account identity in this configuration, so
+its registry binding remains connector/channel/tier only.
 
 Phase 3b adds official Facebook Page inbound text only. Its fixed
 <code>GET</code>/<code>POST /v1/webhooks/facebook-page</code> endpoint handles
@@ -65,6 +67,20 @@ durable. A unique operator bearer exposes only that Page's canonical events at
 <code>GET /v1/facebook-page/inbound-events</code>. There is no Facebook User,
 OAuth, Page access-token storage, Graph API request, outbound Page message,
 attachment, live provider call, or automatic webhook registration.
+
+Phase 3c adds official WhatsApp Business inbound text only. A standalone
+WhatsApp Meta App uses the fixed <code>GET</code>/<code>POST
+/v1/webhooks/whatsapp-business</code> endpoint; one App configured for both
+Facebook Page and WhatsApp uses the common <code>GET</code>/<code>POST
+/v1/webhooks/meta</code> endpoint. Both paths handle Meta's verification
+challenge, map untrusted WABA IDs in `entry[].id` to one configured App, verify
+<code>X-Hub-Signature-256</code> over exact raw request bytes, then return
+<code>200</code> only after canonical text is durable. A unique operator bearer
+exposes only one business phone's canonical events at
+<code>GET /v1/whatsapp-business/inbound-events</code>. There is no WhatsApp
+User, OAuth, Graph API access-token storage, Graph API request, outbound
+message, template, attachment, live provider call, or automatic webhook
+registration.
 
 Multi-connection IDs are opaque safe route labels; <code>.</code> and
 <code>..</code> are rejected because webhook ingress places the ID in a dynamic
@@ -94,8 +110,8 @@ CAPTCHA bypass, fingerprint spoofing, session theft, or bulk-spam capabilities.
 - Data contracts, connector ports, and capability checks for the Telegram Bot
   slice.
 - A temporary legacy one-Bot environment mode and a mutually exclusive,
-  secret-backed multi-connection mode for official Telegram Bot, Zalo OA, and
-  Facebook Page accounts. The latter maps each unique operator token to exactly one
+  secret-backed multi-connection mode for official Telegram Bot, Zalo OA,
+  Facebook Page, and WhatsApp Business accounts. The latter maps each unique operator token to exactly one
   configured account.
 - Dynamic multi-connection webhook ingress that resolves the account server
   side, uses a separate webhook secret, and gives unknown account IDs and wrong
@@ -111,6 +127,9 @@ CAPTCHA bypass, fingerprint spoofing, session theft, or bulk-spam capabilities.
 - A narrow official Facebook Page receive-only boundary: a fixed GET/POST
   signed raw-byte webhook for text messages and a separate bearer-scoped
   canonical-event reader.
+- A narrow official WhatsApp Business receive-only boundary: standalone or
+  shared-Meta GET/POST signed raw-byte webhook ingress for text messages and a
+  separate bearer-scoped canonical-event reader.
 - An isolated PostgreSQL database and schema, a non-superuser application role,
   immutable migration ledger, a runtime connection registry, and readiness that
   refuses traffic when the expected migration is unavailable.
@@ -131,9 +150,10 @@ The following remain plans or explicitly incomplete operational work:
   organizations, webhook administration, public connection management, or a
   connection listing API.
 - A real Telegram Bot/TLS verification, real Zalo OA/TLS verification, real
-  Facebook Page/TLS verification, Zalo OA OAuth/access tokens/outbound
-  messages/attachments, Facebook Page access-token handling/outbound messages,
-  Facebook User, Zalo User, and WhatsApp.
+  Facebook Page/TLS verification, real WhatsApp Business/TLS verification,
+  Zalo OA OAuth/access tokens/outbound messages/attachments, Facebook Page or
+  WhatsApp Business access-token handling/outbound messages, Facebook User,
+  Zalo User, and WhatsApp User.
 
 See [ROADMAP.md](ROADMAP.md) for the criteria before each phase can be called
 complete.
@@ -192,7 +212,8 @@ Before the first start, copy <code>.env.example</code> to
    legacy Telegram variables with the shared document. See the
    [Phase 2c multi-connection guide](docs/operations/runtime-multi-connection-2c.md),
    [Phase 3a Zalo OA guide](docs/operations/zalo-oa-3a.md), and
-   [Phase 3b Facebook Page guide](docs/operations/facebook-page-3b.md).
+   [Phase 3b Facebook Page guide](docs/operations/facebook-page-3b.md), and
+   [Phase 3c WhatsApp Business guide](docs/operations/whatsapp-business-3c.md).
 
 ```bash
 docker compose up --build
@@ -234,11 +255,12 @@ Do **not** casually run <code>docker compose down --volumes</code>. It deletes
 the named PostgreSQL volume and therefore every stored inbound event. Backups
 and restore drills are not implemented yet.
 
-Telegram, Zalo OA, and Facebook Page require public HTTPS webhooks. Put a TLS reverse proxy in
+Telegram, Zalo OA, Facebook Page, and WhatsApp Business require public HTTPS webhooks. Put a TLS reverse proxy in
 front of Compose, keep the operator API on loopback, and follow the
 [Phase 2c multi-connection guide](docs/operations/runtime-multi-connection-2c.md),
 [Phase 3a Zalo OA guide](docs/operations/zalo-oa-3a.md), or
 [Phase 3b Facebook Page guide](docs/operations/facebook-page-3b.md), or
+[Phase 3c WhatsApp Business guide](docs/operations/whatsapp-business-3c.md), or
 [Phase 1a legacy guide](docs/operations/telegram-bot-1a.md) only after an
 authorized test is agreed. Starting Compose does not provide TLS or register a
 webhook automatically.
@@ -249,7 +271,9 @@ When a configured connector and PostgreSQL are enabled, a local operator can
 call <code>GET /v1/telegram-bot/inbound-events</code> for Telegram,
 <code>GET /v1/zalo-oa/inbound-events</code> for Zalo OA, or
 <code>GET /v1/facebook-page/inbound-events</code> for Facebook Page with the
-bearer token assigned to one configured account. Each route accepts an optional
+bearer token assigned to one configured account, or
+<code>GET /v1/whatsapp-business/inbound-events</code> for WhatsApp Business
+with the bearer token assigned to one configured business phone. Each route accepts an optional
 <code>limit</code> from 1 to 100 (default 50) and an optional opaque
 <code>cursor</code> returned by the preceding page. Neither accepts a connection
 ID: in legacy Telegram mode it reads the one configured Bot, and in the shared

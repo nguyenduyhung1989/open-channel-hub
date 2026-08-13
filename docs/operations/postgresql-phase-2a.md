@@ -19,11 +19,11 @@ The supplied Compose stack creates three services:
 The database and schema are both named <code>open_channel_hub</code>. The
 application schema contains:
 
-| Object                           | Purpose                                                                                                                                                                                 |
-| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| <code>schema_migrations</code>   | Immutable record of forward schema migrations applied by this binary.                                                                                                                   |
-| <code>connection_registry</code> | Opaque connection ID, immutable connector metadata, registration timestamp, and a non-secret Zalo OA or Facebook Page provider-identity fingerprint when those channels are configured. |
-| <code>inbound_events</code>      | Canonical inbound text-event ledger. Its primary key is <code>(connection_id, provider_event_id)</code>.                                                                                |
+| Object                           | Purpose                                                                                                                                                                                                     |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| <code>schema_migrations</code>   | Immutable record of forward schema migrations applied by this binary.                                                                                                                                       |
+| <code>connection_registry</code> | Opaque connection ID, immutable connector metadata, registration timestamp, and a non-secret Zalo OA, Facebook Page, or WhatsApp Business provider-identity fingerprint when those channels are configured. |
+| <code>inbound_events</code>      | Canonical inbound text-event ledger. Its primary key is <code>(connection_id, provider_event_id)</code>.                                                                                                    |
 
 The ledger stores a canonical event ID, channel/type/timestamps, conversation
 and sender/message identifiers, and message text. It intentionally does **not**
@@ -43,9 +43,11 @@ stores a domain-separated SHA-256 fingerprint of each Zalo OA
 provider identifier; it prevents the durable Zalo connection label from being
 silently rebound to a different pair. Phase 3b's additive <code>0006</code>
 migration requires the same kind of fingerprint for each Facebook Page
-<code>(appId, pageId)</code> pair. Telegram entries remain without a
-provider-identity fingerprint because this configuration does not hold an
-equivalent non-secret Bot account identity. The subsequent foreign key from
+<code>(appId, pageId)</code> pair. Phase 3c's additive <code>0007</code>
+migration requires the same kind of fingerprint for each WhatsApp Business
+<code>(appId, wabaId, phoneNumberId)</code> triple. Telegram entries remain
+without a provider-identity fingerprint because this configuration does not hold
+an equivalent non-secret Bot account identity. The subsequent foreign key from
 <code>inbound_events.connection_id</code> to the registry is marked
 <code>NOT VALID</code>: PostgreSQL enforces new rows, while older Phase 2a
 history can be reconciled and explicitly validated later. Do not manually
@@ -73,7 +75,8 @@ environment variable.
 
 If multi-connection mode is enabled, <code>CONNECTIONS_CONFIG_BASE64</code> is
 a third Compose secret source. It is the unpadded base64url encoding of a JSON
-document that contains inline Telegram Bot, Zalo OA, and/or Facebook Page credentials. The encoded value is
+document that contains inline Telegram Bot, Zalo OA, Facebook Page, and/or
+WhatsApp Business credentials. The encoded value is
 mounted only for the API as <code>runtime_connections_base64</code>; it is not
 sent to the API as an environment value and never belongs in PostgreSQL.
 Base64url prevents Compose from expanding credential <code>$</code> characters;
@@ -81,7 +84,8 @@ it is not encryption. The precise configuration, compatibility, and route rules
 are in the
 [runtime multi-connection guide](runtime-multi-connection-2c.md) and the
 [Phase 3a Zalo OA guide](zalo-oa-3a.md) and
-[Phase 3b Facebook Page guide](facebook-page-3b.md).
+[Phase 3b Facebook Page guide](facebook-page-3b.md) and
+[Phase 3c WhatsApp Business guide](whatsapp-business-3c.md).
 
 Do **not** assume that editing <code>.env</code> rotates an existing database
 password. The role-creation script runs only while a new PostgreSQL volume is
@@ -120,10 +124,13 @@ migration twice, delivered the same fake webhook twice, observed two
 <code>204</code> responses, and verified exactly one ledger row. The verified
 Phase 2c proof extended this to two registered Telegram connections. The
 verified Phase 3a proof added two synthetic Zalo OA connections, raw-byte
-signature checks, and non-secret registry fingerprints. The current Phase 3b
-smoke-test source adds two synthetic Facebook Pages on one fake App, raw-byte
-HMAC checks, and Facebook fingerprints; its final candidate verification is
-separate. No proof path calls a provider or uses a real credential or message.
+signature checks, and non-secret registry fingerprints. The verified Phase 3b
+proof added two synthetic Facebook Pages on one fake App, raw-byte HMAC checks,
+and Facebook fingerprints. The current Phase 3c smoke-test source adds two
+synthetic WhatsApp business phones on that same fake App, the common Meta
+callback, raw-byte HMAC checks, and WhatsApp fingerprints; its final candidate
+verification is separate. No proof path calls a provider or uses a real
+credential or message.
 
 ## Container and network boundary
 
@@ -166,7 +173,7 @@ a routine reset, and do not run it against any data you need to keep.
 - No database audit trail, user/account authorization model, rate limit, or
   capacity policy.
 - No encryption-at-rest claim for the Docker volume or host disk.
-- No public TLS/proxy, real Telegram, Zalo OA, or Facebook Page confirmation,
-  or production monitoring.
+- No public TLS/proxy, real Telegram, Zalo OA, Facebook Page, or WhatsApp
+  Business confirmation, or production monitoring.
 
 These gaps are intentionally left visible in the roadmap and threat model.

@@ -1,12 +1,12 @@
-import { toFacebookPageWebhookPageIds } from '@open-channel-hub/connector-facebook-page';
+import { toWhatsAppBusinessWebhookWabaIds } from '@open-channel-hub/connector-whatsapp-business';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import { apiFailure } from '../http/api-response.js';
+import { matchesMetaHubWebhookSignature } from '../http/meta-hub-signature.js';
 import { parseRawJson, toRawUtf8Json } from '../http/raw-json.js';
 
-import type { FacebookPageFeatureCatalog } from './facebook-page-feature-catalog.js';
-import { matchesFacebookPageWebhookSignature } from './facebook-page-signature.js';
+import type { WhatsAppBusinessFeatureCatalog } from './whatsapp-business-feature-catalog.js';
 
 const verificationQuerySchema = z
   .object({
@@ -17,13 +17,13 @@ const verificationQuerySchema = z
   .strict();
 
 /**
- * Registers one child Fastify scope so Meta Page webhooks alone receive raw
- * JSON bytes for HMAC validation. Telegram and Zalo retain their independent
- * parser scopes and every ordinary API route continues to receive parsed JSON.
+ * Registers one child Fastify scope so WhatsApp Business alone receives raw
+ * JSON bytes for Meta HMAC validation. Other provider routes retain their
+ * independent parsers.
  */
-export const registerFacebookPageWebhookRoute = async (
+export const registerWhatsAppBusinessWebhookRoute = async (
   app: FastifyInstance,
-  catalog: FacebookPageFeatureCatalog
+  catalog: WhatsAppBusinessFeatureCatalog
 ): Promise<void> => {
   app.register((webhookApp, _options, done) => {
     webhookApp.removeContentTypeParser('application/json');
@@ -33,7 +33,7 @@ export const registerFacebookPageWebhookRoute = async (
       (_request, rawBody: Buffer, parseDone) => parseDone(null, rawBody)
     );
 
-    webhookApp.get('/v1/webhooks/facebook-page', async (request, reply) => {
+    webhookApp.get('/v1/webhooks/whatsapp-business', async (request, reply) => {
       const query = verificationQuerySchema.safeParse(request.query);
 
       if (!query.success || !catalog.matchesWebhookVerifyToken(query.data['hub.verify_token'])) {
@@ -45,18 +45,18 @@ export const registerFacebookPageWebhookRoute = async (
       return reply.code(200).type('text/plain; charset=utf-8').send(query.data['hub.challenge']);
     });
 
-    webhookApp.post<{ Body: Buffer }>('/v1/webhooks/facebook-page', async (request, reply) => {
+    webhookApp.post<{ Body: Buffer }>('/v1/webhooks/whatsapp-business', async (request, reply) => {
       const rawJson = toRawUtf8Json(request.body);
       const rawEvent = rawJson === undefined ? undefined : parseRawJson(rawJson);
-      const pageIds = toFacebookPageWebhookPageIds(rawEvent);
-      const providerApp = catalog.findAppByPageIds(pageIds);
+      const wabaIds = toWhatsAppBusinessWebhookWabaIds(rawEvent);
+      const providerApp = catalog.findAppByWabaIds(wabaIds);
       const header = request.headers['x-hub-signature-256'];
       const signature = typeof header === 'string' ? header : undefined;
 
       if (
         rawEvent === undefined ||
         providerApp === undefined ||
-        !matchesFacebookPageWebhookSignature({
+        !matchesMetaHubWebhookSignature({
           appSecret: providerApp.appSecret,
           rawBody: request.body,
           signature

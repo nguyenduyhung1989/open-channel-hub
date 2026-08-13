@@ -83,6 +83,27 @@ follows [Semantic Versioning](https://semver.org/).
   rejection, multi-Page durable append, duplicate idempotency, Page
   bearer/cursor isolation, registry metadata, secret-file mode, and PostgreSQL
   role safety without provider network access.
+- Phase 3c: an official WhatsApp Business receive-only connector package that
+  supports canonical incoming-text normalization and rejects every provider
+  command.
+- Phase 3c: standalone `GET`/`POST /v1/webhooks/whatsapp-business` routes for
+  an App used only by WhatsApp, plus shared `GET`/`POST /v1/webhooks/meta`
+  routes for one App configured for both Facebook Page and WhatsApp. Both
+  handle Meta verification, resolve complete batches to one App, verify
+  `X-Hub-Signature-256` over exact raw request bytes, and append canonical text
+  before acknowledging it.
+- Phase 3c: a token-bound `GET /v1/whatsapp-business/inbound-events` route
+  with canonical-only fields and business-phone-bound opaque cursors.
+- Phase 3c: a forward-only PostgreSQL registry migration that binds each
+  WhatsApp Business connection ID to a non-secret SHA-256 fingerprint of its
+  configured `(appId, wabaId, phoneNumberId)` triple, preventing silent
+  rebinding after durable history exists.
+- A synthetic Compose smoke-test source with two WhatsApp Business phones on
+  one fake WABA and an App shared with two fake Facebook Pages. It checks the
+  common Meta challenge callback, raw-byte HMAC rejection, multi-phone durable
+  append, duplicate idempotency, business-phone bearer/cursor isolation,
+  registry metadata, secret-file mode, and PostgreSQL role safety without
+  provider network access.
 
 ### Changed
 
@@ -90,8 +111,10 @@ follows [Semantic Versioning](https://semver.org/).
   <code>7141949</code>, completed Phase 2a GitHub CI/CodeQL at
   <code>f106bb8</code>, completed Phase 2b GitHub CI/CodeQL at exact commit
   <code>4d5a9c9</code>, completed Phase 2c GitHub CI/CodeQL at exact commit
-  <code>8352b51</code>, and verification still required for the current Phase
-  3a candidate.
+  <code>8352b51</code>, completed Phase 3a GitHub CI/CodeQL at
+  <code>b930d29</code>, completed Phase 3b GitHub CI/CodeQL at
+  <code>c933102</code>, and verification still required for the current Phase
+  3c candidate.
 - An accepted inbound Telegram text event now becomes durable when the
   PostgreSQL configuration is present; a local operator can now list canonical
   inbound events, but this still does not add an inbox, live Telegram proof,
@@ -108,6 +131,10 @@ follows [Semantic Versioning](https://semver.org/).
 - The version-1 runtime document now also supports `facebook_page` entries.
   Multiple Pages can share one configured App only when their App secret and
   verification token match exactly; Page IDs and operator bearers remain unique.
+- The version-1 runtime document now also supports `whatsapp_business` entries.
+  Business phone IDs and operator bearers remain unique, one WABA resolves to
+  one configured App, and an App shared with Facebook Page uses one declared
+  public `/v1/webhooks/meta` callback rather than conflicting product URLs.
 
 ### Security
 
@@ -140,6 +167,10 @@ follows [Semantic Versioning](https://semver.org/).
   resolves to one configured App. The HMAC uses the original raw request bytes;
   unknown/malformed/cross-App batches and invalid signatures return the same
   `401`, while raw payloads and App credentials never enter the database.
+- WhatsApp Business webhook signatures are compared only after every batch WABA
+  ID resolves to one configured App. The HMAC uses the original raw request
+  bytes; unknown/malformed/cross-App batches and invalid signatures return the
+  same `401`, while raw payloads and App credentials never enter the database.
 - The <code>main</code> branch now blocks force pushes and deletion, including
   for administrators. Required checks and pull-request reviews remain
   intentionally unset for the owner-controlled direct-push workflow.

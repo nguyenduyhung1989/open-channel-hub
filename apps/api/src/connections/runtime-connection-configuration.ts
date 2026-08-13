@@ -41,8 +41,28 @@ export interface RuntimeFacebookPageConnection {
   readonly webhookVerifyToken: string;
 }
 
+/**
+ * WhatsApp Business inbound credentials deliberately exclude Graph API access
+ * tokens. Phase 3c verifies signed inbound webhooks only; it does not call
+ * Meta, subscribe a WABA, send messages, or store OAuth credentials.
+ */
+export interface RuntimeWhatsAppBusinessConnection {
+  readonly appId: string;
+  readonly appSecret: string;
+  readonly id: string;
+  readonly operatorApiToken: string;
+  readonly phoneNumberId: string;
+  readonly type: 'whatsapp_business';
+  readonly wabaId: string;
+  readonly webhookUrl?: string;
+  readonly webhookVerifyToken: string;
+}
+
 export type RuntimeConnection =
-  RuntimeTelegramBotConnection | RuntimeZaloOaConnection | RuntimeFacebookPageConnection;
+  | RuntimeTelegramBotConnection
+  | RuntimeZaloOaConnection
+  | RuntimeFacebookPageConnection
+  | RuntimeWhatsAppBusinessConnection;
 
 export interface RuntimeConnectionConfiguration {
   readonly connections: readonly RuntimeConnection[];
@@ -91,11 +111,23 @@ const FACEBOOK_PAGE_CONNECTION_REQUIRED_KEYS = Object.freeze([
   'operatorApiToken'
 ]);
 const FACEBOOK_PAGE_CONNECTION_OPTIONAL_KEYS = Object.freeze(['webhookUrl']);
+const WHATSAPP_BUSINESS_CONNECTION_REQUIRED_KEYS = Object.freeze([
+  'id',
+  'type',
+  'appId',
+  'wabaId',
+  'phoneNumberId',
+  'appSecret',
+  'webhookVerifyToken',
+  'operatorApiToken'
+]);
+const WHATSAPP_BUSINESS_CONNECTION_OPTIONAL_KEYS = Object.freeze(['webhookUrl']);
 const CONNECTION_ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
 const PRINTABLE_TOKEN_PATTERN = /^[!-~]+$/;
 const WEBHOOK_SECRET_PATTERN = /^[A-Za-z0-9_-]{32,256}$/;
 const ZALO_IDENTIFIER_PATTERN = /^[0-9]{1,32}$/;
 const FACEBOOK_IDENTIFIER_PATTERN = /^[0-9]{1,32}$/;
+const WHATSAPP_BUSINESS_IDENTIFIER_PATTERN = /^[0-9]{1,32}$/;
 const PRIVATE_HOSTNAME_SUFFIXES = Object.freeze(['.localhost', '.local', '.internal']);
 
 /**
@@ -184,12 +216,13 @@ const parseRuntimeConnectionConfiguration = (value: unknown): RuntimeConnectionC
   const exclusiveCredentials = new Set<string>();
   const zaloOaSecrets = new Set<string>();
   const zaloOaPairs = new Set<string>();
-  const facebookCredentials = new Set<string>();
+  const metaCredentials = new Set<string>();
+  const metaApps = new Map<string, Readonly<{ appSecret: string; webhookVerifyToken: string }>>();
   const facebookPageIds = new Set<string>();
-  const facebookApps = new Map<
-    string,
-    Readonly<{ appSecret: string; webhookVerifyToken: string }>
-  >();
+  const whatsappBusinessPhoneNumberIds = new Set<string>();
+  const whatsappBusinessWabaApps = new Map<string, string>();
+  const metaAppWebhookUrls = new Map<string, Set<string>>();
+  const metaAppChannels = new Map<string, Set<'facebook_page' | 'whatsapp_business'>>();
   const connections = value.connections.map((candidate) => {
     const connection = parseConnection(candidate);
 
@@ -203,7 +236,7 @@ const parseRuntimeConnectionConfiguration = (value: unknown): RuntimeConnectionC
       operatorTokens.has(connection.operatorApiToken) ||
       exclusiveCredentials.has(connection.operatorApiToken) ||
       zaloOaSecrets.has(connection.operatorApiToken) ||
-      facebookCredentials.has(connection.operatorApiToken)
+      metaCredentials.has(connection.operatorApiToken)
     ) {
       throw new RuntimeConnectionConfigurationError();
     }
@@ -216,7 +249,7 @@ const parseRuntimeConnectionConfiguration = (value: unknown): RuntimeConnectionC
         if (
           exclusiveCredentials.has(credential) ||
           zaloOaSecrets.has(credential) ||
-          facebookCredentials.has(credential)
+          metaCredentials.has(credential)
         ) {
           throw new RuntimeConnectionConfigurationError();
         }
@@ -228,7 +261,7 @@ const parseRuntimeConnectionConfiguration = (value: unknown): RuntimeConnectionC
 
       if (
         exclusiveCredentials.has(connection.oaSecretKey) ||
-        facebookCredentials.has(connection.oaSecretKey) ||
+        metaCredentials.has(connection.oaSecretKey) ||
         zaloOaPairs.has(pairKey)
       ) {
         throw new RuntimeConnectionConfigurationError();
@@ -236,48 +269,76 @@ const parseRuntimeConnectionConfiguration = (value: unknown): RuntimeConnectionC
 
       zaloOaSecrets.add(connection.oaSecretKey);
       zaloOaPairs.add(pairKey);
-    } else {
-      const existingApp = facebookApps.get(connection.appId);
+    } else if (connection.type === 'facebook_page') {
+      registerMetaAppCredentials({
+        appId: connection.appId,
+        appSecret: connection.appSecret,
+        webhookVerifyToken: connection.webhookVerifyToken,
+        exclusiveCredentials,
+        metaApps,
+        metaCredentials,
+        zaloOaSecrets
+      });
 
       if (facebookPageIds.has(connection.pageId)) {
         throw new RuntimeConnectionConfigurationError();
       }
 
-      if (
-        existingApp !== undefined &&
-        (existingApp.appSecret !== connection.appSecret ||
-          existingApp.webhookVerifyToken !== connection.webhookVerifyToken)
-      ) {
+      facebookPageIds.add(connection.pageId);
+      recordMetaWebhookConfiguration({
+        appId: connection.appId,
+        channel: connection.type,
+        metaAppChannels,
+        metaAppWebhookUrls,
+        webhookUrl: connection.webhookUrl
+      });
+    } else {
+      registerMetaAppCredentials({
+        appId: connection.appId,
+        appSecret: connection.appSecret,
+        webhookVerifyToken: connection.webhookVerifyToken,
+        exclusiveCredentials,
+        metaApps,
+        metaCredentials,
+        zaloOaSecrets
+      });
+
+      if (whatsappBusinessPhoneNumberIds.has(connection.phoneNumberId)) {
         throw new RuntimeConnectionConfigurationError();
       }
 
-      if (existingApp === undefined) {
-        for (const credential of [connection.appSecret, connection.webhookVerifyToken]) {
-          if (
-            exclusiveCredentials.has(credential) ||
-            zaloOaSecrets.has(credential) ||
-            facebookCredentials.has(credential)
-          ) {
-            throw new RuntimeConnectionConfigurationError();
-          }
-        }
+      const existingWabaApp = whatsappBusinessWabaApps.get(connection.wabaId);
 
-        facebookCredentials.add(connection.appSecret);
-        facebookCredentials.add(connection.webhookVerifyToken);
-        facebookApps.set(
-          connection.appId,
-          Object.freeze({
-            appSecret: connection.appSecret,
-            webhookVerifyToken: connection.webhookVerifyToken
-          })
-        );
+      if (existingWabaApp !== undefined && existingWabaApp !== connection.appId) {
+        throw new RuntimeConnectionConfigurationError();
       }
 
-      facebookPageIds.add(connection.pageId);
+      whatsappBusinessPhoneNumberIds.add(connection.phoneNumberId);
+      whatsappBusinessWabaApps.set(connection.wabaId, connection.appId);
+      recordMetaWebhookConfiguration({
+        appId: connection.appId,
+        channel: connection.type,
+        metaAppChannels,
+        metaAppWebhookUrls,
+        webhookUrl: connection.webhookUrl
+      });
     }
 
     return connection;
   });
+
+  for (const [appId, channels] of metaAppChannels) {
+    const webhookUrls = metaAppWebhookUrls.get(appId) ?? new Set<string>();
+
+    if (
+      channels.has('facebook_page') &&
+      channels.has('whatsapp_business') &&
+      (webhookUrls.size > 1 ||
+        [...webhookUrls].some((webhookUrl) => !isMetaSharedWebhookUrl(webhookUrl)))
+    ) {
+      throw new RuntimeConnectionConfigurationError();
+    }
+  }
 
   return Object.freeze({ connections: Object.freeze(connections) });
 };
@@ -297,6 +358,10 @@ const parseConnection = (value: unknown): RuntimeConnection => {
 
   if (value.type === 'facebook_page') {
     return parseFacebookPageConnection(value);
+  }
+
+  if (value.type === 'whatsapp_business') {
+    return parseWhatsAppBusinessConnection(value);
   }
 
   throw new RuntimeConnectionConfigurationError();
@@ -411,6 +476,120 @@ const parseFacebookPageConnection = (value: unknown): RuntimeFacebookPageConnect
   });
 };
 
+const parseWhatsAppBusinessConnection = (value: unknown): RuntimeWhatsAppBusinessConnection => {
+  if (
+    !hasExactKeys(
+      value,
+      WHATSAPP_BUSINESS_CONNECTION_REQUIRED_KEYS,
+      WHATSAPP_BUSINESS_CONNECTION_OPTIONAL_KEYS
+    ) ||
+    !isConnectionId(value.id) ||
+    value.type !== 'whatsapp_business' ||
+    !isWhatsAppBusinessIdentifier(value.appId) ||
+    !isWhatsAppBusinessIdentifier(value.wabaId) ||
+    !isWhatsAppBusinessIdentifier(value.phoneNumberId) ||
+    !isPrintableToken(value.appSecret, 32) ||
+    !isPrintableToken(value.webhookVerifyToken, 32) ||
+    !isPrintableToken(value.operatorApiToken, 32)
+  ) {
+    throw new RuntimeConnectionConfigurationError();
+  }
+
+  const webhookUrl = value.webhookUrl;
+
+  if (
+    webhookUrl !== undefined &&
+    (!isString(webhookUrl) || !isValidPublicWhatsAppBusinessWebhookUrl(webhookUrl))
+  ) {
+    throw new RuntimeConnectionConfigurationError();
+  }
+
+  return Object.freeze({
+    appId: value.appId,
+    appSecret: value.appSecret,
+    id: value.id,
+    operatorApiToken: value.operatorApiToken,
+    phoneNumberId: value.phoneNumberId,
+    type: 'whatsapp_business',
+    wabaId: value.wabaId,
+    webhookVerifyToken: value.webhookVerifyToken,
+    ...(webhookUrl === undefined ? {} : { webhookUrl })
+  });
+};
+
+interface MetaAppCredentialRegistration {
+  readonly appId: string;
+  readonly appSecret: string;
+  readonly webhookVerifyToken: string;
+  readonly exclusiveCredentials: Set<string>;
+  readonly metaApps: Map<string, Readonly<{ appSecret: string; webhookVerifyToken: string }>>;
+  readonly metaCredentials: Set<string>;
+  readonly zaloOaSecrets: Set<string>;
+}
+
+interface MetaWebhookConfiguration {
+  readonly appId: string;
+  readonly channel: 'facebook_page' | 'whatsapp_business';
+  readonly metaAppChannels: Map<string, Set<'facebook_page' | 'whatsapp_business'>>;
+  readonly metaAppWebhookUrls: Map<string, Set<string>>;
+  readonly webhookUrl: string | undefined;
+}
+
+const registerMetaAppCredentials = ({
+  appId,
+  appSecret,
+  webhookVerifyToken,
+  exclusiveCredentials,
+  metaApps,
+  metaCredentials,
+  zaloOaSecrets
+}: MetaAppCredentialRegistration): void => {
+  const existingApp = metaApps.get(appId);
+
+  if (
+    existingApp !== undefined &&
+    (existingApp.appSecret !== appSecret || existingApp.webhookVerifyToken !== webhookVerifyToken)
+  ) {
+    throw new RuntimeConnectionConfigurationError();
+  }
+
+  if (existingApp !== undefined) {
+    return;
+  }
+
+  for (const credential of [appSecret, webhookVerifyToken]) {
+    if (
+      exclusiveCredentials.has(credential) ||
+      zaloOaSecrets.has(credential) ||
+      metaCredentials.has(credential)
+    ) {
+      throw new RuntimeConnectionConfigurationError();
+    }
+  }
+
+  metaCredentials.add(appSecret);
+  metaCredentials.add(webhookVerifyToken);
+  metaApps.set(appId, Object.freeze({ appSecret, webhookVerifyToken }));
+};
+
+const recordMetaWebhookConfiguration = ({
+  appId,
+  channel,
+  metaAppChannels,
+  metaAppWebhookUrls,
+  webhookUrl
+}: MetaWebhookConfiguration): void => {
+  const channels = metaAppChannels.get(appId) ?? new Set<'facebook_page' | 'whatsapp_business'>();
+  channels.add(channel);
+  metaAppChannels.set(appId, channels);
+
+  if (webhookUrl !== undefined) {
+    const urls = metaAppWebhookUrls.get(appId) ?? new Set<string>();
+    urls.add(webhookUrl);
+    metaAppWebhookUrls.set(appId, urls);
+  }
+};
+
 const isValidFilePath = (value: unknown): value is string =>
   isString(value) &&
   value.length <= MAXIMUM_FILE_PATH_LENGTH &&
@@ -453,6 +632,9 @@ const isZaloIdentifier = (value: unknown): value is string =>
 
 const isFacebookIdentifier = (value: unknown): value is string =>
   isString(value) && FACEBOOK_IDENTIFIER_PATTERN.test(value);
+
+const isWhatsAppBusinessIdentifier = (value: unknown): value is string =>
+  isString(value) && WHATSAPP_BUSINESS_IDENTIFIER_PATTERN.test(value);
 
 const isValidPublicWebhookUrl = (value: string, connectionId: string): boolean => {
   try {
@@ -500,9 +682,38 @@ const isValidPublicFacebookPageWebhookUrl = (value: string): boolean => {
       url.password === '' &&
       url.search === '' &&
       url.hash === '' &&
-      url.pathname === '/v1/webhooks/facebook-page' &&
+      (url.pathname === '/v1/webhooks/facebook-page' || isMetaSharedWebhookPath(url.pathname)) &&
       isPublicHostname(url.hostname)
     );
+  } catch {
+    return false;
+  }
+};
+
+const isValidPublicWhatsAppBusinessWebhookUrl = (value: string): boolean => {
+  try {
+    const url = new URL(value);
+
+    return (
+      url.protocol === 'https:' &&
+      url.username === '' &&
+      url.password === '' &&
+      url.search === '' &&
+      url.hash === '' &&
+      (url.pathname === '/v1/webhooks/whatsapp-business' ||
+        isMetaSharedWebhookPath(url.pathname)) &&
+      isPublicHostname(url.hostname)
+    );
+  } catch {
+    return false;
+  }
+};
+
+const isMetaSharedWebhookPath = (value: string): boolean => value === '/v1/webhooks/meta';
+
+const isMetaSharedWebhookUrl = (value: string): boolean => {
+  try {
+    return isMetaSharedWebhookPath(new URL(value).pathname);
   } catch {
     return false;
   }

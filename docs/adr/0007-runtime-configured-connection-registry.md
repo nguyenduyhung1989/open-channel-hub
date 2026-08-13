@@ -25,8 +25,8 @@ Multi-connection mode reads one local JSON document from the absolute path in
 <code>CONNECTIONS_CONFIG_FILE</code>, or decodes one unpadded base64url JSON
 document from the absolute path in <code>CONNECTIONS_CONFIG_BASE64_FILE</code>.
 The two inputs are mutually exclusive. The document has a strict versioned
-shape and supports <code>telegram_bot</code>, <code>zalo_oa</code>, and
-<code>facebook_page</code> entries.
+shape and supports <code>telegram_bot</code>, <code>zalo_oa</code>,
+<code>facebook_page</code>, and <code>whatsapp_business</code> entries.
 A Telegram entry has an opaque connection ID, a Bot token, an operator bearer
 token, a webhook secret, and an optional public webhook URL. A Zalo OA entry
 has an opaque connection ID, <code>appId</code>, <code>oaId</code>,
@@ -35,7 +35,17 @@ webhook URL. A Facebook Page entry has an opaque connection ID,
 <code>appId</code>, <code>pageId</code>, <code>appSecret</code>,
 <code>webhookVerifyToken</code>, an operator bearer, and an optional fixed
 App-level webhook URL. Several Facebook Pages may share one App only when those
-two App credentials are identical.
+two App credentials are identical. A WhatsApp Business entry has an opaque
+connection ID, <code>appId</code>, <code>wabaId</code>,
+<code>phoneNumberId</code>, <code>appSecret</code>,
+<code>webhookVerifyToken</code>, an operator bearer, and an optional fixed
+App-level webhook URL. Phone IDs are unique; one WABA maps to one configured
+App. Several phones or WABAs may share one App only when those App credentials
+are identical. Facebook Page and WhatsApp Business entries may share one Meta
+App only with the same credentials. A Meta App configured for both products may
+declare only the common public <code>/v1/webhooks/meta</code> callback for both
+entry types; their declared URLs must be identical. A standalone Facebook Page
+or WhatsApp Business App may instead use its product-specific callback.
 
 The document is a secret because it contains inline credentials. It is never
 committed, logged, exposed through an API, or stored in PostgreSQL. Direct or
@@ -53,8 +63,10 @@ environment interpolation marker; it is an encoding boundary, not encryption.
 
 The loader rejects unknown fields, duplicate connection IDs, duplicate
 Telegram/operator credential-role values, duplicate Zalo
-<code>(appId, oaId)</code> pairs, invalid paths, malformed JSON, invalid public
-webhook URLs, and every provider/network operation at load time. It
+<code>(appId, oaId)</code> pairs, duplicate Facebook Page or WhatsApp business
+phone IDs, ambiguous WhatsApp WABA-to-App mappings, Meta App credential drift,
+invalid paths, malformed JSON, invalid public webhook URLs, and every
+provider/network operation at load time. It
 intentionally makes no undocumented claim that Zalo OA entries sharing an App
 ID must share an OA secret.
 Although old one-Bot environment labels are retained for compatibility, the
@@ -106,6 +118,15 @@ identifiers or a credential, rejects rebinding an existing Page connection ID,
 and uses the same pre-registry-history guard. It does not add an equivalent
 Telegram binding.
 
+Migration
+<code>0007_connection_registry_whatsapp_business_provider_identity</code>
+requires the same opaque fingerprint field for every
+<code>whatsapp_business</code> row. Its domain-separated digest derives from
+<code>(appId, wabaId, phoneNumberId)</code>, never stores those raw identifiers
+or a credential, rejects rebinding an existing WhatsApp connection ID, and uses
+the same pre-registry-history guard. It does not add an equivalent Telegram
+binding.
+
 ### Credentials select an account; callers never select one
 
 Multi-connection webhook ingress is
@@ -139,6 +160,20 @@ batch, and then verifies <code>X-Hub-Signature-256</code> over the original raw
 bytes with that App's secret. The caller never supplies an internal connection
 ID. The Phase 3b inbound-only boundary does not store a Page access token, call
 the Graph API, send a provider request, or register a webhook automatically.
+
+WhatsApp Business webhook ingress uses the standalone
+<code>GET</code>/<code>POST /v1/webhooks/whatsapp-business</code> path when an
+App is configured only for WhatsApp. When that App also configures Facebook
+Page, both products use the shared
+<code>GET</code>/<code>POST /v1/webhooks/meta</code> path instead. GET checks
+the configured verify token and returns Meta's challenge. POST collects every
+untrusted <code>entry[].id</code> WABA ID, requires one configured App for the
+entire batch, and then verifies <code>X-Hub-Signature-256</code> over the
+original raw bytes with that App's secret. The adapter then binds each text
+message to a configured WABA and business phone number. The caller never
+supplies an internal connection ID. The Phase 3c inbound-only boundary does not
+store an access token, call the Graph API, send a provider request, or register
+a webhook automatically.
 
 ### Temporary legacy compatibility
 
@@ -181,16 +216,16 @@ not a second configuration layer.
 
 ## Consequences
 
-- One runtime can hold multiple official Telegram Bot, Zalo OA, and Facebook
-  Page accounts
+- One runtime can hold multiple official Telegram Bot, Zalo OA, Facebook Page,
+  and WhatsApp Business accounts
   without giving an HTTP caller a way to choose somebody else's account.
 - The database can reject future event rows whose connection was never
   registered, while old Phase 2a rows remain available for an explicit future
   reconciliation decision.
-- A Zalo OA or Facebook Page connection ID with durable history cannot be
-  silently repointed to another configured provider pair. The database records
-  only a domain-separated hash, not the pair itself or a credential; this
-  narrower binding does not currently apply to Telegram.
+- A Zalo OA, Facebook Page, or WhatsApp Business connection ID with durable
+  history cannot be silently repointed to another configured provider identity.
+  The database records only a domain-separated hash, not the identity itself or
+  a credential; this narrower binding does not currently apply to Telegram.
 - Connection IDs are durable internal identifiers. Operators must not reuse an
   existing ID for a different connector, channel, or tier.
 - This is configuration plumbing, not a multi-tenant SaaS. It adds no user

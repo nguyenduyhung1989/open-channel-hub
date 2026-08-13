@@ -36,8 +36,9 @@ complete.** Historical local and GitHub evidence exists for candidate
 <code>f106bb8</code>, and the exact Phase 2b commit <code>4d5a9c9</code> also
 has both checks green. The exact Phase 2c multi-connection commit
 <code>8352b51</code> and the exact Phase 3a Zalo OA commit
-<code>b930d29</code> also have both checks green. The current Phase 3b Facebook
-Page candidate needs its own verification. No real Telegram Bot token,
+<code>b930d29</code> and Phase 3b Facebook Page commit <code>c933102</code>
+also have both checks green. The current Phase 3c WhatsApp Business candidate
+needs its own verification. No real Telegram Bot token,
 authenticated Bot API request, or test-bot flow has occurred.
 
 ### 1a — HTTP boundary and local operation
@@ -177,9 +178,9 @@ independent review, and fresh GitHub CI/CodeQL are complete for exact commit
 
 ### 3b — official Facebook Page signed inbound text
 
-**Status: source implementation is present; final local candidate verification,
-synthetic Docker proof, independent review, and fresh GitHub CI/CodeQL remain
-required for its exact commit.**
+**Status: implementation, final local verification, synthetic Docker proof,
+independent review, and fresh GitHub CI/CodeQL are complete for exact commit
+<code>c933102</code>. A real provider acceptance test remains separate.**
 
 - [x] An official receive-only Facebook Page connector package that exposes only
       `message.receive.text` and rejects every outbound command.
@@ -199,17 +200,52 @@ required for its exact commit.**
 - [x] No Facebook User, OAuth, Page access-token storage, Graph API client,
       outbound message, attachment, automatic subscription, or live provider
       request.
-- [ ] Final local candidate checks, synthetic Compose verification, and
+- [x] Final local candidate checks, synthetic Compose verification, and
       independent review.
-- [ ] Fresh GitHub CI/CodeQL for the exact Phase 3b commit.
+- [x] Fresh GitHub CI/CodeQL for exact commit <code>c933102</code>.
 - [ ] Owner-authorized public TLS and real signed Facebook Page webhook proof
       without exposing a secret, header, or customer message.
+
+### 3c — official WhatsApp Business signed inbound text
+
+**Status: source implementation is present; final local candidate verification,
+synthetic Docker proof, independent review, and fresh GitHub CI/CodeQL remain
+required for its exact commit.**
+
+- [x] An official receive-only WhatsApp Business connector package that exposes
+      only `message.receive.text` and rejects every outbound command.
+- [x] A standalone `GET`/`POST /v1/webhooks/whatsapp-business` boundary for a
+      WhatsApp-only Meta App, plus the shared `GET`/`POST /v1/webhooks/meta`
+      boundary for an App configured for both Facebook Page and WhatsApp. Both
+      handle Meta verification, resolve signed batches server side, verify
+      `X-Hub-Signature-256` over exact raw request bytes, and make canonical
+      customer text durable before acknowledging it.
+- [x] A strict runtime-document entry for `whatsapp_business`, with opaque
+      connection ID, `appId`, `wabaId`, `phoneNumberId`, App secret, verify
+      token, unique operator bearer, and optional public webhook URL. Phone IDs
+      are unique; a WABA maps to exactly one configured App. A shared Facebook
+      Page/WhatsApp App must use one identical `/v1/webhooks/meta` URL whenever
+      a callback URL is declared.
+- [x] A bearer-scoped `GET /v1/whatsapp-business/inbound-events` route with
+      canonical-only fields, bounded pagination, and business-phone-bound
+      opaque cursors.
+- [x] A forward-only registry migration that binds each WhatsApp Business
+      connection ID to a non-secret SHA-256 fingerprint of its configured
+      `(appId, wabaId, phoneNumberId)` triple, preventing silent rebinding after
+      durable history exists.
+- [x] No WhatsApp User, OAuth, Graph API access-token storage, Graph API
+      client, outbound message, template, attachment, automatic subscription,
+      or live provider request.
+- [ ] Final local candidate checks, synthetic Compose verification, and
+      independent review.
+- [ ] Fresh GitHub CI/CodeQL for the exact Phase 3c commit.
+- [ ] Owner-authorized public TLS, subscription, and real signed WhatsApp
+      Business webhook proof without exposing a secret, header, or customer
+      message.
 
 ### Later Phase 3 work
 
 - A dashboard, accounts/organizations, and tested authorization.
-- Evaluation of WhatsApp against current official documentation and policy at
-  implementation time.
 - A capability matrix, health state, and separate contract tests for each
   connector.
 

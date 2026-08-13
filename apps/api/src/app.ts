@@ -2,6 +2,7 @@ import helmet from '@fastify/helmet';
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 
 import { apiFailure } from './http/api-response.js';
+import { registerMetaWebhookRoute } from './http/meta-webhook-route.js';
 import { registerHealthRoute } from './health/health-route.js';
 import { registerReadinessRoute, type ReadinessCheck } from './health/readiness-route.js';
 import {
@@ -22,6 +23,10 @@ import type { ZaloOaFeature } from './zalo-oa/zalo-oa-feature.js';
 import { createZaloOaFeatureCatalog } from './zalo-oa/zalo-oa-feature-catalog.js';
 import { registerZaloOaInboundEventsRoute } from './zalo-oa/zalo-oa-inbound-events-route.js';
 import { registerZaloOaWebhookRoute } from './zalo-oa/zalo-oa-webhook-route.js';
+import type { WhatsAppBusinessFeature } from './whatsapp-business/whatsapp-business-feature.js';
+import { createWhatsAppBusinessFeatureCatalog } from './whatsapp-business/whatsapp-business-feature-catalog.js';
+import { registerWhatsAppBusinessInboundEventsRoute } from './whatsapp-business/whatsapp-business-inbound-events-route.js';
+import { registerWhatsAppBusinessWebhookRoute } from './whatsapp-business/whatsapp-business-webhook-route.js';
 
 export interface BuildAppOptions {
   readonly readiness?: ReadinessCheck;
@@ -29,6 +34,7 @@ export interface BuildAppOptions {
   readonly facebookPages?: readonly FacebookPageFeature[];
   readonly telegramBot?: TelegramBotFeature;
   readonly telegramBots?: readonly TelegramBotFeature[];
+  readonly whatsappBusinesses?: readonly WhatsAppBusinessFeature[];
   readonly zaloOas?: readonly ZaloOaFeature[];
 }
 
@@ -87,6 +93,9 @@ export const buildApp = async (options: BuildAppOptions = {}): Promise<FastifyIn
     throw new Error('Telegram connection configuration is ambiguous.');
   }
 
+  let facebookPageCatalog: ReturnType<typeof createFacebookPageFeatureCatalog> | undefined;
+  let whatsappBusinessCatalog: ReturnType<typeof createWhatsAppBusinessFeatureCatalog> | undefined;
+
   const telegramBots =
     options.telegramBot === undefined
       ? options.telegramBots
@@ -117,11 +126,25 @@ export const buildApp = async (options: BuildAppOptions = {}): Promise<FastifyIn
   }
 
   if (options.facebookPages !== undefined) {
-    const catalog = createFacebookPageFeatureCatalog(options.facebookPages);
+    facebookPageCatalog = createFacebookPageFeatureCatalog(options.facebookPages);
 
-    await registerFacebookPageInboundEventsRoute(app, catalog);
-    await registerFacebookPageWebhookRoute(app, catalog);
+    await registerFacebookPageInboundEventsRoute(app, facebookPageCatalog);
+    await registerFacebookPageWebhookRoute(app, facebookPageCatalog);
   }
+
+  if (options.whatsappBusinesses !== undefined) {
+    whatsappBusinessCatalog = createWhatsAppBusinessFeatureCatalog(options.whatsappBusinesses);
+
+    await registerWhatsAppBusinessInboundEventsRoute(app, whatsappBusinessCatalog);
+    await registerWhatsAppBusinessWebhookRoute(app, whatsappBusinessCatalog);
+  }
+
+  await registerMetaWebhookRoute(app, {
+    ...(facebookPageCatalog === undefined ? {} : { facebookPages: facebookPageCatalog }),
+    ...(whatsappBusinessCatalog === undefined
+      ? {}
+      : { whatsappBusinesses: whatsappBusinessCatalog })
+  });
 
   return app;
 };

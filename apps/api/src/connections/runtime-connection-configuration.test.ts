@@ -288,6 +288,123 @@ describe('loadRuntimeConnectionConfiguration', () => {
       await expectGenericFailure(loadRuntimeConnectionConfiguration(CONFIGURATION_PATH));
     }
   });
+
+  it('accepts multiple WhatsApp Business phone numbers for one WABA and a shared Meta App', async () => {
+    const configuration = validWhatsAppBusinessConfiguration();
+    readFileMock.mockResolvedValue(JSON.stringify(configuration));
+
+    await expect(loadRuntimeConnectionConfiguration(CONFIGURATION_PATH)).resolves.toEqual({
+      connections: configuration.connections
+    });
+  });
+
+  it('accepts Facebook Page and WhatsApp Business connections that share one exact Meta callback URL', async () => {
+    const sharedWebhookUrl = 'https://example.test/v1/webhooks/meta';
+    const configuration: MutableMixedMetaRuntimeConnectionConfiguration = {
+      version: 1,
+      connections: [
+        validFacebookPageConnection({ webhookUrl: sharedWebhookUrl }),
+        validWhatsAppBusinessConnection({ webhookUrl: sharedWebhookUrl })
+      ]
+    };
+    readFileMock.mockResolvedValue(JSON.stringify(configuration));
+
+    await expect(loadRuntimeConnectionConfiguration(CONFIGURATION_PATH)).resolves.toEqual({
+      connections: configuration.connections
+    });
+  });
+
+  it('rejects ambiguous WhatsApp mappings, incompatible shared Meta callbacks, credential drift, and cross-role reuse', async () => {
+    const duplicatePhoneNumber = validWhatsAppBusinessConfiguration();
+    duplicatePhoneNumber.connections[1]!.phoneNumberId =
+      duplicatePhoneNumber.connections[0]!.phoneNumberId;
+
+    const wabaAcrossApps = validWhatsAppBusinessConfiguration();
+    Object.assign(wabaAcrossApps.connections[1]!, {
+      appId: '1234567890123456790',
+      appSecret: 'synthetic-whatsapp-second-app-secret-012345678901',
+      webhookVerifyToken: 'synthetic-whatsapp-second-verify-token-0123456789'
+    });
+
+    const metaCredentialDrift: MutableMixedMetaRuntimeConnectionConfiguration = {
+      version: 1,
+      connections: [
+        validFacebookPageConnection(),
+        validWhatsAppBusinessConnection({
+          appSecret: 'synthetic-whatsapp-drift-app-secret-01234567890123'
+        })
+      ]
+    };
+
+    const incompatibleSharedMetaCallbacks: MutableMixedMetaRuntimeConnectionConfiguration = {
+      version: 1,
+      connections: [validFacebookPageConnection(), validWhatsAppBusinessConnection()]
+    };
+
+    const differentSharedMetaHosts: MutableMixedMetaRuntimeConnectionConfiguration = {
+      version: 1,
+      connections: [
+        validFacebookPageConnection({
+          webhookUrl: 'https://facebook.example.test/v1/webhooks/meta'
+        }),
+        validWhatsAppBusinessConnection({
+          webhookUrl: 'https://whatsapp.example.test/v1/webhooks/meta'
+        })
+      ]
+    };
+
+    const crossRoleReuse = validWhatsAppBusinessConfiguration();
+    crossRoleReuse.connections.push(
+      validZaloOaConnection({
+        id: 'zalo-oa-whatsapp-collision',
+        oaId: '9876543210987654333',
+        oaSecretKey: crossRoleReuse.connections[0]!.appSecret
+      }) as unknown as MutableRuntimeWhatsAppBusinessConnection
+    );
+
+    for (const configuration of [
+      duplicatePhoneNumber,
+      wabaAcrossApps,
+      metaCredentialDrift,
+      incompatibleSharedMetaCallbacks,
+      differentSharedMetaHosts,
+      crossRoleReuse
+    ]) {
+      readFileMock.mockResolvedValueOnce(JSON.stringify(configuration));
+      await expectGenericFailure(loadRuntimeConnectionConfiguration(CONFIGURATION_PATH));
+    }
+  });
+
+  it('rejects malformed WhatsApp Business identifiers, short credentials, and a webhook URL outside its fixed path', async () => {
+    const invalidConnections: readonly Readonly<
+      Partial<MutableRuntimeWhatsAppBusinessConnection>
+    >[] = [
+      { appId: 'app-123' },
+      { wabaId: 'waba-456' },
+      { phoneNumberId: 'phone-789' },
+      { id: '.' },
+      { appSecret: 'too-short' },
+      { webhookVerifyToken: 'too-short' }
+    ];
+
+    for (const override of invalidConnections) {
+      const configuration = validWhatsAppBusinessConfiguration();
+      Object.assign(configuration.connections[0]!, override);
+      readFileMock.mockResolvedValueOnce(JSON.stringify(configuration));
+      await expectGenericFailure(loadRuntimeConnectionConfiguration(CONFIGURATION_PATH));
+    }
+
+    for (const webhookUrl of [
+      'https://example.test/v1/webhooks/whatsapp-business?credential=synthetic',
+      'https://example.test/v1/webhooks/whatsapp-business/another-phone',
+      'https://localhost/v1/webhooks/whatsapp-business'
+    ]) {
+      const configuration = validWhatsAppBusinessConfiguration();
+      configuration.connections[0]!.webhookUrl = webhookUrl;
+      readFileMock.mockResolvedValueOnce(JSON.stringify(configuration));
+      await expectGenericFailure(loadRuntimeConnectionConfiguration(CONFIGURATION_PATH));
+    }
+  });
 });
 
 const validConfiguration = (): MutableRuntimeConnectionConfiguration => ({
@@ -404,6 +521,57 @@ interface MutableRuntimeFacebookPageConnection {
   operatorApiToken: string;
   pageId: string;
   type: string;
+  webhookUrl?: string;
+  webhookVerifyToken: string;
+}
+
+const validWhatsAppBusinessConfiguration = (): MutableRuntimeWhatsAppBusinessConfiguration => ({
+  version: 1,
+  connections: [
+    validWhatsAppBusinessConnection(),
+    validWhatsAppBusinessConnection({
+      id: 'whatsapp-business-sales',
+      operatorApiToken: 'synthetic_whatsapp_operator_sales_012345678901234567',
+      phoneNumberId: '9876543210987654322'
+    })
+  ]
+});
+
+const validWhatsAppBusinessConnection = (
+  overrides: Readonly<Partial<MutableRuntimeWhatsAppBusinessConnection>> = {}
+): MutableRuntimeWhatsAppBusinessConnection => ({
+  appId: '1234567890123456789',
+  appSecret: 'synthetic-facebook-app-secret-01234567890123456789',
+  id: 'whatsapp-business-support',
+  operatorApiToken: 'synthetic_whatsapp_operator_support_012345678901234567',
+  phoneNumberId: '9876543210987654321',
+  type: 'whatsapp_business',
+  wabaId: '1111111111111111111',
+  webhookUrl: 'https://example.test/v1/webhooks/whatsapp-business',
+  webhookVerifyToken: 'synthetic-facebook-verify-token-012345678901234567',
+  ...overrides
+});
+
+interface MutableRuntimeWhatsAppBusinessConfiguration {
+  version: number;
+  connections: MutableRuntimeWhatsAppBusinessConnection[];
+}
+
+interface MutableMixedMetaRuntimeConnectionConfiguration {
+  version: number;
+  connections: Array<
+    MutableRuntimeFacebookPageConnection | MutableRuntimeWhatsAppBusinessConnection
+  >;
+}
+
+interface MutableRuntimeWhatsAppBusinessConnection {
+  appId: string;
+  appSecret: string;
+  id: string;
+  operatorApiToken: string;
+  phoneNumberId: string;
+  type: string;
+  wabaId: string;
   webhookUrl?: string;
   webhookVerifyToken: string;
 }

@@ -7,7 +7,7 @@ name: open-channel-hub
 # TELEGRAM_WEBHOOK_URL may be blank. When set, it must be a public absolute HTTPS URL with no userinfo, query, fragment, or secret.
 # CONNECTIONS_CONFIG_BASE64 may be blank. When non-blank, Compose writes its unpadded base64url value only to the
 # runtime_connections_base64 Docker secret and points the API at its 0400 secret file; it is never an API environment value.
-# It encodes (but does not encrypt) one or more official Telegram Bot and/or Zalo OA connections and must not be mixed with temporary legacy Telegram variables.
+# It encodes (but does not encrypt) one or more official Telegram Bot, Zalo OA, Facebook Page, and/or WhatsApp Business connections and must not be mixed with temporary legacy Telegram variables.
 # PostgreSQL is initialized for this hub only: database `open_channel_hub`, schema `open_channel_hub`, and a non-superuser
 # application role. The migration service applies idempotent schema changes before the API starts. This stack still does not provide
 # Redis, a queue, TLS, a public proxy, backups, or a production deployment.

@@ -35,6 +35,14 @@ const FACEBOOK_PAGE_REGISTRATION: ConnectionRegistration = Object.freeze({
   tier: 'OFFICIAL'
 });
 
+const WHATSAPP_BUSINESS_REGISTRATION: ConnectionRegistration = Object.freeze({
+  channel: 'whatsapp_business',
+  connectorId: 'whatsapp-business',
+  id: 'whatsapp-business-support',
+  providerIdentityFingerprint: 'f5f6d3c9e5c80d0441f83c42d6f8a8545e772156c3320b0f9fb4df9d4cb61c76',
+  tier: 'OFFICIAL'
+});
+
 describe('PostgresConnectionRegistry', () => {
   it('registers matching metadata idempotently through parameterized transactions', async () => {
     const pool = createRegistryPool();
@@ -160,6 +168,57 @@ describe('PostgresConnectionRegistry', () => {
     await expect(registry.ensureRegistered([FACEBOOK_PAGE_REGISTRATION])).rejects.toBeInstanceOf(
       PostgresStorageError
     );
+    expect(pool.records).toEqual([]);
+    expect(pool.client.queries.map((query) => query.sql)).toContain('ROLLBACK');
+  });
+
+  it('requires an opaque provider identity fingerprint for a WhatsApp Business registration', async () => {
+    const invalidRegistrations: readonly ConnectionRegistration[] = [
+      Object.freeze({
+        channel: WHATSAPP_BUSINESS_REGISTRATION.channel,
+        connectorId: WHATSAPP_BUSINESS_REGISTRATION.connectorId,
+        id: WHATSAPP_BUSINESS_REGISTRATION.id,
+        tier: WHATSAPP_BUSINESS_REGISTRATION.tier
+      } satisfies ConnectionRegistration),
+      Object.freeze({
+        ...WHATSAPP_BUSINESS_REGISTRATION,
+        providerIdentityFingerprint: 'not-a-sha-256-fingerprint'
+      })
+    ];
+
+    for (const registration of invalidRegistrations) {
+      const pool = createRegistryPool();
+
+      await expect(
+        new PostgresConnectionRegistry(pool).ensureRegistered([registration])
+      ).rejects.toBeInstanceOf(PostgresStorageError);
+      expect(pool.client.queries).toEqual([]);
+    }
+  });
+
+  it('rejects rebinding a WhatsApp Business connection id to a different opaque provider identity', async () => {
+    const pool = createRegistryPool([WHATSAPP_BUSINESS_REGISTRATION]);
+    const registry = new PostgresConnectionRegistry(pool);
+    const rebound = Object.freeze({
+      ...WHATSAPP_BUSINESS_REGISTRATION,
+      providerIdentityFingerprint:
+        '6fb4d468bae3102075d0ad82e4b6b7e115b2332a4ff8d0d0c826d90d2a5b55f0'
+    });
+
+    await expect(registry.ensureRegistered([rebound])).rejects.toBeInstanceOf(PostgresStorageError);
+    expect(pool.records).toEqual([WHATSAPP_BUSINESS_REGISTRATION]);
+    expect(pool.client.queries.map((query) => query.sql)).toContain('ROLLBACK');
+  });
+
+  it('rejects first binding a WhatsApp Business id that has pre-registry inbound history', async () => {
+    const pool = createRegistryPool({
+      historicalConnectionIds: [WHATSAPP_BUSINESS_REGISTRATION.id]
+    });
+    const registry = new PostgresConnectionRegistry(pool);
+
+    await expect(
+      registry.ensureRegistered([WHATSAPP_BUSINESS_REGISTRATION])
+    ).rejects.toBeInstanceOf(PostgresStorageError);
     expect(pool.records).toEqual([]);
     expect(pool.client.queries.map((query) => query.sql)).toContain('ROLLBACK');
   });

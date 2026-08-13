@@ -10,6 +10,8 @@ import {
 } from './telegram-bot/telegram-bot-connection-configurations.js';
 import { createZaloOaFeature } from './zalo-oa/create-zalo-oa-feature.js';
 import { toZaloOaConnectionConfigurations } from './zalo-oa/zalo-oa-connection-configurations.js';
+import { createWhatsAppBusinessFeature } from './whatsapp-business/create-whatsapp-business-feature.js';
+import { toWhatsAppBusinessConnectionConfigurations } from './whatsapp-business/whatsapp-business-connection-configurations.js';
 import { createPostgresDatabase } from '@open-channel-hub/storage-postgres';
 
 const environment = parseEnvironment(process.env);
@@ -27,6 +29,8 @@ try {
   let telegramBots: readonly Awaited<ReturnType<typeof createTelegramBotFeature>>[] | undefined;
   let zaloOas: readonly Awaited<ReturnType<typeof createZaloOaFeature>>[] | undefined;
   let facebookPages: readonly Awaited<ReturnType<typeof createFacebookPageFeature>>[] | undefined;
+  let whatsappBusinesses:
+    readonly Awaited<ReturnType<typeof createWhatsAppBusinessFeature>>[] | undefined;
 
   if (environment.connectorRuntime.enabled) {
     const inboundEventReader = postgres?.inboundEventReader;
@@ -57,43 +61,59 @@ try {
       configuredConnections === undefined
         ? Object.freeze([])
         : toFacebookPageConnectionConfigurations(configuredConnections);
-    const [telegramFeatures, zaloOaFeatures, facebookPageFeatures] = await Promise.all([
-      Promise.all(
-        telegramConnections.map(async (connection) =>
-          createTelegramBotFeature(connection, {
-            readInboundEvents: async (input) => inboundEventReader.list(input),
-            receiveEvents: async (events) => {
-              await inboundEventStore.append(events);
-            }
-          })
+    const whatsappBusinessConnections =
+      configuredConnections === undefined
+        ? Object.freeze([])
+        : toWhatsAppBusinessConnectionConfigurations(configuredConnections);
+    const [telegramFeatures, zaloOaFeatures, facebookPageFeatures, whatsappBusinessFeatures] =
+      await Promise.all([
+        Promise.all(
+          telegramConnections.map(async (connection) =>
+            createTelegramBotFeature(connection, {
+              readInboundEvents: async (input) => inboundEventReader.list(input),
+              receiveEvents: async (events) => {
+                await inboundEventStore.append(events);
+              }
+            })
+          )
+        ),
+        Promise.all(
+          zaloOaConnections.map(async (connection) =>
+            createZaloOaFeature(connection, {
+              readInboundEvents: async (input) => inboundEventReader.list(input),
+              receiveEvents: async (events) => {
+                await inboundEventStore.append(events);
+              }
+            })
+          )
+        ),
+        Promise.all(
+          facebookPageConnections.map(async (connection) =>
+            createFacebookPageFeature(connection, {
+              readInboundEvents: async (input) => inboundEventReader.list(input),
+              receiveEvents: async (events) => {
+                await inboundEventStore.append(events);
+              }
+            })
+          )
+        ),
+        Promise.all(
+          whatsappBusinessConnections.map(async (connection) =>
+            createWhatsAppBusinessFeature(connection, {
+              readInboundEvents: async (input) => inboundEventReader.list(input),
+              receiveEvents: async (events) => {
+                await inboundEventStore.append(events);
+              }
+            })
+          )
         )
-      ),
-      Promise.all(
-        zaloOaConnections.map(async (connection) =>
-          createZaloOaFeature(connection, {
-            readInboundEvents: async (input) => inboundEventReader.list(input),
-            receiveEvents: async (events) => {
-              await inboundEventStore.append(events);
-            }
-          })
-        )
-      ),
-      Promise.all(
-        facebookPageConnections.map(async (connection) =>
-          createFacebookPageFeature(connection, {
-            readInboundEvents: async (input) => inboundEventReader.list(input),
-            receiveEvents: async (events) => {
-              await inboundEventStore.append(events);
-            }
-          })
-        )
-      )
-    ]);
+      ]);
 
     await connectionRegistry.ensureRegistered([
       ...telegramFeatures.map((feature) => feature.registration),
       ...zaloOaFeatures.map((feature) => feature.registration),
-      ...facebookPageFeatures.map((feature) => feature.registration)
+      ...facebookPageFeatures.map((feature) => feature.registration),
+      ...whatsappBusinessFeatures.map((feature) => feature.registration)
     ]);
 
     if (configuredConnections !== undefined) {
@@ -107,6 +127,10 @@ try {
 
       if (facebookPageFeatures.length > 0) {
         facebookPages = Object.freeze(facebookPageFeatures);
+      }
+
+      if (whatsappBusinessFeatures.length > 0) {
+        whatsappBusinesses = Object.freeze(whatsappBusinessFeatures);
       }
     } else {
       const feature = telegramFeatures[0];
@@ -130,7 +154,8 @@ try {
     ...(telegramBot === undefined ? {} : { telegramBot }),
     ...(telegramBots === undefined ? {} : { telegramBots }),
     ...(zaloOas === undefined ? {} : { zaloOas }),
-    ...(facebookPages === undefined ? {} : { facebookPages })
+    ...(facebookPages === undefined ? {} : { facebookPages }),
+    ...(whatsappBusinesses === undefined ? {} : { whatsappBusinesses })
   });
 
   if (postgres !== undefined) {

@@ -155,7 +155,7 @@ const isConnectorTier = (value: unknown): value is ConnectorTier =>
   typeof value === 'string' && (CONNECTOR_TIERS as readonly string[]).includes(value);
 
 const requiresProviderIdentityFingerprint = (channel: Channel): boolean =>
-  channel === 'zalo_oa' || channel === 'facebook_page';
+  channel === 'zalo_oa' || channel === 'facebook_page' || channel === 'whatsapp_business';
 
 const isProviderIdentityFingerprint = (value: unknown): value is string =>
   typeof value === 'string' && PROVIDER_IDENTITY_FINGERPRINT_PATTERN.test(value);
