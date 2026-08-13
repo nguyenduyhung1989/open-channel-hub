@@ -1,4 +1,4 @@
-FROM node:24.18.1-alpine AS base
+FROM node:26.7.0-alpine AS base
 WORKDIR /app
 
 RUN addgroup --system --gid 10001 app \
