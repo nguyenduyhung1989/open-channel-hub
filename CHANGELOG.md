@@ -104,6 +104,19 @@ follows [Semantic Versioning](https://semver.org/).
   append, duplicate idempotency, business-phone bearer/cursor isolation,
   registry metadata, secret-file mode, and PostgreSQL role safety without
   provider network access.
+- Phase 4a: an optional strict `inboxes` array in the version-1 runtime secret
+  document. Each configured inbox has its own bearer token and an explicit
+  allow-list of one or more configured connection IDs.
+- Phase 4a: `GET /v1/inbox/inbound-events`, a canonical-only aggregate feed
+  over one token-resolved inbox scope. It uses the durable ledger's stable
+  reverse sequence and has no caller-selectable inbox or connection ID.
+- Phase 4a: a PostgreSQL inbound-event feed reader and opaque cursors bound to
+  the configured inbox ID plus a SHA-256 binding of its canonical connection
+  set. A cursor cannot move across inboxes or a changed scope.
+- A synthetic Compose smoke-test source with two configured inboxes spanning
+  multiple fake provider accounts. It checks aggregate scope, bearer isolation,
+  cursor-scope rejection, canonical-only output, secret-file mode, and
+  PostgreSQL role safety without provider network access.
 
 ### Changed
 
@@ -113,8 +126,10 @@ follows [Semantic Versioning](https://semver.org/).
   <code>4d5a9c9</code>, completed Phase 2c GitHub CI/CodeQL at exact commit
   <code>8352b51</code>, completed Phase 3a GitHub CI/CodeQL at
   <code>b930d29</code>, completed Phase 3b GitHub CI/CodeQL at
-  <code>c933102</code>, and verification still required for the current Phase
-  3c candidate.
+  <code>c933102</code>, and completed Phase 3c final local checks,
+  independent review, synthetic Compose proof, and GitHub CI/CodeQL at exact
+  commit <code>fd802cb</code>. Verification remains required for the current
+  Phase 4a candidate.
 - An accepted inbound Telegram text event now becomes durable when the
   PostgreSQL configuration is present; a local operator can now list canonical
   inbound events, but this still does not add an inbox, live Telegram proof,
@@ -135,6 +150,14 @@ follows [Semantic Versioning](https://semver.org/).
   Business phone IDs and operator bearers remain unique, one WABA resolves to
   one configured App, and an App shared with Facebook Page uses one declared
   public `/v1/webhooks/meta` callback rather than conflicting product URLs.
+- The version-1 runtime document now optionally supports configured
+  read-only `inboxes`. Their unique bearer credentials resolve a fixed,
+  explicit connection allow-list server side; this does not create a user,
+  organization, role, or dashboard.
+- Per-account inbound-event cursors issued before Phase 4a are intentionally
+  rejected with <code>400</code>. The durable ledger now orders by its numeric
+  sequence rather than a text alias; callers must restart from page one after
+  upgrading so a mixed ordering cannot silently skip events.
 
 ### Security
 
@@ -171,6 +194,10 @@ follows [Semantic Versioning](https://semver.org/).
   ID resolves to one configured App. The HMAC uses the original raw request
   bytes; unknown/malformed/cross-App batches and invalid signatures return the
   same `401`, while raw payloads and App credentials never enter the database.
+- The aggregate inbox route authenticates its configured bearer before query
+  parsing or storage access, never accepts a caller-selected scope, keeps inbox
+  tokens distinct from connection credentials, and binds cursors to the inbox
+  ID plus canonical connection set. It returns canonical events only.
 - The <code>main</code> branch now blocks force pushes and deletion, including
   for administrators. Required checks and pull-request reviews remain
   intentionally unset for the owner-controlled direct-push workflow.

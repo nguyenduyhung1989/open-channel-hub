@@ -3,6 +3,8 @@ import { EnvironmentConfigurationError, parseEnvironment } from './config/enviro
 import { loadRuntimeConnections } from './connections/load-runtime-connections.js';
 import { createFacebookPageFeature } from './facebook-page/create-facebook-page-feature.js';
 import { toFacebookPageConnectionConfigurations } from './facebook-page/facebook-page-connection-configurations.js';
+import { createRuntimeInboxFeatures } from './inbox/create-runtime-inbox-features.js';
+import type { InboxFeature } from './inbox/inbox-feature.js';
 import { createTelegramBotFeature } from './telegram-bot/create-telegram-bot-feature.js';
 import {
   loadTelegramBotConnectionConfigurations,
@@ -31,6 +33,7 @@ try {
   let facebookPages: readonly Awaited<ReturnType<typeof createFacebookPageFeature>>[] | undefined;
   let whatsappBusinesses:
     readonly Awaited<ReturnType<typeof createWhatsAppBusinessFeature>>[] | undefined;
+  let inboxes: readonly InboxFeature[] | undefined;
 
   if (environment.connectorRuntime.enabled) {
     const inboundEventReader = postgres?.inboundEventReader;
@@ -49,6 +52,7 @@ try {
       environment.connectorRuntime
     );
     const configuredConnections = configuredConnectionConfiguration?.connections;
+    const configuredInboxes = configuredConnectionConfiguration?.inboxes;
     const telegramConnections =
       configuredConnections === undefined
         ? await loadTelegramBotConnectionConfigurations(environment.connectorRuntime)
@@ -132,6 +136,16 @@ try {
       if (whatsappBusinessFeatures.length > 0) {
         whatsappBusinesses = Object.freeze(whatsappBusinessFeatures);
       }
+
+      if (configuredInboxes !== undefined) {
+        const inboundEventFeedReader = postgres?.inboundEventFeedReader;
+
+        if (inboundEventFeedReader === undefined) {
+          throw new EnvironmentConfigurationError();
+        }
+
+        inboxes = createRuntimeInboxFeatures(configuredInboxes, inboundEventFeedReader);
+      }
     } else {
       const feature = telegramFeatures[0];
 
@@ -155,6 +169,7 @@ try {
     ...(telegramBots === undefined ? {} : { telegramBots }),
     ...(zaloOas === undefined ? {} : { zaloOas }),
     ...(facebookPages === undefined ? {} : { facebookPages }),
+    ...(inboxes === undefined ? {} : { inboxes }),
     ...(whatsappBusinesses === undefined ? {} : { whatsappBusinesses })
   });
 

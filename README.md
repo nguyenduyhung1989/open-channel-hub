@@ -2,16 +2,16 @@
 
 > A self-hosted, official-first multichannel messaging hub.
 
-**Status: Phase 3c alpha.** The repository contains a durable PostgreSQL
-inbound-event ledger, account-scoped operator read APIs, secret-backed runtime
-configuration for several official accounts, and narrow official Zalo Official
-Account (OA), Facebook Page, and WhatsApp Business signed inbound-text
-boundaries. GitHub CI and CodeQL succeeded for exact Phase 3a commit
-<code>b930d29</code> and Phase 3b commit <code>c933102</code>. The current
-Phase 3c source still needs its own final local and GitHub verification. Phase
-1a remains incomplete until an owner-authorized Telegram test bot works through
-public TLS; Phases 3a, 3b, and 3c likewise have no owner-authorized real
-provider proof.
+**Status: Phase 4a alpha.** The repository contains a durable PostgreSQL
+inbound-event ledger, account-scoped operator read APIs, a configured
+multi-connection read-only inbox API, secret-backed runtime configuration for
+official accounts, and narrow official Zalo Official Account (OA), Facebook
+Page, and WhatsApp Business signed inbound-text boundaries. Phase 3c passed
+final local checks, independent review, a synthetic Docker proof, and GitHub
+CI/CodeQL for exact commit <code>fd802cb</code>. The current Phase 4a source
+needs its own final local and GitHub verification. Phase 1a remains incomplete
+until an owner-authorized Telegram test bot works through public TLS; Phases
+3a, 3b, and 3c likewise have no owner-authorized real provider proof.
 
 The official Telegram Bot HTTP transport is wired for a deliberately narrow
 text send/receive slice. Legacy mode uses <code>OPERATOR_API_TOKEN</code>;
@@ -28,6 +28,9 @@ delivery a no-op for the same configured connection.
 Phase 2b adds <code>GET /v1/telegram-bot/inbound-events</code>. It returns only
 canonical event fields through a stable reverse-chronological cursor, so newer
 events do not shift or duplicate an operator's already-started page traversal.
+The Phase 4a numeric ledger-order correction deliberately rejects a cursor
+issued by an earlier release with <code>400</code>; restart that account read
+from its first page after upgrading rather than risk silently skipping events.
 
 Phase 2c adds a secret-backed runtime configuration document and a durable
 connection registry. In multi-connection mode, each unique operator bearer
@@ -82,6 +85,16 @@ User, OAuth, Graph API access-token storage, Graph API request, outbound
 message, template, attachment, live provider call, or automatic webhook
 registration.
 
+Phase 4a adds an optional configured `inboxes` array to the same version-1
+runtime secret document. Each inbox has a distinct bearer token and an explicit
+allow-list of configured connection IDs. `GET /v1/inbox/inbound-events` reads
+canonical events across that fixed server-side scope in stable reverse ledger
+order. Its opaque cursor is bound to both the configured inbox and its
+canonical connection set; a caller cannot select an inbox or connection ID.
+This is a deliberately small read API, not a browser inbox, user login,
+organization/RBAC model, conversation model, search service, or outbound
+message path.
+
 Multi-connection IDs are opaque safe route labels; <code>.</code> and
 <code>..</code> are rejected because webhook ingress places the ID in a dynamic
 path. This restriction does not rewrite a historical legacy one-Bot environment
@@ -113,6 +126,8 @@ CAPTCHA bypass, fingerprint spoofing, session theft, or bulk-spam capabilities.
   secret-backed multi-connection mode for official Telegram Bot, Zalo OA,
   Facebook Page, and WhatsApp Business accounts. The latter maps each unique operator token to exactly one
   configured account.
+- Optional configured read-only inbox principals, each with a separate bearer
+  and an explicit server-side allow-list of one or more configured accounts.
 - Dynamic multi-connection webhook ingress that resolves the account server
   side, uses a separate webhook secret, and gives unknown account IDs and wrong
   secrets the same <code>401</code> response.
@@ -142,11 +157,11 @@ CAPTCHA bypass, fingerprint spoofing, session theft, or bulk-spam capabilities.
 
 The following remain plans or explicitly incomplete operational work:
 
-- A user-visible inbox, conversation model, attachment storage, search,
+- A browser-visible inbox/dashboard, conversation model, attachment storage, search,
   retention/deletion policy, backups, restore drills, or encryption-at-rest
   assurance.
 - Redis, a queue, durable outbound delivery, retries, and an outbox.
-- A web dashboard, user accounts, role-based access control, multiple
+- User accounts, role-based access control, multiple
   organizations, webhook administration, public connection management, or a
   connection listing API.
 - A real Telegram Bot/TLS verification, real Zalo OA/TLS verification, real
@@ -213,7 +228,8 @@ Before the first start, copy <code>.env.example</code> to
    [Phase 2c multi-connection guide](docs/operations/runtime-multi-connection-2c.md),
    [Phase 3a Zalo OA guide](docs/operations/zalo-oa-3a.md), and
    [Phase 3b Facebook Page guide](docs/operations/facebook-page-3b.md), and
-   [Phase 3c WhatsApp Business guide](docs/operations/whatsapp-business-3c.md).
+   [Phase 3c WhatsApp Business guide](docs/operations/whatsapp-business-3c.md),
+   and [Phase 4a unified inbox guide](docs/operations/unified-inbox-4a.md).
 
 ```bash
 docker compose up --build
@@ -261,6 +277,7 @@ front of Compose, keep the operator API on loopback, and follow the
 [Phase 3a Zalo OA guide](docs/operations/zalo-oa-3a.md), or
 [Phase 3b Facebook Page guide](docs/operations/facebook-page-3b.md), or
 [Phase 3c WhatsApp Business guide](docs/operations/whatsapp-business-3c.md), or
+[Phase 4a unified inbox guide](docs/operations/unified-inbox-4a.md), or
 [Phase 1a legacy guide](docs/operations/telegram-bot-1a.md) only after an
 authorized test is agreed. Starting Compose does not provide TLS or register a
 webhook automatically.
@@ -279,12 +296,27 @@ with the bearer token assigned to one configured business phone. Each route acce
 ID: in legacy Telegram mode it reads the one configured Bot, and in the shared
 multi-connection mode the bearer token selects exactly one account server side.
 
+When the optional runtime `inboxes` array is configured, a separate inbox
+bearer can call <code>GET /v1/inbox/inbound-events</code> to read canonical
+events across its explicit connection allow-list. It accepts the same bounded
+<code>limit</code> and opaque <code>cursor</code>, but never an inbox or
+connection ID. Its cursor binds both the configured inbox ID and its canonical
+connection set, so another inbox or a changed set cannot reuse it. See the
+[Phase 4a unified inbox guide](docs/operations/unified-inbox-4a.md) for the
+configuration and explicit limits.
+
 The response contains <code>events</code> and, when another page exists,
 <code>nextCursor</code>. Treat the cursor as opaque. It is a stable snapshot
 position, not an authorization mechanism; bearer authentication and
-server-selected account scope remain mandatory. A cursor from one account is
-rejected for another. This API is not a dashboard, user login, role-based
-access control, search service, or a raw-provider-payload archive.
+server-selected account or inbox scope remain mandatory. A cursor from one
+account or inbox scope is rejected for another. This API is not a dashboard,
+user login, role-based access control, search service, or a
+raw-provider-payload archive.
+
+Per-account cursors from releases before Phase 4a are intentionally no longer
+accepted and return <code>400</code>. Those cursors used an older ordering
+format; restart the traversal at page one after upgrading. Phase 4a inbox
+cursors are new and already carry the current ordering version.
 
 ## Corresponding-source offer
 

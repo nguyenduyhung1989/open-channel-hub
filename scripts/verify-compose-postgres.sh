@@ -28,8 +28,10 @@ readonly facebook_sales_operator_api_token='synthetic_facebook_operator_sales_01
 readonly facebook_webhook_payload='{"object":"page","entry":[{"id":"900000000000000301","messaging":[{"sender":{"id":"900000000000000401"},"recipient":{"id":"900000000000000301"},"timestamp":1786492800000,"message":{"mid":"facebook-message-901","text":"Synthetic Facebook Page inbound message"}}]},{"id":"900000000000000302","messaging":[{"sender":{"id":"900000000000000402"},"recipient":{"id":"900000000000000302"},"timestamp":1786492800000,"message":{"mid":"facebook-message-901","text":"Synthetic Facebook Page inbound message"}}]}]}'
 readonly whatsapp_support_operator_api_token='synthetic_whatsapp_operator_support_012345678901234567'
 readonly whatsapp_sales_operator_api_token='synthetic_whatsapp_operator_sales_0123456789012345678'
+readonly support_inbox_api_token='synthetic_inbox_support_token_01234567890123456789'
+readonly sales_inbox_api_token='synthetic_inbox_sales_token_01234567890123456789012'
 readonly whatsapp_webhook_payload='{"object":"whatsapp_business_account","entry":[{"id":"900000000000000501","changes":[{"field":"messages","value":{"messaging_product":"whatsapp","metadata":{"phone_number_id":"900000000000000601"},"messages":[{"from":"900000000000000701","id":"wamid.synthetic.901","timestamp":"1786492800","type":"text","text":{"body":"Synthetic WhatsApp Business inbound message"}}]}}]},{"id":"900000000000000501","changes":[{"field":"messages","value":{"messaging_product":"whatsapp","metadata":{"phone_number_id":"900000000000000602"},"messages":[{"from":"900000000000000702","id":"wamid.synthetic.901","timestamp":"1786492800","type":"text","text":{"body":"Synthetic WhatsApp Business inbound message"}}]}}]}]}'
-readonly runtime_connections_configuration='{"version":1,"connections":[{"id":"telegram-bot-support","type":"telegram_bot","botToken":"synthetic-bot-token-support","operatorApiToken":"synthetic_operator_support_01234567890123456789","webhookSecret":"synthetic_support_webhook_secret_0123456789","webhookUrl":"https://example.test/v1/webhooks/telegram-bot/telegram-bot-support"},{"id":"telegram-bot-sales","type":"telegram_bot","botToken":"synthetic-bot-token-sales","operatorApiToken":"synthetic_operator_sales_0123456789012345678901","webhookSecret":"synthetic_sales_webhook_secret_01234567890123456789","webhookUrl":"https://example.test/v1/webhooks/telegram-bot/telegram-bot-sales"},{"id":"zalo-oa-support","type":"zalo_oa","appId":"900000000000000001","oaId":"900000000000000101","oaSecretKey":"synthetic-zalo-oa-support-secret-$-key","operatorApiToken":"synthetic_zalo_operator_support_012345678901234567","webhookUrl":"https://example.test/v1/webhooks/zalo-oa"},{"id":"zalo-oa-sales","type":"zalo_oa","appId":"900000000000000002","oaId":"900000000000000102","oaSecretKey":"synthetic-zalo-oa-sales-secret-$-key","operatorApiToken":"synthetic_zalo_operator_sales_0123456789012345678","webhookUrl":"https://example.test/v1/webhooks/zalo-oa"},{"id":"facebook-page-support","type":"facebook_page","appId":"900000000000000003","pageId":"900000000000000301","appSecret":"synthetic-facebook-app-secret-$-value-01234567890","webhookVerifyToken":"synthetic-facebook-verify-token-012345678901234567","operatorApiToken":"synthetic_facebook_operator_support_012345678901234567","webhookUrl":"https://example.test/v1/webhooks/meta"},{"id":"facebook-page-sales","type":"facebook_page","appId":"900000000000000003","pageId":"900000000000000302","appSecret":"synthetic-facebook-app-secret-$-value-01234567890","webhookVerifyToken":"synthetic-facebook-verify-token-012345678901234567","operatorApiToken":"synthetic_facebook_operator_sales_0123456789012345678","webhookUrl":"https://example.test/v1/webhooks/meta"},{"id":"whatsapp-business-support","type":"whatsapp_business","appId":"900000000000000003","wabaId":"900000000000000501","phoneNumberId":"900000000000000601","appSecret":"synthetic-facebook-app-secret-$-value-01234567890","webhookVerifyToken":"synthetic-facebook-verify-token-012345678901234567","operatorApiToken":"synthetic_whatsapp_operator_support_012345678901234567","webhookUrl":"https://example.test/v1/webhooks/meta"},{"id":"whatsapp-business-sales","type":"whatsapp_business","appId":"900000000000000003","wabaId":"900000000000000501","phoneNumberId":"900000000000000602","appSecret":"synthetic-facebook-app-secret-$-value-01234567890","webhookVerifyToken":"synthetic-facebook-verify-token-012345678901234567","operatorApiToken":"synthetic_whatsapp_operator_sales_0123456789012345678","webhookUrl":"https://example.test/v1/webhooks/meta"}]}'
+readonly runtime_connections_configuration='{"version":1,"connections":[{"id":"telegram-bot-support","type":"telegram_bot","botToken":"synthetic-bot-token-support","operatorApiToken":"synthetic_operator_support_01234567890123456789","webhookSecret":"synthetic_support_webhook_secret_0123456789","webhookUrl":"https://example.test/v1/webhooks/telegram-bot/telegram-bot-support"},{"id":"telegram-bot-sales","type":"telegram_bot","botToken":"synthetic-bot-token-sales","operatorApiToken":"synthetic_operator_sales_0123456789012345678901","webhookSecret":"synthetic_sales_webhook_secret_01234567890123456789","webhookUrl":"https://example.test/v1/webhooks/telegram-bot/telegram-bot-sales"},{"id":"zalo-oa-support","type":"zalo_oa","appId":"900000000000000001","oaId":"900000000000000101","oaSecretKey":"synthetic-zalo-oa-support-secret-$-key","operatorApiToken":"synthetic_zalo_operator_support_012345678901234567","webhookUrl":"https://example.test/v1/webhooks/zalo-oa"},{"id":"zalo-oa-sales","type":"zalo_oa","appId":"900000000000000002","oaId":"900000000000000102","oaSecretKey":"synthetic-zalo-oa-sales-secret-$-key","operatorApiToken":"synthetic_zalo_operator_sales_0123456789012345678","webhookUrl":"https://example.test/v1/webhooks/zalo-oa"},{"id":"facebook-page-support","type":"facebook_page","appId":"900000000000000003","pageId":"900000000000000301","appSecret":"synthetic-facebook-app-secret-$-value-01234567890","webhookVerifyToken":"synthetic-facebook-verify-token-012345678901234567","operatorApiToken":"synthetic_facebook_operator_support_012345678901234567","webhookUrl":"https://example.test/v1/webhooks/meta"},{"id":"facebook-page-sales","type":"facebook_page","appId":"900000000000000003","pageId":"900000000000000302","appSecret":"synthetic-facebook-app-secret-$-value-01234567890","webhookVerifyToken":"synthetic-facebook-verify-token-012345678901234567","operatorApiToken":"synthetic_facebook_operator_sales_0123456789012345678","webhookUrl":"https://example.test/v1/webhooks/meta"},{"id":"whatsapp-business-support","type":"whatsapp_business","appId":"900000000000000003","wabaId":"900000000000000501","phoneNumberId":"900000000000000601","appSecret":"synthetic-facebook-app-secret-$-value-01234567890","webhookVerifyToken":"synthetic-facebook-verify-token-012345678901234567","operatorApiToken":"synthetic_whatsapp_operator_support_012345678901234567","webhookUrl":"https://example.test/v1/webhooks/meta"},{"id":"whatsapp-business-sales","type":"whatsapp_business","appId":"900000000000000003","wabaId":"900000000000000501","phoneNumberId":"900000000000000602","appSecret":"synthetic-facebook-app-secret-$-value-01234567890","webhookVerifyToken":"synthetic-facebook-verify-token-012345678901234567","operatorApiToken":"synthetic_whatsapp_operator_sales_0123456789012345678","webhookUrl":"https://example.test/v1/webhooks/meta"}],"inboxes":[{"id":"support-inbox","token":"synthetic_inbox_support_token_01234567890123456789","connectionIds":["telegram-bot-support","zalo-oa-support","facebook-page-support","whatsapp-business-support"]},{"id":"sales-inbox","token":"synthetic_inbox_sales_token_01234567890123456789012","connectionIds":["telegram-bot-sales","zalo-oa-sales","facebook-page-sales","whatsapp-business-sales"]}]}'
 
 compose=(docker compose --project-name "$project_name" --file compose.yaml)
 
@@ -232,6 +234,36 @@ read_whatsapp_business_inbound_events_status() {
     "http://127.0.0.1:${api_host_port}/v1/whatsapp-business/inbound-events?cursor=${cursor}"
 }
 
+read_inbox_inbound_events() {
+  local inbox_api_token=$1
+  local query=${2:-}
+  local url="http://127.0.0.1:${api_host_port}/v1/inbox/inbound-events"
+
+  if [[ -n "$query" ]]; then
+    url+="?${query}"
+  fi
+
+  curl --fail --silent --show-error --connect-timeout 3 --max-time 10 \
+    --header "authorization: Bearer ${inbox_api_token}" \
+    "$url"
+}
+
+read_inbox_inbound_events_status() {
+  local inbox_api_token=$1
+  local query=${2:-}
+  local url="http://127.0.0.1:${api_host_port}/v1/inbox/inbound-events"
+
+  if [[ -n "$query" ]]; then
+    url+="?${query}"
+  fi
+
+  curl --silent --show-error --connect-timeout 3 --max-time 10 \
+    --header "authorization: Bearer ${inbox_api_token}" \
+    --output /dev/null \
+    --write-out '%{http_code}' \
+    "$url"
+}
+
 query_postgres() {
   "${compose[@]}" exec -T postgres \
     psql --username=postgres --dbname=open_channel_hub --tuples-only --no-align --command "$1"
@@ -249,6 +281,59 @@ assert_scoped_event_response() {
     printf 'The operator inbound-event API did not remain scoped to the configured connection.\n' >&2
     return 1
   fi
+}
+
+assert_inbox_event_response() {
+  local response=$1
+  local expected_connection_one=$2
+  local expected_connection_two=$3
+  local expected_connection_three=$4
+  local expected_connection_four=$5
+  local forbidden_connection_one=$6
+  local forbidden_connection_two=$7
+  local forbidden_connection_three=$8
+  local forbidden_connection_four=$9
+
+  if [[ "$response" != *'"success":true'* ||
+    "$response" != *"\"connectionId\":\"${expected_connection_one}\""* ||
+    "$response" != *"\"connectionId\":\"${expected_connection_two}\""* ||
+    "$response" != *"\"connectionId\":\"${expected_connection_three}\""* ||
+    "$response" != *"\"connectionId\":\"${expected_connection_four}\""* ||
+    "$response" == *"\"connectionId\":\"${forbidden_connection_one}\""* ||
+    "$response" == *"\"connectionId\":\"${forbidden_connection_two}\""* ||
+    "$response" == *"\"connectionId\":\"${forbidden_connection_three}\""* ||
+    "$response" == *"\"connectionId\":\"${forbidden_connection_four}\""* ||
+    "$response" == *'rawProviderPayload'* ]]; then
+    printf 'The aggregate inbox API did not preserve configured scope or canonical-only output.\n' >&2
+    return 1
+  fi
+}
+
+assert_response_contains_no_secret() {
+  local response=$1
+  shift
+  local candidate_secret
+
+  for candidate_secret in "$@"; do
+    if [[ "$response" == *"${candidate_secret}"* ]]; then
+      printf 'A synthetic secret escaped through the aggregate inbox API.\n' >&2
+      return 1
+    fi
+  done
+}
+
+extract_next_cursor() {
+  local response=$1
+  local cursor
+
+  cursor="$(printf '%s' "$response" | sed -n 's/.*"nextCursor":"\([A-Za-z0-9_-]*\)".*/\1/p')"
+
+  if [[ ! "$cursor" =~ ^[A-Za-z0-9_-]+$ ]]; then
+    printf 'The aggregate inbox API did not return a valid opaque next cursor.\n' >&2
+    return 1
+  fi
+
+  printf '%s' "$cursor"
 }
 
 trap cleanup EXIT
@@ -462,6 +547,85 @@ assert_scoped_event_response \
   "$whatsapp_sales_inbound_events_response" \
   'whatsapp-business-sales' \
   'whatsapp-business-support'
+
+support_inbox_inbound_events_response="$(
+  read_inbox_inbound_events "$support_inbox_api_token" 'limit=100'
+)"
+sales_inbox_inbound_events_response="$(
+  read_inbox_inbound_events "$sales_inbox_api_token" 'limit=100'
+)"
+
+assert_inbox_event_response \
+  "$support_inbox_inbound_events_response" \
+  'telegram-bot-support' \
+  'zalo-oa-support' \
+  'facebook-page-support' \
+  'whatsapp-business-support' \
+  'telegram-bot-sales' \
+  'zalo-oa-sales' \
+  'facebook-page-sales' \
+  'whatsapp-business-sales'
+assert_inbox_event_response \
+  "$sales_inbox_inbound_events_response" \
+  'telegram-bot-sales' \
+  'zalo-oa-sales' \
+  'facebook-page-sales' \
+  'whatsapp-business-sales' \
+  'telegram-bot-support' \
+  'zalo-oa-support' \
+  'facebook-page-support' \
+  'whatsapp-business-support'
+
+assert_response_contains_no_secret \
+  "$support_inbox_inbound_events_response" \
+  "$support_operator_api_token" \
+  "$sales_operator_api_token" \
+  "$support_webhook_secret" \
+  "$sales_webhook_secret" \
+  "$zalo_support_oa_secret_key" \
+  "$zalo_sales_oa_secret_key" \
+  "$facebook_app_secret" \
+  "$facebook_webhook_verify_token" \
+  "$support_inbox_api_token" \
+  "$sales_inbox_api_token" \
+  "$DATABASE_PASSWORD" \
+  "$POSTGRES_PASSWORD"
+assert_response_contains_no_secret \
+  "$sales_inbox_inbound_events_response" \
+  "$support_operator_api_token" \
+  "$sales_operator_api_token" \
+  "$support_webhook_secret" \
+  "$sales_webhook_secret" \
+  "$zalo_support_oa_secret_key" \
+  "$zalo_sales_oa_secret_key" \
+  "$facebook_app_secret" \
+  "$facebook_webhook_verify_token" \
+  "$support_inbox_api_token" \
+  "$sales_inbox_api_token" \
+  "$DATABASE_PASSWORD" \
+  "$POSTGRES_PASSWORD"
+
+assert_equal \
+  '401' \
+  "$(read_inbox_inbound_events_status "$support_operator_api_token")" \
+  'account bearer rejection at the aggregate inbox route'
+
+support_inbox_first_page_response="$(
+  read_inbox_inbound_events "$support_inbox_api_token" 'limit=1'
+)"
+support_inbox_cursor="$(extract_next_cursor "$support_inbox_first_page_response")"
+assert_equal \
+  '200' \
+  "$(read_inbox_inbound_events_status "$support_inbox_api_token" "cursor=${support_inbox_cursor}")" \
+  'same-inbox cursor continuation'
+assert_equal \
+  '400' \
+  "$(read_inbox_inbound_events_status "$sales_inbox_api_token" "cursor=${support_inbox_cursor}")" \
+  'cross-inbox cursor rejection'
+assert_equal \
+  '401' \
+  "$(read_inbound_events_status "$support_inbox_api_token" '')" \
+  'inbox bearer rejection at an account route'
 
 cross_connection_cursor="$(
   printf '%s' '{"beforeSequence":"1","connectionId":"telegram-bot-support","snapshotMaxSequence":"1"}' \

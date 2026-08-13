@@ -1,17 +1,18 @@
 # Runtime multi-connection configuration
 
 This guide configures the current alpha's official Telegram Bot, Zalo Official
-Account (OA), Facebook Page, and WhatsApp Business entries. It does not create
-a dashboard, user login, organization, public connection API, or permission
-model. It has not been
+Account (OA), Facebook Page, WhatsApp Business, and optional read-only inbox
+entries. It does not create a dashboard, user login, organization, public
+connection API, or full permission model. It has not been
 verified with a real provider account or public TLS endpoint.
 
 ## What is configured
 
 One secret JSON document can configure one to one hundred Telegram Bot, Zalo
-OA, Facebook Page, and WhatsApp Business connections. It contains credentials,
-so treat the entire document as a secret even though the connection IDs are
-opaque internal labels.
+OA, Facebook Page, and WhatsApp Business connections, plus up to one hundred
+optional configured read-only inboxes. It contains credentials, so treat the
+entire document as a secret even though connection and inbox IDs are opaque
+internal labels.
 
 The strict document shape is:
 
@@ -116,6 +117,38 @@ valid only when that App does not configure the other product. See the
 [Phase 3c WhatsApp Business guide](whatsapp-business-3c.md) for WABA/phone
 selection, raw-byte HMAC, and live-test boundaries.
 
+The root document may also include the optional `inboxes` array:
+
+```json
+{
+  "inboxes": [
+    {
+      "id": "support-inbox",
+      "token": "<unique 32-512 character inbox token>",
+      "connectionIds": ["facebook-page-support", "telegram-bot-support"]
+    }
+  ]
+}
+```
+
+An inbox is a configured read-only principal, not a provider connection. It
+contains one to one hundred entries, each with a unique opaque `id`, a unique
+printable non-whitespace `token` of 32 to 512 characters, and one to one
+hundred unique `connectionIds` that already exist in the document's
+`connections` array. Inbox IDs use the same safe identifier alphabet as
+connection IDs and cannot be `.` or `..`. An inbox token cannot collide with
+another inbox token or any Bot, webhook, provider, or account-operator
+credential. Connection IDs are canonicalized in ascending order before the
+inbox is used.
+
+An inbox token grants canonical inbound-event reads only for its explicit
+connection set through `GET /v1/inbox/inbound-events`. It is distinct from the
+one-account operator bearer on each connection; neither token works for the
+other route. The inbox does not create a browser UI, user, organization, role,
+conversation summary, outbound action, or provider credential. See the
+[Phase 4a unified inbox guide](unified-inbox-4a.md) for its cursor and
+operational boundary.
+
 Do not paste a real document in a terminal command, issue, pull request,
 screenshot, log, or repository file. The samples above contain placeholders,
 not usable credentials.
@@ -205,11 +238,20 @@ token, webhook secret, or webhook URL. The temporary
 | WhatsApp verification     | <code>GET /v1/webhooks/whatsapp-business</code> or <code>/v1/webhooks/meta</code>  | The product-specific route is for an App used only by WhatsApp. A shared Facebook/WhatsApp App uses `/meta`; its `hub.verify_token` must match one configured App before the exact `hub.challenge` is returned.                                                         |
 | WhatsApp Business ingress | <code>POST /v1/webhooks/whatsapp-business</code> or <code>/v1/webhooks/meta</code> | Every untrusted WABA ID must resolve to one configured App before raw-byte `X-Hub-Signature-256` HMAC is checked. A shared App selects the product from the signed envelope at `/meta`; unknown/cross-App identity and invalid signature return <code>401</code>.       |
 | Read WhatsApp events      | <code>GET /v1/whatsapp-business/inbound-events</code>                              | The unique <code>Authorization: Bearer</code> value maps to exactly one configured business phone. Cursor continuation is bound to that connection.                                                                                                                     |
+| Read configured inbox     | <code>GET /v1/inbox/inbound-events</code>                                          | The unique inbox <code>Authorization: Bearer</code> value maps to its configured connection allow-list. The caller supplies no inbox or connection ID. Cursor continuation is bound to that inbox and exact canonical connection set.                                   |
 
-The caller cannot select a connection ID on either operator route. A cursor
-from one account is rejected when presented with another account's bearer
-token. This limits the current operator API to one account per token; it is not
-user authentication or RBAC.
+The caller cannot select a connection ID on any read route. A cursor from one
+account is rejected when presented with another account's bearer token. An
+inbox cursor is rejected for a different inbox bearer or after that inbox's
+connection set changes. This limits the current operator API to a configured
+account or configured inbox scope per token; it is not user authentication or
+RBAC.
+
+The Phase 4a numeric ledger-order correction invalidates all per-account
+cursors issued by earlier releases. They deliberately return `400` rather than
+continue under mixed ordering and risk skipping an event; restart from the
+first page after upgrading. Newly issued account and inbox cursors carry the
+current ordering version.
 
 The legacy one-bot mode retains
 <code>POST /v1/webhooks/telegram-bot</code> only for compatibility. New
@@ -283,13 +325,15 @@ account isolation, durable storage, or production readiness.
 
 The repository's disposable Compose smoke test uses two synthetic Telegram Bot
 connections, two synthetic Zalo OA connections, two synthetic Facebook Pages,
-and two synthetic WhatsApp business phones on one fake shared Meta App. It
-migrates the seven immutable schema entries twice, verifies registry rows and
-Zalo/Facebook/WhatsApp fingerprint presence without printing them, checks
-Telegram dynamic webhook behavior, proves Zalo raw-byte hashing and shared Meta
-raw-byte HMAC boundaries, checks duplicate idempotency within every connection,
-verifies bearer-scoped reads, and rejects cross-account cursors. It makes no
-provider network request and uses no real credential or message.
+and two synthetic WhatsApp business phones on one fake shared Meta App. It also
+configures separate support and sales inboxes, each spanning four of those
+accounts. It migrates the seven immutable schema entries twice, verifies
+registry rows and Zalo/Facebook/WhatsApp fingerprint presence without printing
+them, checks Telegram dynamic webhook behavior, proves Zalo raw-byte hashing
+and shared Meta raw-byte HMAC boundaries, checks duplicate idempotency within
+every connection, verifies account and inbox bearer scopes, and rejects both
+cross-account and cross-inbox cursors. It makes no provider network request and
+uses no real credential or message.
 
 Before a real account is used, still complete TLS/proxy, rate limiting,
 monitoring, backup/restore, retention/deletion, secret rotation, access/audit,

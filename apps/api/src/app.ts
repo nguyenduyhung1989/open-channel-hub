@@ -3,6 +3,9 @@ import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 
 import { apiFailure } from './http/api-response.js';
 import { registerMetaWebhookRoute } from './http/meta-webhook-route.js';
+import type { InboxFeature } from './inbox/inbox-feature.js';
+import { createInboxFeatureCatalog } from './inbox/inbox-feature-catalog.js';
+import { registerInboxInboundEventsRoute } from './inbox/inbox-inbound-events-route.js';
 import { registerHealthRoute } from './health/health-route.js';
 import { registerReadinessRoute, type ReadinessCheck } from './health/readiness-route.js';
 import {
@@ -32,6 +35,7 @@ export interface BuildAppOptions {
   readonly readiness?: ReadinessCheck;
   readonly sourceOfferUrl?: string;
   readonly facebookPages?: readonly FacebookPageFeature[];
+  readonly inboxes?: readonly InboxFeature[];
   readonly telegramBot?: TelegramBotFeature;
   readonly telegramBots?: readonly TelegramBotFeature[];
   readonly whatsappBusinesses?: readonly WhatsAppBusinessFeature[];
@@ -88,6 +92,12 @@ export const buildApp = async (options: BuildAppOptions = {}): Promise<FastifyIn
   await registerHealthRoute(app);
   await registerReadinessRoute(app, options.readiness);
   await registerSourceOfferRoute(app, sourceOfferUrl);
+
+  if (options.inboxes !== undefined) {
+    const catalog = createInboxFeatureCatalog(options.inboxes);
+
+    await registerInboxInboundEventsRoute(app, catalog);
+  }
 
   if (options.telegramBot !== undefined && options.telegramBots !== undefined) {
     throw new Error('Telegram connection configuration is ambiguous.');

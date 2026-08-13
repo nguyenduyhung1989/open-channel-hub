@@ -37,8 +37,9 @@ complete.** Historical local and GitHub evidence exists for candidate
 has both checks green. The exact Phase 2c multi-connection commit
 <code>8352b51</code> and the exact Phase 3a Zalo OA commit
 <code>b930d29</code> and Phase 3b Facebook Page commit <code>c933102</code>
-also have both checks green. The current Phase 3c WhatsApp Business candidate
-needs its own verification. No real Telegram Bot token,
+also have both checks green. The exact Phase 3c WhatsApp Business commit
+<code>fd802cb</code> passed final local checks, independent review, a synthetic
+Compose proof, and both GitHub checks. No real Telegram Bot token,
 authenticated Bot API request, or test-bot flow has occurred.
 
 ### 1a — HTTP boundary and local operation
@@ -208,9 +209,9 @@ independent review, and fresh GitHub CI/CodeQL are complete for exact commit
 
 ### 3c — official WhatsApp Business signed inbound text
 
-**Status: source implementation is present; final local candidate verification,
-synthetic Docker proof, independent review, and fresh GitHub CI/CodeQL remain
-required for its exact commit.**
+**Status: implementation, final local verification, a synthetic Compose proof,
+independent review, and GitHub CI/CodeQL evidence are complete for exact commit
+<code>fd802cb</code>.**
 
 - [x] An official receive-only WhatsApp Business connector package that exposes
       only `message.receive.text` and rejects every outbound command.
@@ -236,20 +237,59 @@ required for its exact commit.**
 - [x] No WhatsApp User, OAuth, Graph API access-token storage, Graph API
       client, outbound message, template, attachment, automatic subscription,
       or live provider request.
-- [ ] Final local candidate checks, synthetic Compose verification, and
+- [x] Final local candidate checks, synthetic Compose verification, and
       independent review.
-- [ ] Fresh GitHub CI/CodeQL for the exact Phase 3c commit.
+- [x] Fresh GitHub CI/CodeQL for exact commit <code>fd802cb</code>.
 - [ ] Owner-authorized public TLS, subscription, and real signed WhatsApp
       Business webhook proof without exposing a secret, header, or customer
       message.
 
 ### Later Phase 3 work
 
-- A dashboard, accounts/organizations, and tested authorization.
 - A capability matrix, health state, and separate contract tests for each
   connector.
 
-## Phase 4 — experimental connectors, only with evidence
+## Phase 4 — configured read-only inbox foundation
+
+### 4a — explicit multi-connection inbound feed
+
+**Status: source implementation is present; final local candidate verification,
+synthetic Compose proof, independent review, and fresh GitHub CI/CodeQL remain
+required for its exact commit.**
+
+- [x] An optional strict `inboxes` array in the version-1 runtime secret
+      document. Each entry has an opaque ID, a unique bearer token that cannot
+      collide with another configured credential, and one to one hundred unique
+      configured connection IDs.
+- [x] `GET /v1/inbox/inbound-events` authenticates a configured inbox bearer
+      before parsing its bounded query or reading storage. The route accepts no
+      caller-selected inbox ID, connection ID, or connection scope.
+- [x] A domain-owned PostgreSQL feed reader returns canonical inbound events
+      across the explicit configured connection set in stable reverse-ledger
+      order. It uses parameterized SQL, bounded input, and does not return raw
+      provider payloads or database rows.
+- [x] Opaque inbox cursors bind their ledger position to both the configured
+      inbox ID and a SHA-256 representation of its canonical connection set.
+      A different inbox or changed scope cannot reuse them.
+- [x] No browser dashboard, user identity, organization/RBAC model,
+      conversation summary, search, attachment, outbound action, provider
+      access token, or live-provider call is implied by this read-only API.
+- [ ] Final local candidate checks, synthetic Compose verification, and
+      independent review.
+- [ ] Fresh GitHub CI/CodeQL for the exact Phase 4a commit.
+
+### Later Phase 4 work
+
+- A browser dashboard, user accounts/organizations, tested authorization,
+  audit trail, and explicit secret-rotation operation.
+- Conversation summaries, read/unread state, assignment, labels, search,
+  attachments, retention/deletion, backups/restore, and encryption-at-rest
+  assurance.
+- A durable outbound queue, provider-specific policy/capability design,
+  delivery status, and retries only after official provider review and a
+  separate security boundary.
+
+## Phase 5 — experimental connectors, only with evidence
 
 Facebook User and Zalo User are not feature promises. If researched, they must
 be separate, opt-in packages with constrained capabilities and clear

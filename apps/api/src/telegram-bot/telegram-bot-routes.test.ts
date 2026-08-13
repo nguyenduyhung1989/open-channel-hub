@@ -175,27 +175,38 @@ describe('Telegram Bot routes', () => {
     expect(response.body).not.toContain(rawProviderPayload);
   });
 
-  it('accepts a Phase 2b cursor only while one legacy connection is configured', async () => {
+  it('invalidates unversioned connection-bound and Phase 2b cursors even in legacy one-Bot mode', async () => {
     const { feature, readInboundEvents } = createFeature();
     const app = await buildApp({ telegramBot: feature });
     applications.push(app);
-    const legacyCursor = Buffer.from(
-      JSON.stringify({ beforeSequence: '29', snapshotMaxSequence: '41' }),
-      'utf8'
-    ).toString('base64url');
-
-    const response = await app.inject({
-      headers: { authorization: `Bearer ${OPERATOR_TOKEN}` },
-      method: 'GET',
-      url: `/v1/telegram-bot/inbound-events?cursor=${legacyCursor}`
-    });
-
-    expect(response.statusCode).toBe(200);
-    expect(readInboundEvents).toHaveBeenCalledWith({
+    const unversionedBoundCursor = encodeRawCursor({
+      beforeSequence: '29',
       connectionId: 'telegram-bot-default',
-      cursor: { beforeSequence: '29', snapshotMaxSequence: '41' },
-      pageSize: 50
+      snapshotMaxSequence: '41'
     });
+    const phase2bCursor = encodeRawCursor({ beforeSequence: '29', snapshotMaxSequence: '41' });
+
+    const [unversionedBound, phase2b] = await Promise.all([
+      app.inject({
+        headers: { authorization: `Bearer ${OPERATOR_TOKEN}` },
+        method: 'GET',
+        url: `/v1/telegram-bot/inbound-events?cursor=${unversionedBoundCursor}`
+      }),
+      app.inject({
+        headers: { authorization: `Bearer ${OPERATOR_TOKEN}` },
+        method: 'GET',
+        url: `/v1/telegram-bot/inbound-events?cursor=${phase2bCursor}`
+      })
+    ]);
+
+    for (const response of [unversionedBound, phase2b]) {
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toEqual({
+        success: false,
+        error: { code: 'validation_error', message: 'The request is invalid.' }
+      });
+    }
+    expect(readInboundEvents).not.toHaveBeenCalled();
   });
 
   it('does not expose a dynamic webhook path in legacy one-Bot mode', async () => {
@@ -234,6 +245,12 @@ describe('Telegram Bot routes', () => {
     });
 
     expect(firstResponse.statusCode).toBe(200);
+    expect(decodeCursor(nextCursor)).toEqual({
+      beforeSequence: '29',
+      connectionId: '.',
+      orderVersion: 2,
+      snapshotMaxSequence: '41'
+    });
     expect(secondResponse.statusCode).toBe(200);
     expect(readInboundEvents).toHaveBeenLastCalledWith({
       connectionId: '.',
@@ -614,11 +631,15 @@ const encodeCursor = (
   cursor: Readonly<{ beforeSequence: string; snapshotMaxSequence: string }>,
   connectionId = 'telegram-bot-default'
 ): string =>
-  Buffer.from(
-    JSON.stringify({
-      beforeSequence: cursor.beforeSequence,
-      connectionId,
-      snapshotMaxSequence: cursor.snapshotMaxSequence
-    }),
-    'utf8'
-  ).toString('base64url');
+  encodeRawCursor({
+    beforeSequence: cursor.beforeSequence,
+    connectionId,
+    orderVersion: 2,
+    snapshotMaxSequence: cursor.snapshotMaxSequence
+  });
+
+const encodeRawCursor = (cursor: Readonly<Record<string, unknown>>): string =>
+  Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url');
+
+const decodeCursor = (cursor: string): unknown =>
+  JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8'));

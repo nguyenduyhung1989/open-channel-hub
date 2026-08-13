@@ -126,9 +126,12 @@ Phase 2c proof extended this to two registered Telegram connections. The
 verified Phase 3a proof added two synthetic Zalo OA connections, raw-byte
 signature checks, and non-secret registry fingerprints. The verified Phase 3b
 proof added two synthetic Facebook Pages on one fake App, raw-byte HMAC checks,
-and Facebook fingerprints. The current Phase 3c smoke-test source adds two
-synthetic WhatsApp business phones on that same fake App, the common Meta
-callback, raw-byte HMAC checks, and WhatsApp fingerprints; its final candidate
+and Facebook fingerprints. The verified Phase 3c proof added two synthetic
+WhatsApp business phones on that same fake App, the common Meta callback,
+raw-byte HMAC checks, and WhatsApp fingerprints for exact commit
+<code>fd802cb</code>. The current Phase 4a smoke-test source adds separate
+support and sales inboxes across those accounts, aggregate bearer scope,
+cross-inbox cursor rejection, and canonical-only output; its final candidate
 verification is separate. No proof path calls a provider or uses a real
 credential or message.
 

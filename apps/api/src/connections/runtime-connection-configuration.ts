@@ -64,8 +64,20 @@ export type RuntimeConnection =
   | RuntimeFacebookPageConnection
   | RuntimeWhatsAppBusinessConnection;
 
+/**
+ * A locally configured bearer principal for the unified, read-only inbox.
+ * Its connection identifiers form an immutable allow-list; HTTP callers never
+ * choose an account themselves.
+ */
+export interface RuntimeInbox {
+  readonly connectionIds: readonly string[];
+  readonly id: string;
+  readonly token: string;
+}
+
 export interface RuntimeConnectionConfiguration {
   readonly connections: readonly RuntimeConnection[];
+  readonly inboxes?: readonly RuntimeInbox[];
 }
 
 /**
@@ -83,7 +95,9 @@ const MAXIMUM_FILE_PATH_LENGTH = 1_024;
 const MAXIMUM_CONFIGURATION_SOURCE_LENGTH = 262_144;
 const MAXIMUM_BASE64URL_CONFIGURATION_SOURCE_LENGTH = 349_526;
 const MAXIMUM_CONNECTIONS = 100;
+const MAXIMUM_INBOXES = 100;
 const ROOT_KEYS = Object.freeze(['version', 'connections']);
+const ROOT_OPTIONAL_KEYS = Object.freeze(['inboxes']);
 const TELEGRAM_BOT_CONNECTION_REQUIRED_KEYS = Object.freeze([
   'id',
   'type',
@@ -122,6 +136,7 @@ const WHATSAPP_BUSINESS_CONNECTION_REQUIRED_KEYS = Object.freeze([
   'operatorApiToken'
 ]);
 const WHATSAPP_BUSINESS_CONNECTION_OPTIONAL_KEYS = Object.freeze(['webhookUrl']);
+const INBOX_REQUIRED_KEYS = Object.freeze(['id', 'token', 'connectionIds']);
 const CONNECTION_ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
 const PRINTABLE_TOKEN_PATTERN = /^[!-~]+$/;
 const WEBHOOK_SECRET_PATTERN = /^[A-Za-z0-9_-]{32,256}$/;
@@ -202,7 +217,7 @@ const parseBase64UrlJsonConfiguration = (source: string): unknown => {
 
 const parseRuntimeConnectionConfiguration = (value: unknown): RuntimeConnectionConfiguration => {
   if (
-    !hasExactKeys(value, ROOT_KEYS, []) ||
+    !hasExactKeys(value, ROOT_KEYS, ROOT_OPTIONAL_KEYS) ||
     value.version !== 1 ||
     !Array.isArray(value.connections) ||
     value.connections.length < 1 ||
@@ -340,7 +355,87 @@ const parseRuntimeConnectionConfiguration = (value: unknown): RuntimeConnectionC
     }
   }
 
-  return Object.freeze({ connections: Object.freeze(connections) });
+  const inboxes = parseInboxes({
+    candidate: value.inboxes,
+    connectionIds: identifiers,
+    credentials: new Set([...exclusiveCredentials, ...zaloOaSecrets, ...metaCredentials])
+  });
+
+  return Object.freeze({
+    connections: Object.freeze(connections),
+    ...(inboxes === undefined ? {} : { inboxes })
+  });
+};
+
+interface ParseInboxesInput {
+  readonly candidate: unknown;
+  readonly connectionIds: ReadonlySet<string>;
+  readonly credentials: ReadonlySet<string>;
+}
+
+const parseInboxes = ({
+  candidate,
+  connectionIds,
+  credentials
+}: ParseInboxesInput): readonly RuntimeInbox[] | undefined => {
+  if (candidate === undefined) {
+    return undefined;
+  }
+
+  if (!Array.isArray(candidate) || candidate.length < 1 || candidate.length > MAXIMUM_INBOXES) {
+    throw new RuntimeConnectionConfigurationError();
+  }
+
+  const inboxIds = new Set<string>();
+  const inboxTokens = new Set<string>();
+
+  const inboxes = candidate.map((value) => {
+    const inbox = parseInbox(value, connectionIds);
+
+    if (inboxIds.has(inbox.id) || inboxTokens.has(inbox.token) || credentials.has(inbox.token)) {
+      throw new RuntimeConnectionConfigurationError();
+    }
+
+    inboxIds.add(inbox.id);
+    inboxTokens.add(inbox.token);
+
+    return inbox;
+  });
+
+  return Object.freeze(inboxes);
+};
+
+const parseInbox = (value: unknown, configuredConnectionIds: ReadonlySet<string>): RuntimeInbox => {
+  if (
+    !hasExactKeys(value, INBOX_REQUIRED_KEYS, []) ||
+    !isInboxId(value.id) ||
+    !isPrintableToken(value.token, 32) ||
+    !Array.isArray(value.connectionIds) ||
+    value.connectionIds.length < 1 ||
+    value.connectionIds.length > MAXIMUM_CONNECTIONS
+  ) {
+    throw new RuntimeConnectionConfigurationError();
+  }
+
+  const connectionIds = new Set<string>();
+
+  for (const connectionId of value.connectionIds) {
+    if (
+      !isConnectionId(connectionId) ||
+      !configuredConnectionIds.has(connectionId) ||
+      connectionIds.has(connectionId)
+    ) {
+      throw new RuntimeConnectionConfigurationError();
+    }
+
+    connectionIds.add(connectionId);
+  }
+
+  return Object.freeze({
+    connectionIds: Object.freeze([...connectionIds].sort()),
+    id: value.id,
+    token: value.token
+  });
 };
 
 const parseConnection = (value: unknown): RuntimeConnection => {
@@ -616,6 +711,9 @@ const hasExactKeys = (
 };
 
 const isConnectionId = (value: unknown): value is string =>
+  isString(value) && CONNECTION_ID_PATTERN.test(value) && value !== '.' && value !== '..';
+
+const isInboxId = (value: unknown): value is string =>
   isString(value) && CONNECTION_ID_PATTERN.test(value) && value !== '.' && value !== '..';
 
 const isPrintableToken = (value: unknown, minimumLength: number): value is string =>

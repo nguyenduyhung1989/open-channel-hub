@@ -12,12 +12,14 @@ import { apiFailure, apiSuccess } from './api-response.js';
 const DEFAULT_PAGE_SIZE = 50;
 const MAX_CURSOR_LENGTH = 512;
 const MAX_POSTGRES_BIGINT = '9223372036854775807';
+const CURRENT_ORDER_VERSION = 2;
 const cursorConnectionIdSchema = z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/);
 const sequenceSchema = z.string().regex(/^[1-9][0-9]{0,18}$/);
 const pageCursorSchema = z
   .object({
     beforeSequence: sequenceSchema,
     connectionId: cursorConnectionIdSchema,
+    orderVersion: z.literal(CURRENT_ORDER_VERSION),
     snapshotMaxSequence: sequenceSchema
   })
   .strict();
@@ -124,7 +126,11 @@ const decodeCursor = (
 };
 
 const encodeCursor = (cursor: InboundEventPageCursor, connectionId: string): string => {
-  const parsed = pageCursorSchema.safeParse({ ...cursor, connectionId });
+  const parsed = pageCursorSchema.safeParse({
+    ...cursor,
+    connectionId,
+    orderVersion: CURRENT_ORDER_VERSION
+  });
 
   if (!parsed.success || !isValidCursor(parsed.data)) {
     throw new Error('The inbound-event reader returned an invalid cursor.');

@@ -1,6 +1,10 @@
 export type { ConnectionRegistry } from './ports/connection-registry.js';
 export type { InboundEventStore } from './ports/inbound-event-store.js';
 export type {
+  InboundEventFeedListInput,
+  InboundEventFeedReader
+} from './ports/inbound-event-feed-reader.js';
+export type {
   InboundEventListInput,
   InboundEventPage,
   InboundEventPageCursor,

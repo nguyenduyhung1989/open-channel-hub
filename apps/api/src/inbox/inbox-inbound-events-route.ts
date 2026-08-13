@@ -1,25 +1,27 @@
+import { createHash } from 'node:crypto';
+
 import type { CanonicalEvent } from '@open-channel-hub/contracts';
 import type { InboundEventPageCursor } from '@open-channel-hub/domain';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import { apiFailure, apiSuccess } from '../http/api-response.js';
-import type { TelegramBotFeatureCatalog } from './telegram-bot-feature-catalog.js';
+import type { InboxFeature } from './inbox-feature.js';
+import type { InboxFeatureCatalog } from './inbox-feature-catalog.js';
 
 const DEFAULT_PAGE_SIZE = 50;
 const MAX_CURSOR_LENGTH = 512;
 const MAX_POSTGRES_BIGINT = '9223372036854775807';
 const CURRENT_ORDER_VERSION = 2;
-// A cursor only binds an authenticated read to a connection; it is never
-// interpolated into the dynamic webhook path. Keep legacy `.`/`..` labels
-// readable while dynamic runtime configuration rejects those labels at startup.
-const cursorConnectionIdSchema = z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/);
+const scopeHashSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
+const identifierSchema = z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/);
 const sequenceSchema = z.string().regex(/^[1-9][0-9]{0,18}$/);
 const pageCursorSchema = z
   .object({
     beforeSequence: sequenceSchema,
-    connectionId: cursorConnectionIdSchema,
+    inboxId: identifierSchema,
     orderVersion: z.literal(CURRENT_ORDER_VERSION),
+    scopeHash: scopeHashSchema,
     snapshotMaxSequence: sequenceSchema
   })
   .strict();
@@ -33,34 +35,20 @@ const querySchema = z
   })
   .strict();
 
-export interface TelegramBotInboundEventsRouteOptions {
-  /**
-   * Retained for composition-root source compatibility. Pre-v2 cursors remain
-   * invalid even when this historic option is supplied.
-   */
-  readonly allowLegacyCursor?: boolean;
-}
-
 /**
- * Lists canonical events for exactly the Telegram connection resolved from the
- * operator bearer token. The opaque cursor prevents callers from selecting a
- * different account or constructing storage queries directly.
+ * Lists canonical inbound events across the immutable connection scope of one
+ * configured inbox. Authentication precedes parsing so unauthenticated input
+ * cannot be used as a parser or storage oracle.
  */
-export const registerTelegramBotInboundEventsRoute = async (
+export const registerInboxInboundEventsRoute = async (
   app: FastifyInstance,
-  catalog: TelegramBotFeatureCatalog,
-  options: TelegramBotInboundEventsRouteOptions = {}
+  catalog: InboxFeatureCatalog
 ): Promise<void> => {
-  // Numeric ledger ordering cannot safely resume a lexical-order cursor.
-  void options;
-
-  app.get('/v1/telegram-bot/inbound-events', async (request, reply) => {
-    const feature = catalog.findByOperatorAuthorization(request.headers.authorization);
+  app.get('/v1/inbox/inbound-events', async (request, reply) => {
+    const feature = catalog.findByAuthorization(request.headers.authorization);
 
     if (feature === undefined) {
-      return reply
-        .code(401)
-        .send(apiFailure('unauthorized', 'The operator credential is invalid.'));
+      return reply.code(401).send(apiFailure('unauthorized', 'The inbox credential is invalid.'));
     }
 
     const query = querySchema.safeParse(request.query);
@@ -69,14 +57,13 @@ export const registerTelegramBotInboundEventsRoute = async (
       return reply.code(400).send(apiFailure('validation_error', 'The request is invalid.'));
     }
 
-    const cursor = decodeCursor(query.data.cursor, feature.connectionId);
+    const cursor = decodeCursor(query.data.cursor, feature);
 
     if (cursor === null) {
       return reply.code(400).send(apiFailure('validation_error', 'The request is invalid.'));
     }
 
     const page = await feature.readInboundEvents({
-      connectionId: feature.connectionId,
       ...(cursor === undefined ? {} : { cursor }),
       pageSize: query.data.limit === undefined ? DEFAULT_PAGE_SIZE : Number(query.data.limit)
     });
@@ -86,7 +73,7 @@ export const registerTelegramBotInboundEventsRoute = async (
         events: page.events.map(toPublicCanonicalEvent),
         ...(page.nextCursor === undefined
           ? {}
-          : { nextCursor: encodeCursor(page.nextCursor, feature.connectionId) })
+          : { nextCursor: encodeCursor(page.nextCursor, feature) })
       })
     );
   });
@@ -94,7 +81,7 @@ export const registerTelegramBotInboundEventsRoute = async (
 
 const decodeCursor = (
   value: string | undefined,
-  connectionId: string
+  feature: InboxFeature
 ): InboundEventPageCursor | null | undefined => {
   if (value === undefined) {
     return undefined;
@@ -112,8 +99,12 @@ const decodeCursor = (
     }
 
     const parsed = pageCursorSchema.safeParse(JSON.parse(encoded.toString('utf8')));
+    const expectedScopeHash = scopeHashFor(feature.connectionIds);
 
-    return parsed.success && parsed.data.connectionId === connectionId && isValidCursor(parsed.data)
+    return parsed.success &&
+      parsed.data.inboxId === feature.id &&
+      parsed.data.scopeHash === expectedScopeHash &&
+      isValidCursor(parsed.data)
       ? Object.freeze({
           beforeSequence: parsed.data.beforeSequence,
           snapshotMaxSequence: parsed.data.snapshotMaxSequence
@@ -124,19 +115,28 @@ const decodeCursor = (
   }
 };
 
-const encodeCursor = (cursor: InboundEventPageCursor, connectionId: string): string => {
+const encodeCursor = (cursor: InboundEventPageCursor, feature: InboxFeature): string => {
   const parsed = pageCursorSchema.safeParse({
     ...cursor,
-    connectionId,
-    orderVersion: CURRENT_ORDER_VERSION
+    inboxId: feature.id,
+    orderVersion: CURRENT_ORDER_VERSION,
+    scopeHash: scopeHashFor(feature.connectionIds)
   });
 
   if (!parsed.success || !isValidCursor(parsed.data)) {
-    throw new Error('The inbound-event reader returned an invalid cursor.');
+    throw new Error('The inbound-event feed reader returned an invalid cursor.');
   }
 
   return Buffer.from(JSON.stringify(parsed.data), 'utf8').toString('base64url');
 };
+
+/**
+ * The configuration loader canonicalizes connection identifiers in ascending
+ * order. Newlines cannot occur in an identifier, so this is an unambiguous
+ * stable representation of the effective connection set.
+ */
+const scopeHashFor = (connectionIds: readonly string[]): string =>
+  createHash('sha256').update(connectionIds.join('\n'), 'utf8').digest('base64url');
 
 const isValidCursor = (cursor: InboundEventPageCursor): boolean =>
   isPositivePostgresBigInt(cursor.beforeSequence) &&

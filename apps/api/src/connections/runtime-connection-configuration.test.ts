@@ -29,6 +29,126 @@ describe('loadRuntimeConnectionConfiguration', () => {
     expect(readFileMock).toHaveBeenCalledWith(CONFIGURATION_PATH, 'utf8');
   });
 
+  it('loads an optional immutable inbox scope while keeping old v1 documents inbox-free', async () => {
+    const legacyConfiguration = validConfiguration();
+    readFileMock.mockResolvedValueOnce(JSON.stringify(legacyConfiguration));
+
+    const legacy = await loadRuntimeConnectionConfiguration(CONFIGURATION_PATH);
+
+    expect(legacy).toEqual({ connections: legacyConfiguration.connections });
+    expect(Object.hasOwn(legacy, 'inboxes')).toBe(false);
+
+    const configuration = validInboxConfiguration();
+    readFileMock.mockResolvedValueOnce(JSON.stringify(configuration));
+
+    const result = await loadRuntimeConnectionConfiguration(CONFIGURATION_PATH);
+
+    expect(result).toEqual({
+      connections: configuration.connections,
+      inboxes: [
+        {
+          connectionIds: ['telegram-bot-primary', 'telegram-bot-secondary'],
+          id: 'support-inbox',
+          token: 'synthetic_inbox_support_token_01234567890123456789'
+        }
+      ]
+    });
+    const inbox = result.inboxes?.[0];
+    expect(inbox).toBeDefined();
+    expect(Object.isFrozen(result.inboxes)).toBe(true);
+    expect(Object.isFrozen(inbox)).toBe(true);
+    expect(Object.isFrozen(inbox?.connectionIds)).toBe(true);
+    expect(() => {
+      (inbox?.connectionIds as string[]).push('telegram-bot-another');
+    }).toThrow(TypeError);
+  });
+
+  it('rejects invalid inbox scopes and every collision with a connection credential', async () => {
+    const emptyScope = validInboxConfiguration();
+    emptyScope.inboxes[0]!.connectionIds = [];
+
+    const duplicateScopeMember = validInboxConfiguration();
+    duplicateScopeMember.inboxes[0]!.connectionIds = [
+      'telegram-bot-primary',
+      'telegram-bot-primary'
+    ];
+
+    const unknownScopeMember = validInboxConfiguration();
+    unknownScopeMember.inboxes[0]!.connectionIds = ['not-configured'];
+
+    const duplicateInboxId = validInboxConfiguration();
+    duplicateInboxId.inboxes.push({
+      connectionIds: ['telegram-bot-primary'],
+      id: 'support-inbox',
+      token: 'synthetic_inbox_sales_token_01234567890123456789012'
+    });
+
+    const duplicateInboxToken = validInboxConfiguration();
+    duplicateInboxToken.inboxes.push({
+      connectionIds: ['telegram-bot-primary'],
+      id: 'sales-inbox',
+      token: duplicateInboxToken.inboxes[0]!.token
+    });
+
+    const operatorCredentialCollision = validInboxConfiguration();
+    operatorCredentialCollision.inboxes[0]!.token =
+      operatorCredentialCollision.connections[0]!.operatorApiToken;
+
+    const botCredentialCollision = validInboxConfiguration();
+    botCredentialCollision.inboxes[0]!.token = botCredentialCollision.connections[0]!.botToken;
+
+    const webhookCredentialCollision = validInboxConfiguration();
+    webhookCredentialCollision.inboxes[0]!.token =
+      webhookCredentialCollision.connections[0]!.webhookSecret;
+
+    for (const configuration of [
+      emptyScope,
+      duplicateScopeMember,
+      unknownScopeMember,
+      duplicateInboxId,
+      duplicateInboxToken,
+      operatorCredentialCollision,
+      botCredentialCollision,
+      webhookCredentialCollision
+    ]) {
+      readFileMock.mockResolvedValueOnce(JSON.stringify(configuration));
+      await expectGenericFailure(loadRuntimeConnectionConfiguration(CONFIGURATION_PATH));
+    }
+  });
+
+  it('rejects an inbox token that collides with a shared Meta App credential', async () => {
+    const configuration =
+      validFacebookPageConfiguration() as MutableRuntimeFacebookPageConfiguration & {
+        inboxes: MutableRuntimeInbox[];
+      };
+    configuration.inboxes = [
+      {
+        connectionIds: ['facebook-page-support'],
+        id: 'support-inbox',
+        token: configuration.connections[0]!.appSecret
+      }
+    ];
+    readFileMock.mockResolvedValue(JSON.stringify(configuration));
+
+    await expectGenericFailure(loadRuntimeConnectionConfiguration(CONFIGURATION_PATH));
+  });
+
+  it('rejects an inbox token that collides with a Zalo OA provider credential', async () => {
+    const configuration = validZaloOaConfiguration() as MutableRuntimeZaloOaConfiguration & {
+      inboxes: MutableRuntimeInbox[];
+    };
+    configuration.inboxes = [
+      {
+        connectionIds: ['zalo-oa-support'],
+        id: 'support-inbox',
+        token: configuration.connections[0]!.oaSecretKey
+      }
+    ];
+    readFileMock.mockResolvedValue(JSON.stringify(configuration));
+
+    await expectGenericFailure(loadRuntimeConnectionConfiguration(CONFIGURATION_PATH));
+  });
+
   it('loads a canonical base64url JSON document without interpreting credential characters', async () => {
     const configuration = validConfiguration();
     configuration.connections[0]!.botToken = 'synthetic-bot-$credential';
@@ -429,9 +549,30 @@ const validConfiguration = (): MutableRuntimeConnectionConfiguration => ({
   ]
 });
 
+const validInboxConfiguration = (): MutableRuntimeInboxConfiguration => ({
+  ...validConfiguration(),
+  inboxes: [
+    {
+      connectionIds: ['telegram-bot-secondary', 'telegram-bot-primary'],
+      id: 'support-inbox',
+      token: 'synthetic_inbox_support_token_01234567890123456789'
+    }
+  ]
+});
+
 interface MutableRuntimeConnectionConfiguration {
   version: number;
   connections: MutableRuntimeTelegramBotConnection[];
+}
+
+interface MutableRuntimeInboxConfiguration extends MutableRuntimeConnectionConfiguration {
+  inboxes: MutableRuntimeInbox[];
+}
+
+interface MutableRuntimeInbox {
+  connectionIds: string[];
+  id: string;
+  token: string;
 }
 
 interface MutableRuntimeTelegramBotConnection {

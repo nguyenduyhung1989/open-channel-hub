@@ -27,17 +27,32 @@ describe('PostgresInboundEventReader', () => {
     });
     expect(pool.queries).toHaveLength(2);
     expect(pool.queries[0]).toMatchObject({
-      sql: expect.stringContaining('WHERE connection_id = $1'),
+      sql: expect.stringContaining('WHERE inbound_event.connection_id = $1'),
       values: [CONNECTION_ID]
     });
     expect(pool.queries[1]).toMatchObject({
-      sql: expect.stringContaining('connection_id = $1'),
+      sql: expect.stringContaining('inbound_event.connection_id = $1'),
       values: [CONNECTION_ID, '9', 3]
     });
-    expect(pool.queries[1]?.sql).toContain('ledger_id <= $2::bigint');
-    expect(pool.queries[1]?.sql).toContain('ORDER BY ledger_id DESC');
+    expect(pool.queries[1]?.sql).toContain('inbound_event.ledger_id <= $2::bigint');
+    expect(pool.queries[1]?.sql).toContain('ORDER BY inbound_event.ledger_id DESC');
     expect(pool.queries[1]?.sql).not.toContain(CONNECTION_ID);
     expect(result.events[0]).not.toHaveProperty('ledgerId');
+  });
+
+  it('orders the underlying bigint ledger column numerically rather than the projected text alias', async () => {
+    const pool = createPool({
+      pageRows: [row('11'), row('7'), row('4'), row('1')],
+      snapshotRows: [Object.freeze({ snapshot_max_sequence: '11' })]
+    });
+
+    await expect(
+      new PostgresInboundEventReader(pool).list({ connectionId: CONNECTION_ID, pageSize: 4 })
+    ).resolves.toEqual({
+      events: [event('11'), event('7'), event('4'), event('1')]
+    });
+    expect(pool.queries[1]?.sql).toContain('ORDER BY inbound_event.ledger_id DESC');
+    expect(pool.queries[1]?.sql).not.toContain('ORDER BY ledger_id DESC');
   });
 
   it('continues below the same snapshot ceiling without fetching a new maximum', async () => {
@@ -54,9 +69,10 @@ describe('PostgresInboundEventReader', () => {
     expect(result).toEqual({ events: [event('7'), event('6')] });
     expect(pool.queries).toHaveLength(1);
     expect(pool.queries[0]).toMatchObject({
-      sql: expect.stringContaining('ledger_id < $3::bigint'),
+      sql: expect.stringContaining('inbound_event.ledger_id < $3::bigint'),
       values: [CONNECTION_ID, '9', '8', 3]
     });
+    expect(pool.queries[0]?.sql).toContain('ORDER BY inbound_event.ledger_id DESC');
   });
 
   it('returns an empty first page when the connection has no committed event snapshot', async () => {
@@ -155,7 +171,7 @@ const createPool = (options: PoolOptions = {}): FakePool => {
         throw new Error('Synthetic PostgreSQL details must never cross the adapter boundary.');
       }
 
-      if (sql.includes('MAX(ledger_id)::text')) {
+      if (sql.includes('MAX(inbound_event.ledger_id)::text')) {
         return Object.freeze({
           rows: options.snapshotRows ?? [Object.freeze({ snapshot_max_sequence: '9' })]
         });

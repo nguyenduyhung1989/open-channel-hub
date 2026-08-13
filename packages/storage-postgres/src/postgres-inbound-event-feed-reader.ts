@@ -1,22 +1,23 @@
 import { CHANNELS, type CanonicalEvent, type Channel } from '@open-channel-hub/contracts';
 import type {
-  InboundEventListInput,
+  InboundEventFeedListInput,
+  InboundEventFeedReader,
   InboundEventPage,
-  InboundEventPageCursor,
-  InboundEventReader
+  InboundEventPageCursor
 } from '@open-channel-hub/domain';
 
 import { PostgresStorageError } from './postgres-error.js';
 import { POSTGRES_SCHEMA } from './postgres-migrations.js';
 import type { SqlPool } from './sql.js';
 
+const MAXIMUM_CONNECTION_IDS = 100;
 const MAXIMUM_PAGE_SIZE = 100;
 const MAX_POSTGRES_BIGINT = '9223372036854775807';
 
 const SNAPSHOT_MAX_SEQUENCE_SQL = `
 SELECT MAX(inbound_event.ledger_id)::text AS snapshot_max_sequence
 FROM ${POSTGRES_SCHEMA}.inbound_events AS inbound_event
-WHERE inbound_event.connection_id = $1
+WHERE inbound_event.connection_id = ANY($1::text[])
 `;
 
 const FIRST_PAGE_SQL = `
@@ -33,7 +34,7 @@ SELECT
   sender_id,
   message_text
 FROM ${POSTGRES_SCHEMA}.inbound_events AS inbound_event
-WHERE inbound_event.connection_id = $1
+WHERE inbound_event.connection_id = ANY($1::text[])
   AND inbound_event.ledger_id <= $2::bigint
 ORDER BY inbound_event.ledger_id DESC
 LIMIT $3
@@ -53,15 +54,15 @@ SELECT
   sender_id,
   message_text
 FROM ${POSTGRES_SCHEMA}.inbound_events AS inbound_event
-WHERE inbound_event.connection_id = $1
+WHERE inbound_event.connection_id = ANY($1::text[])
   AND inbound_event.ledger_id <= $2::bigint
   AND inbound_event.ledger_id < $3::bigint
 ORDER BY inbound_event.ledger_id DESC
 LIMIT $4
 `;
 
-interface ValidatedListInput {
-  readonly connectionId: string;
+interface ValidatedFeedListInput {
+  readonly connectionIds: readonly string[];
   readonly pageSize: number;
   readonly cursor?: InboundEventPageCursor;
 }
@@ -72,19 +73,18 @@ interface ParsedLedgerRow {
 }
 
 /**
- * Parameterized PostgreSQL reader for the domain-owned inbound-event boundary.
- * It returns only the canonical fields needed by callers, never a database row
- * or raw provider payload.
+ * Parameterized PostgreSQL reader for a canonical inbound-event feed across an
+ * explicit connection scope. It returns no database rows or raw payloads.
  */
-export class PostgresInboundEventReader implements InboundEventReader {
+export class PostgresInboundEventFeedReader implements InboundEventFeedReader {
   public constructor(private readonly pool: SqlPool) {}
 
-  public async list(input: InboundEventListInput): Promise<InboundEventPage> {
+  public async list(input: InboundEventFeedListInput): Promise<InboundEventPage> {
     try {
       const validated = validateInput(input);
       const snapshotMaxSequence =
         validated.cursor === undefined
-          ? await this.findSnapshotMaxSequence(validated.connectionId)
+          ? await this.findSnapshotMaxSequence(validated.connectionIds)
           : validated.cursor.snapshotMaxSequence;
 
       if (snapshotMaxSequence === undefined) {
@@ -94,12 +94,12 @@ export class PostgresInboundEventReader implements InboundEventReader {
       const result =
         validated.cursor === undefined
           ? await this.pool.query(FIRST_PAGE_SQL, [
-              validated.connectionId,
+              validated.connectionIds,
               snapshotMaxSequence,
               validated.pageSize + 1
             ])
           : await this.pool.query(CONTINUATION_PAGE_SQL, [
-              validated.connectionId,
+              validated.connectionIds,
               snapshotMaxSequence,
               validated.cursor.beforeSequence,
               validated.pageSize + 1
@@ -112,7 +112,7 @@ export class PostgresInboundEventReader implements InboundEventReader {
       const hasNextPage = result.rows.length > validated.pageSize;
       const selectedRows = result.rows.slice(0, validated.pageSize);
       const parsedRows = selectedRows.map((row) =>
-        parseLedgerRow(row, validated.connectionId, snapshotMaxSequence, validated.cursor)
+        parseLedgerRow(row, validated.connectionIds, snapshotMaxSequence, validated.cursor)
       );
       assertDescendingSequences(parsedRows);
       const events = Object.freeze(parsedRows.map((row) => row.event));
@@ -143,8 +143,10 @@ export class PostgresInboundEventReader implements InboundEventReader {
     }
   }
 
-  private async findSnapshotMaxSequence(connectionId: string): Promise<string | undefined> {
-    const result = await this.pool.query(SNAPSHOT_MAX_SEQUENCE_SQL, [connectionId]);
+  private async findSnapshotMaxSequence(
+    connectionIds: readonly string[]
+  ): Promise<string | undefined> {
+    const result = await this.pool.query(SNAPSHOT_MAX_SEQUENCE_SQL, [connectionIds]);
 
     if (result.rows.length !== 1) {
       throw new PostgresStorageError();
@@ -164,13 +166,15 @@ export class PostgresInboundEventReader implements InboundEventReader {
   }
 }
 
-const validateInput = (input: InboundEventListInput): ValidatedListInput => {
-  if (!isRecord(input) || !isNonBlankString(input.connectionId) || !isPageSize(input.pageSize)) {
+const validateInput = (input: InboundEventFeedListInput): ValidatedFeedListInput => {
+  if (!isRecord(input) || !isConnectionScope(input.connectionIds) || !isPageSize(input.pageSize)) {
     throw new PostgresStorageError();
   }
 
+  const connectionIds = Object.freeze([...input.connectionIds]);
+
   if (input.cursor === undefined) {
-    return Object.freeze({ connectionId: input.connectionId, pageSize: input.pageSize });
+    return Object.freeze({ connectionIds, pageSize: input.pageSize });
   }
 
   if (!isValidCursor(input.cursor)) {
@@ -178,13 +182,31 @@ const validateInput = (input: InboundEventListInput): ValidatedListInput => {
   }
 
   return Object.freeze({
-    connectionId: input.connectionId,
+    connectionIds,
     pageSize: input.pageSize,
     cursor: Object.freeze({
       beforeSequence: input.cursor.beforeSequence,
       snapshotMaxSequence: input.cursor.snapshotMaxSequence
     })
   });
+};
+
+const isConnectionScope = (value: unknown): value is readonly string[] => {
+  if (!Array.isArray(value) || value.length === 0 || value.length > MAXIMUM_CONNECTION_IDS) {
+    return false;
+  }
+
+  const seen = new Set<string>();
+
+  for (const connectionId of value) {
+    if (!isNonBlankString(connectionId) || seen.has(connectionId)) {
+      return false;
+    }
+
+    seen.add(connectionId);
+  }
+
+  return true;
 };
 
 const isValidCursor = (cursor: unknown): cursor is InboundEventPageCursor =>
@@ -195,7 +217,7 @@ const isValidCursor = (cursor: unknown): cursor is InboundEventPageCursor =>
 
 const parseLedgerRow = (
   row: Readonly<Record<string, unknown>>,
-  expectedConnectionId: string,
+  connectionIds: readonly string[],
   snapshotMaxSequence: string,
   cursor: InboundEventPageCursor | undefined
 ): ParsedLedgerRow => {
@@ -214,7 +236,7 @@ const parseLedgerRow = (
   if (
     !isPositivePostgresBigIntString(sequence) ||
     !isNonBlankString(connectionId) ||
-    connectionId !== expectedConnectionId ||
+    !connectionIds.includes(connectionId) ||
     !isNonBlankString(providerEventId) ||
     !isNonBlankString(id) ||
     !isChannel(channel) ||

@@ -50,6 +50,12 @@ const canonicalEvent = (connectionId = CONNECTION_ID): CanonicalEvent =>
 
 const toRawJson = (payload: object): string => JSON.stringify(payload);
 
+const encodeCursor = (cursor: Readonly<Record<string, unknown>>): string =>
+  Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url');
+
+const decodeCursor = (cursor: string): unknown =>
+  JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8'));
+
 const sign = (
   rawJson: string,
   options: Readonly<{ appId?: string; oaSecretKey?: string; timestamp?: string }> = {}
@@ -248,7 +254,7 @@ describe('Zalo OA routes', () => {
     expect(sales.receiveEvents).toHaveBeenCalledWith([canonicalEvent(SALES_CONNECTION_ID)]);
   });
 
-  it('requires an account-bound operator bearer before listing Zalo canonical events', async () => {
+  it('requires an account-bound bearer, issues v2 cursors, and invalidates prior cursor shapes', async () => {
     const support = createFeature({
       readInboundEvents: vi.fn(async (): Promise<InboundEventPage> => ({
         events: [canonicalEvent()],
@@ -274,11 +280,35 @@ describe('Zalo OA routes', () => {
       url: '/v1/zalo-oa/inbound-events?limit=2'
     });
     const supportCursor = supportPage.json().data.nextCursor as string;
-    const crossAccountCursor = await app.inject({
-      headers: { authorization: `Bearer ${SALES_OPERATOR_TOKEN}` },
+    const unversionedBoundCursor = encodeCursor({
+      beforeSequence: '4',
+      connectionId: CONNECTION_ID,
+      snapshotMaxSequence: '9'
+    });
+    const twoFieldLegacyCursor = encodeCursor({ beforeSequence: '4', snapshotMaxSequence: '9' });
+    const continuation = await app.inject({
+      headers: { authorization: `Bearer ${OPERATOR_TOKEN}` },
       method: 'GET',
       url: `/v1/zalo-oa/inbound-events?cursor=${supportCursor}`
     });
+    const [crossAccountCursor, invalidUnversionedBoundCursor, invalidTwoFieldLegacyCursor] =
+      await Promise.all([
+        app.inject({
+          headers: { authorization: `Bearer ${SALES_OPERATOR_TOKEN}` },
+          method: 'GET',
+          url: `/v1/zalo-oa/inbound-events?cursor=${supportCursor}`
+        }),
+        app.inject({
+          headers: { authorization: `Bearer ${OPERATOR_TOKEN}` },
+          method: 'GET',
+          url: `/v1/zalo-oa/inbound-events?cursor=${unversionedBoundCursor}`
+        }),
+        app.inject({
+          headers: { authorization: `Bearer ${OPERATOR_TOKEN}` },
+          method: 'GET',
+          url: `/v1/zalo-oa/inbound-events?cursor=${twoFieldLegacyCursor}`
+        })
+      ]);
 
     expect(unauthorized.statusCode).toBe(401);
     expect(supportPage.statusCode).toBe(200);
@@ -286,11 +316,34 @@ describe('Zalo OA routes', () => {
       success: true,
       data: { events: [canonicalEvent()], nextCursor: supportCursor }
     });
+    expect(decodeCursor(supportCursor)).toEqual({
+      beforeSequence: '4',
+      connectionId: CONNECTION_ID,
+      orderVersion: 2,
+      snapshotMaxSequence: '9'
+    });
     expect(support.readInboundEvents).toHaveBeenCalledWith({
       connectionId: CONNECTION_ID,
       pageSize: 2
     });
-    expect(crossAccountCursor.statusCode).toBe(400);
+    expect(continuation.statusCode).toBe(200);
+    expect(support.readInboundEvents).toHaveBeenLastCalledWith({
+      connectionId: CONNECTION_ID,
+      cursor: { beforeSequence: '4', snapshotMaxSequence: '9' },
+      pageSize: 50
+    });
+    expect(support.readInboundEvents).toHaveBeenCalledTimes(2);
+    for (const response of [
+      crossAccountCursor,
+      invalidUnversionedBoundCursor,
+      invalidTwoFieldLegacyCursor
+    ]) {
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toEqual({
+        success: false,
+        error: { code: 'validation_error', message: 'The request is invalid.' }
+      });
+    }
     expect(sales.readInboundEvents).not.toHaveBeenCalled();
   });
 

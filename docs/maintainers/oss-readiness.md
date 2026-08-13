@@ -34,9 +34,13 @@ organization has accepted the project.
   canonical-event reader. Its final local verification, synthetic Compose
   proof, independent review, GitHub CI, and CodeQL succeeded for exact commit
   <code>c933102</code>.
-- The current Phase 3c source adds a deliberately receive-only official
-  WhatsApp Business boundary: standalone or shared-Meta GET verification/raw-
-  byte HMAC webhook ingress and a bearer-scoped canonical-event reader. Its
+- Phase 3c added a deliberately receive-only official WhatsApp Business
+  boundary: standalone or shared-Meta GET verification/raw-byte HMAC webhook
+  ingress and a bearer-scoped canonical-event reader. Its final local
+  verification, synthetic Compose proof, independent review, GitHub CI, and
+  CodeQL succeeded for exact commit <code>fd802cb</code>.
+- The current Phase 4a source adds a configured read-only inbox bearer with an
+  explicit multi-connection allow-list and canonical aggregate event feed. Its
   final local verification, synthetic Compose proof, independent review, and
   GitHub checks remain required for the exact candidate commit.
 
@@ -53,6 +57,8 @@ organization has accepted the project.
   <code>b930d29</code>.
 - GitHub CI and CodeQL succeeded for the Phase 3b Facebook Page candidate at
   <code>c933102</code>.
+- GitHub CI and CodeQL succeeded for the Phase 3c WhatsApp Business candidate
+  at <code>fd802cb</code>.
 - GitHub Private Vulnerability Reporting, secret scanning, Dependabot alerts,
   and automatic security fixes are enabled.
 - The <code>main</code> branch blocks force pushes and deletion, including by
@@ -73,10 +79,12 @@ organization has accepted the project.
 - Treat the runtime multi-connection document as a secret. Never commit it,
   publish it through a ticket/log/screenshot, store it in PostgreSQL, or mix it
   with legacy Telegram Bot credentials in one process. It can contain Telegram
-  Bot, Zalo OA, Facebook Page, and WhatsApp Business credentials, but Phase 3a
-  does not store or transmit Zalo's provider access token, Phase 3b does not
-  store a Facebook Page access token or make a Graph API request, and Phase 3c
-  does not store a WhatsApp access token or make a Graph API request.
+  Bot, Zalo OA, Facebook Page, WhatsApp Business, per-account operator, and
+  configured inbox credentials. Phase 3a does not store or transmit Zalo's
+  provider access token, Phase 3b does not store a Facebook Page access token
+  or make a Graph API request, Phase 3c does not store a WhatsApp access token
+  or make a Graph API request, and Phase 4a does not store an inbox principal
+  in PostgreSQL.
 - Treat canonical message text and identifiers as sensitive data. Build and
   test backup/restore, retention/deletion, secret rotation, access controls,
   and operational observability before operating real customer data.
