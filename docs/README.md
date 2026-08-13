@@ -28,5 +28,5 @@
   boundaries, current controls, and planned work.
 - [Open-source readiness](maintainers/oss-readiness.md): an honest operating
   checklist for maintainers.
-- [Phase 4a checkpoint and Phase 4b candidate](maintainers/current-phase.md):
+- [Phase 4a–4b checkpoint](maintainers/current-phase.md):
   verified milestones, active code state, risks, and exact next verification.

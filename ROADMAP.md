@@ -280,9 +280,9 @@ independent review, and GitHub CI/CodeQL evidence are complete for exact commit
 
 ### 4b — server-rendered local-principal dashboard
 
-**Status: implementation candidate in progress; it is not complete and has no
-final local, Docker, independent-review, GitHub, public-TLS, or production
-evidence yet.**
+**Status: implementation, final local verification, synthetic Docker proof,
+independent review, and GitHub CI/CodeQL evidence are complete for exact commit
+<code>7672be9</code>. Public TLS/proxy and production evidence remain open.**
 
 - [x] An optional strict `dashboard` object in the version-1 runtime secret.
       It requires configured inboxes, an exact external HTTPS origin, one or
@@ -298,8 +298,10 @@ evidence yet.**
       <code>0008_dashboard_sessions</code> that stores only HMACs of random
       browser tokens and session metadata, never raw token/password/provider
       credential/inbox bearer values.
-- [ ] Freeze one candidate and run the full local verification, secret scan,
-      synthetic Compose proof, independent review, and fresh GitHub CI/CodeQL.
+- [x] Final local verification: formatting, lint, strict type checking, 48 test
+      files / 319 tests, build, low-threshold dependency audit, secret scan,
+      synthetic Compose proof, and independent review.
+- [x] Fresh GitHub CI/CodeQL for exact commit <code>7672be9</code>.
 - [ ] Configure and verify an external TLS reverse proxy, edge rate limiting,
       cookie/header logging policy, and the exact public browser origin before
       claiming a dashboard deployment.

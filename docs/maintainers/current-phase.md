@@ -1,13 +1,13 @@
-# Public checkpoint: Phase 4a verified; Phase 4b candidate active
+# Public checkpoint: Phase 4a and Phase 4b verified locally
 
 **Verified scope:** Phase 4a is a configured, read-only aggregate feed across
 an explicit set of existing official connections. It builds on the Telegram
 Bot, Zalo OA, Facebook Page, and WhatsApp Business runtime configuration and
 durable PostgreSQL inbound-event ledger.
 
-**Active candidate:** Phase 4b adds an optional server-rendered local-principal
-browser view over that same inbox scope. It is not yet final-verified or
-deployed. It is not a full user login, organization/RBAC model,
+**Verified local scope:** Phase 4b adds an optional server-rendered
+local-principal browser view over that same inbox scope. It is not a deployed
+browser service or a full user login, organization/RBAC model,
 conversation/thread model, search service, attachment store, outbound queue,
 provider credential manager, real provider test, or production deployment.
 
@@ -28,6 +28,9 @@ provider credential manager, real provider test, or production deployment.
 - Phase 4a's configured inbox source passed final local checks, independent
   review, a synthetic Compose proof, and fresh GitHub CI/CodeQL for exact
   commit <code>705db0a</code>.
+- Phase 4b's operator dashboard source passed final local checks, independent
+  security review, a synthetic Compose proof, and fresh GitHub CI/CodeQL for
+  exact commit <code>7672be9</code>.
 - Historical evidence proves only those exact revisions. It does not verify any
   live provider account.
 
@@ -84,7 +87,7 @@ cross-inbox cursor rejection, unchanged per-account cursor isolation,
 secret-file permission, and PostgreSQL role safety. It is not a live-provider,
 TLS, dashboard, or production-authorization proof.
 
-## Active Phase 4b candidate
+## Verified Phase 4b source
 
 The current source adds a bounded browser surface without moving a bearer into
 the browser:
@@ -112,13 +115,13 @@ the browser:
   `dashboard` absent. It verifies the eighth migration but cannot prove a
   browser login that depends on external HTTPS cookies and origin semantics.
 
-This candidate has no frozen commit or final verification evidence yet. Before
-calling it complete, freeze the source; run formatting, lint, strict type
-checking, complete tests, build, dependency/secret scans, Compose
-configuration, and the synthetic Docker proof; obtain independent review; then
-record fresh GitHub CI and CodeQL for the exact candidate. An external TLS
-proxy, edge rate limit, cookie/header log policy, and real public origin remain
-separate operational proof.
+Exact commit <code>7672be9</code> passed formatting, lint, strict type
+checking, 48 test files / 319 tests, build, low-threshold dependency audit,
+secret scan, Compose configuration, and the synthetic Docker proof. An
+independent security review found no remaining actionable high- or
+medium-severity issue, and GitHub CI plus CodeQL both succeeded for that exact
+commit. An external TLS proxy, edge rate limit, cookie/header log policy, and
+real public origin remain separate operational proof.
 
 ## Explicitly not proven or not implemented
 
@@ -144,8 +147,7 @@ separate operational proof.
 ## Next authorized work
 
 Keep all live provider use separate: require explicit owner authorization before
-connecting a real account or exposing public TLS. Finish the Phase 4b candidate
-only with its own frozen verification and external TLS/proxy evidence. Any
-later full user/organization authorization, conversation model, or outbound
-engine must start with its own bounded design, migration/security review, and
-verification criteria.
+connecting a real account or exposing public TLS. Any later full
+user/organization authorization, conversation model, durable outbound engine,
+or dashboard deployment must start with its own bounded design,
+migration/security review, and verification criteria.

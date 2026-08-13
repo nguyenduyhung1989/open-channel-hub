@@ -117,11 +117,11 @@ follows [Semantic Versioning](https://semver.org/).
   multiple fake provider accounts. It checks aggregate scope, bearer isolation,
   cursor-scope rejection, canonical-only output, secret-file mode, and
   PostgreSQL role safety without provider network access.
-- Phase 4b candidate: an optional server-rendered, no-JavaScript operator
+- Phase 4b: an optional server-rendered, no-JavaScript operator
   dashboard scoped to existing configured inboxes. It exposes HTML/CSS only;
   browser code never receives an inbox bearer, provider credential, or
   connection-selection capability.
-- Phase 4b candidate: an Argon2id password-hash CLI using the exact
+- Phase 4b: an Argon2id password-hash CLI using the exact
   `m=19456,t=2,p=1` profile, configured local principals, signed secure
   browser cookies, anti-forgery forms, bounded session lifetime, and forward
   migration <code>0008_dashboard_sessions</code> for HMAC-only session
@@ -138,7 +138,8 @@ follows [Semantic Versioning](https://semver.org/).
   <code>c933102</code>, and completed Phase 3c final local checks,
   independent review, synthetic Compose proof, and GitHub CI/CodeQL at exact
   commit <code>fd802cb</code>; Phase 4a completed the same evidence at exact
-  commit <code>705db0a</code>.
+  commit <code>705db0a</code>; Phase 4b completed the same evidence at exact
+  commit <code>7672be9</code>.
 - An accepted inbound Telegram text event now becomes durable when the
   PostgreSQL configuration is present; a local operator can now list canonical
   inbound events, but this still does not add an inbox, live Telegram proof,
@@ -215,8 +216,8 @@ follows [Semantic Versioning](https://semver.org/).
   cookie signing keys and session pepper must be distinct from each other and
   every provider, webhook, account-operator, and inbox credential. Login and
   logout enforce the exact configured external HTTPS origin and anti-forgery
-  tokens. This candidate has not yet verified a TLS proxy or production
-  deployment.
+  tokens. The feature is locally verified, but has not verified a TLS proxy or
+  production deployment.
 - The <code>main</code> branch now blocks force pushes and deletion, including
   for administrators. Required checks and pull-request reviews remain
   intentionally unset for the owner-controlled direct-push workflow.

@@ -140,7 +140,11 @@ raw-byte HMAC checks, and WhatsApp fingerprints for exact commit
 separate support and sales inboxes across those accounts, aggregate bearer
 scope, cross-inbox cursor rejection, and canonical-only output; it passed its
 final local verification, independent review, and GitHub CI/CodeQL. No proof
-path calls a provider or uses a real credential or message.
+path calls a provider or uses a real credential or message. Phase 4b's exact
+commit <code>7672be9</code> adds the eighth migration for HMAC-only dashboard
+sessions; it passed the same local verification, independent review, synthetic
+Compose proof, and GitHub CI/CodeQL. The smoke remains dashboard-free because
+it is loopback HTTP, not proof of browser cookies over external HTTPS.
 
 ## Container and network boundary
 
