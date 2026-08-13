@@ -1,3 +1,4 @@
+import cookie from '@fastify/cookie';
 import helmet from '@fastify/helmet';
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 
@@ -6,6 +7,8 @@ import { registerMetaWebhookRoute } from './http/meta-webhook-route.js';
 import type { InboxFeature } from './inbox/inbox-feature.js';
 import { createInboxFeatureCatalog } from './inbox/inbox-feature-catalog.js';
 import { registerInboxInboundEventsRoute } from './inbox/inbox-inbound-events-route.js';
+import type { DashboardFeature } from './dashboard/dashboard-feature.js';
+import { registerDashboardRoutes } from './dashboard/dashboard-routes.js';
 import { registerHealthRoute } from './health/health-route.js';
 import { registerReadinessRoute, type ReadinessCheck } from './health/readiness-route.js';
 import {
@@ -32,6 +35,7 @@ import { registerWhatsAppBusinessInboundEventsRoute } from './whatsapp-business/
 import { registerWhatsAppBusinessWebhookRoute } from './whatsapp-business/whatsapp-business-webhook-route.js';
 
 export interface BuildAppOptions {
+  readonly dashboard?: DashboardFeature;
   readonly readiness?: ReadinessCheck;
   readonly sourceOfferUrl?: string;
   readonly facebookPages?: readonly FacebookPageFeature[];
@@ -56,6 +60,7 @@ export const buildApp = async (options: BuildAppOptions = {}): Promise<FastifyIn
         defaultSrc: ["'self'"],
         baseUri: ["'self'"],
         frameAncestors: ["'none'"],
+        formAction: ["'self'"],
         objectSrc: ["'none'"],
         scriptSrc: ["'self'"],
         styleSrc: ["'self'"]
@@ -92,6 +97,13 @@ export const buildApp = async (options: BuildAppOptions = {}): Promise<FastifyIn
   await registerHealthRoute(app);
   await registerReadinessRoute(app, options.readiness);
   await registerSourceOfferRoute(app, sourceOfferUrl);
+
+  if (options.dashboard !== undefined) {
+    await app.register(cookie, {
+      secret: [...options.dashboard.sessionCookieSigningKeys]
+    });
+    await registerDashboardRoutes(app, options.dashboard);
+  }
 
   if (options.inboxes !== undefined) {
     const catalog = createInboxFeatureCatalog(options.inboxes);

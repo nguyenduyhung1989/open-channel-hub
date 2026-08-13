@@ -16,6 +16,7 @@ it does not mean a feature is complete.
 | [0008](0008-facebook-page-signed-inbound.md)           | accepted | Facebook Page signed inbound text boundary                     |
 | [0009](0009-whatsapp-business-signed-inbound.md)       | accepted | WhatsApp Business signed inbound text boundary                 |
 | [0010](0010-configured-read-only-inbox-principals.md)  | accepted | Configured read-only inbox principals                          |
+| [0011](0011-server-rendered-operator-dashboard.md)     | accepted | Server-rendered local-principal operator dashboard             |
 
 Template for a new ADR:
 

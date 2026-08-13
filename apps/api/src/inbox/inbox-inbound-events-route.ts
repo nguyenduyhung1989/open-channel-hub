@@ -1,33 +1,15 @@
-import { createHash } from 'node:crypto';
-
 import type { CanonicalEvent } from '@open-channel-hub/contracts';
-import type { InboundEventPageCursor } from '@open-channel-hub/domain';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import { apiFailure, apiSuccess } from '../http/api-response.js';
-import type { InboxFeature } from './inbox-feature.js';
+import { decodeInboxCursor, encodeInboxCursor } from './inbox-cursor.js';
 import type { InboxFeatureCatalog } from './inbox-feature-catalog.js';
 
 const DEFAULT_PAGE_SIZE = 50;
-const MAX_CURSOR_LENGTH = 512;
-const MAX_POSTGRES_BIGINT = '9223372036854775807';
-const CURRENT_ORDER_VERSION = 2;
-const scopeHashSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
-const identifierSchema = z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/);
-const sequenceSchema = z.string().regex(/^[1-9][0-9]{0,18}$/);
-const pageCursorSchema = z
-  .object({
-    beforeSequence: sequenceSchema,
-    inboxId: identifierSchema,
-    orderVersion: z.literal(CURRENT_ORDER_VERSION),
-    scopeHash: scopeHashSchema,
-    snapshotMaxSequence: sequenceSchema
-  })
-  .strict();
 const querySchema = z
   .object({
-    cursor: z.string().min(1).max(MAX_CURSOR_LENGTH).optional(),
+    cursor: z.string().min(1).max(512).optional(),
     limit: z
       .string()
       .regex(/^(?:[1-9][0-9]?|100)$/)
@@ -57,7 +39,7 @@ export const registerInboxInboundEventsRoute = async (
       return reply.code(400).send(apiFailure('validation_error', 'The request is invalid.'));
     }
 
-    const cursor = decodeCursor(query.data.cursor, feature);
+    const cursor = decodeInboxCursor(query.data.cursor, feature);
 
     if (cursor === null) {
       return reply.code(400).send(apiFailure('validation_error', 'The request is invalid.'));
@@ -73,82 +55,11 @@ export const registerInboxInboundEventsRoute = async (
         events: page.events.map(toPublicCanonicalEvent),
         ...(page.nextCursor === undefined
           ? {}
-          : { nextCursor: encodeCursor(page.nextCursor, feature) })
+          : { nextCursor: encodeInboxCursor(page.nextCursor, feature) })
       })
     );
   });
 };
-
-const decodeCursor = (
-  value: string | undefined,
-  feature: InboxFeature
-): InboundEventPageCursor | null | undefined => {
-  if (value === undefined) {
-    return undefined;
-  }
-
-  if (!/^[A-Za-z0-9_-]+$/.test(value)) {
-    return null;
-  }
-
-  try {
-    const encoded = Buffer.from(value, 'base64url');
-
-    if (encoded.toString('base64url') !== value) {
-      return null;
-    }
-
-    const parsed = pageCursorSchema.safeParse(JSON.parse(encoded.toString('utf8')));
-    const expectedScopeHash = scopeHashFor(feature.connectionIds);
-
-    return parsed.success &&
-      parsed.data.inboxId === feature.id &&
-      parsed.data.scopeHash === expectedScopeHash &&
-      isValidCursor(parsed.data)
-      ? Object.freeze({
-          beforeSequence: parsed.data.beforeSequence,
-          snapshotMaxSequence: parsed.data.snapshotMaxSequence
-        })
-      : null;
-  } catch {
-    return null;
-  }
-};
-
-const encodeCursor = (cursor: InboundEventPageCursor, feature: InboxFeature): string => {
-  const parsed = pageCursorSchema.safeParse({
-    ...cursor,
-    inboxId: feature.id,
-    orderVersion: CURRENT_ORDER_VERSION,
-    scopeHash: scopeHashFor(feature.connectionIds)
-  });
-
-  if (!parsed.success || !isValidCursor(parsed.data)) {
-    throw new Error('The inbound-event feed reader returned an invalid cursor.');
-  }
-
-  return Buffer.from(JSON.stringify(parsed.data), 'utf8').toString('base64url');
-};
-
-/**
- * The configuration loader canonicalizes connection identifiers in ascending
- * order. Newlines cannot occur in an identifier, so this is an unambiguous
- * stable representation of the effective connection set.
- */
-const scopeHashFor = (connectionIds: readonly string[]): string =>
-  createHash('sha256').update(connectionIds.join('\n'), 'utf8').digest('base64url');
-
-const isValidCursor = (cursor: InboundEventPageCursor): boolean =>
-  isPositivePostgresBigInt(cursor.beforeSequence) &&
-  isPositivePostgresBigInt(cursor.snapshotMaxSequence) &&
-  compareDecimalStrings(cursor.beforeSequence, cursor.snapshotMaxSequence) <= 0;
-
-const isPositivePostgresBigInt = (value: string): boolean =>
-  value.length < MAX_POSTGRES_BIGINT.length ||
-  (value.length === MAX_POSTGRES_BIGINT.length && value <= MAX_POSTGRES_BIGINT);
-
-const compareDecimalStrings = (left: string, right: string): number =>
-  left.length === right.length ? left.localeCompare(right) : left.length - right.length;
 
 const toPublicCanonicalEvent = (event: CanonicalEvent): CanonicalEvent =>
   Object.freeze({

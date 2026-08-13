@@ -5,6 +5,7 @@ export default defineConfig({
   dts: false,
   external: ['pg'],
   entry: {
+    'dashboard/password-hash-cli': 'apps/api/src/dashboard/password-hash-cli.ts',
     'db/migrate': 'apps/api/src/db/migrate.ts',
     server: 'apps/api/src/server.ts',
     'telegram-bot/set-webhook': 'apps/api/src/telegram-bot/set-webhook.ts'

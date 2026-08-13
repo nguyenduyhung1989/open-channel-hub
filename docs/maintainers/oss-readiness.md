@@ -43,6 +43,12 @@ organization has accepted the project.
   multi-connection allow-list and canonical aggregate event feed. Its final
   local verification, synthetic Compose proof, independent review, GitHub CI,
   and CodeQL succeeded for exact commit <code>705db0a</code>.
+- Phase 4b is an active implementation candidate, not verified release
+  evidence. It adds an optional server-rendered dashboard with configured local
+  principals, exact-profile Argon2id password hashes, signed secure browser
+  sessions, HMAC-only PostgreSQL session records, and an eighth migration. Its
+  local Compose smoke intentionally remains dashboard-free because it is HTTP
+  on loopback and cannot prove the required external HTTPS browser boundary.
 
 ## Verified GitHub evidence
 

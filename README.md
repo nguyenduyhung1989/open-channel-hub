@@ -2,15 +2,18 @@
 
 > A self-hosted, official-first multichannel messaging hub.
 
-**Status: Phase 4a alpha.** The repository contains a durable PostgreSQL
-inbound-event ledger, account-scoped operator read APIs, a configured
-multi-connection read-only inbox API, secret-backed runtime configuration for
-official accounts, and narrow official Zalo Official Account (OA), Facebook
-Page, and WhatsApp Business signed inbound-text boundaries. Phase 4a passed
-final local checks, independent review, a synthetic Docker proof, and GitHub
-CI/CodeQL for exact commit <code>705db0a</code>. Phase 1a remains incomplete
-until an owner-authorized Telegram test bot works through public TLS; Phases
-3a, 3b, and 3c likewise have no owner-authorized real provider proof.
+**Status: Phase 4b alpha candidate.** The repository contains a durable
+PostgreSQL inbound-event ledger, account-scoped operator read APIs, a
+configured multi-connection read-only inbox API, an optional server-rendered
+operator dashboard, secret-backed runtime configuration for official accounts,
+and narrow official Zalo Official Account (OA), Facebook Page, and WhatsApp
+Business signed inbound-text boundaries. Phase 4a passed final local checks,
+independent review, a synthetic Docker proof, and GitHub CI/CodeQL for exact
+commit <code>705db0a</code>. Phase 4b has not yet earned that evidence and does
+not prove a TLS proxy or production browser deployment. Phase 1a remains
+incomplete until an owner-authorized Telegram test bot works through public
+TLS; Phases 3a, 3b, and 3c likewise have no owner-authorized real provider
+proof.
 
 The official Telegram Bot HTTP transport is wired for a deliberately narrow
 text send/receive slice. Legacy mode uses <code>OPERATOR_API_TOKEN</code>;
@@ -94,6 +97,15 @@ This is a deliberately small read API, not a browser inbox, user login,
 organization/RBAC model, conversation model, search service, or outbound
 message path.
 
+Phase 4b optionally adds a server-rendered read-only dashboard to that exact
+inbox boundary. When the root runtime secret contains `dashboard`, PostgreSQL
+is available, and a matching `inboxes` array already exists, `/operator/login`
+and `/operator` use configured local principals, Argon2id password hashes, and
+signed `Secure` `HttpOnly` session cookies. The browser never receives an inbox
+bearer or provider credential. It is deliberately absent from the supplied
+loopback HTTP Compose configuration because browser authentication requires an
+external HTTPS origin and a TLS reverse proxy.
+
 Multi-connection IDs are opaque safe route labels; <code>.</code> and
 <code>..</code> are rejected because webhook ingress places the ID in a dynamic
 path. This restriction does not rewrite a historical legacy one-Bot environment
@@ -127,6 +139,9 @@ CAPTCHA bypass, fingerprint spoofing, session theft, or bulk-spam capabilities.
   configured account.
 - Optional configured read-only inbox principals, each with a separate bearer
   and an explicit server-side allow-list of one or more configured accounts.
+- An optional server-rendered, no-JavaScript, read-only operator dashboard.
+  It uses local configured password principals and browser session cookies;
+  it never exposes an inbox bearer or provider credential to the browser.
 - Dynamic multi-connection webhook ingress that resolves the account server
   side, uses a separate webhook secret, and gives unknown account IDs and wrong
   secrets the same <code>401</code> response.
@@ -156,9 +171,11 @@ CAPTCHA bypass, fingerprint spoofing, session theft, or bulk-spam capabilities.
 
 The following remain plans or explicitly incomplete operational work:
 
-- A browser-visible inbox/dashboard, conversation model, attachment storage, search,
-  retention/deletion policy, backups, restore drills, or encryption-at-rest
-  assurance.
+- A full browser identity system, organization/RBAC model, password reset,
+  audit trail, proxy/TLS deployment proof, conversation model, attachment
+  storage, search, retention/deletion policy, backups, restore drills, or
+  encryption-at-rest assurance. The narrow Phase 4b dashboard is not a claim
+  to provide those capabilities.
 - Redis, a queue, durable outbound delivery, retries, and an outbox.
 - User accounts, role-based access control, multiple
   organizations, webhook administration, public connection management, or a
@@ -229,6 +246,9 @@ Before the first start, copy <code>.env.example</code> to
    [Phase 3b Facebook Page guide](docs/operations/facebook-page-3b.md), and
    [Phase 3c WhatsApp Business guide](docs/operations/whatsapp-business-3c.md),
    and [Phase 4a unified inbox guide](docs/operations/unified-inbox-4a.md).
+   Do not add `dashboard` for this loopback HTTP runner; see the
+   [Phase 4b operator dashboard guide](docs/operations/operator-dashboard-4b.md)
+   only when an external HTTPS proxy is in scope.
 
 ```bash
 docker compose up --build
@@ -277,6 +297,7 @@ front of Compose, keep the operator API on loopback, and follow the
 [Phase 3b Facebook Page guide](docs/operations/facebook-page-3b.md), or
 [Phase 3c WhatsApp Business guide](docs/operations/whatsapp-business-3c.md), or
 [Phase 4a unified inbox guide](docs/operations/unified-inbox-4a.md), or
+[Phase 4b operator dashboard guide](docs/operations/operator-dashboard-4b.md), or
 [Phase 1a legacy guide](docs/operations/telegram-bot-1a.md) only after an
 authorized test is agreed. Starting Compose does not provide TLS or register a
 webhook automatically.
@@ -316,6 +337,27 @@ Per-account cursors from releases before Phase 4a are intentionally no longer
 accepted and return <code>400</code>. Those cursors used an older ordering
 format; restart the traversal at page one after upgrading. Phase 4a inbox
 cursors are new and already carry the current ordering version.
+
+## Use the optional browser dashboard
+
+The dashboard is configured inside the same secret document as connections and
+inboxes, not by a browser token or `DASHBOARD_*` environment variable. It is
+absent by default. A valid configuration needs an exact public HTTPS origin,
+one or two unique cookie-signing keys, a separate session HMAC pepper, and one
+or more configured principals scoped to existing inboxes. Password values are
+stored only as exact-profile Argon2id PHC hashes.
+
+Its read-only HTML pages are `/operator/login` and `/operator`; the CSS is
+same-origin at `/operator/assets/dashboard.css`. Login and logout require the
+configured browser origin and anti-forgery tokens. Sessions expire after 30
+minutes idle or eight hours absolute. The supplied Compose smoke deliberately
+does not submit a dashboard login through HTTP; that would not prove the
+required HTTPS cookie behavior.
+
+Read [the Phase 4b operator dashboard guide](docs/operations/operator-dashboard-4b.md)
+before configuring a proxy, password hash, or session-key rotation. It records
+the current limits: no self-service accounts, role model, audit trail,
+production TLS proof, cross-instance rate-limit proof, or outbound action.
 
 ## Corresponding-source offer
 

@@ -41,6 +41,28 @@ describe('PostgreSQL migrations', () => {
     expect(sql).toContain(
       "channel <> 'whatsapp_business' OR provider_identity_fingerprint IS NOT NULL"
     );
+    expect(sql).toContain('CREATE TABLE open_channel_hub.dashboard_sessions');
+    expect(sql).toContain('session_token_hmac text NOT NULL UNIQUE');
+    expect(sql).toContain('csrf_token_hmac text NOT NULL');
+    expect(sql).toContain("session_id ~ '^[A-Za-z0-9._:-]{1,128}$'");
+    expect(sql).toContain("principal_id ~ '^[A-Za-z0-9._:-]{1,128}$'");
+    expect(sql).toContain("session_id NOT IN ('.', '..')");
+    expect(sql).toContain("principal_id NOT IN ('.', '..')");
+    expect(sql).toContain("session_token_hmac ~ '^[a-f0-9]{64}$'");
+    expect(sql).toContain("csrf_token_hmac ~ '^[a-f0-9]{64}$'");
+    expect(sql).toContain('session_token_hmac <> csrf_token_hmac');
+    expect(sql).toContain('issued_at <= last_seen_at');
+    expect(sql).toContain('last_seen_at < idle_expires_at');
+    expect(sql).toContain('idle_expires_at <= absolute_expires_at');
+    expect(sql).toContain('CREATE INDEX dashboard_sessions_active_expiry');
+    expect(sql).toContain('WHERE revoked_at IS NULL');
+    const dashboardSessionSql = sql.slice(
+      sql.indexOf('CREATE TABLE open_channel_hub.dashboard_sessions')
+    );
+    expect(dashboardSessionSql).not.toContain('password');
+    expect(dashboardSessionSql).not.toContain('inbox');
+    expect(dashboardSessionSql).not.toContain('provider_');
+    expect(dashboardSessionSql).not.toContain('raw_token');
     expect(sql).toContain('INSERT INTO open_channel_hub.schema_migrations');
     expect(sql).not.toContain('public.');
     expect(
@@ -54,7 +76,8 @@ describe('PostgreSQL migrations', () => {
       '0004_inbound_events_connection_registry_fk',
       '0005_connection_registry_provider_identity',
       '0006_connection_registry_facebook_page_provider_identity',
-      '0007_connection_registry_whatsapp_business_provider_identity'
+      '0007_connection_registry_whatsapp_business_provider_identity',
+      '0008_dashboard_sessions'
     ]);
     expect(pool.releaseCount).toBe(1);
   });
@@ -83,6 +106,8 @@ describe('PostgreSQL migrations', () => {
     expect(secondRunSql).not.toContain(
       'ADD CONSTRAINT connection_registry_whatsapp_business_provider_identity_required'
     );
+    expect(secondRunSql).not.toContain('CREATE TABLE open_channel_hub.dashboard_sessions');
+    expect(secondRunSql).not.toContain('CREATE INDEX dashboard_sessions_active_expiry');
     expect(secondRunSql).not.toContain('INSERT INTO open_channel_hub.schema_migrations');
     expect(pool.releaseCount).toBe(2);
   });

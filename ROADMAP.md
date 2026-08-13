@@ -278,10 +278,36 @@ independent review, and GitHub CI/CodeQL evidence are complete for exact commit
       independent review.
 - [x] Fresh GitHub CI/CodeQL for exact commit <code>705db0a</code>.
 
+### 4b — server-rendered local-principal dashboard
+
+**Status: implementation candidate in progress; it is not complete and has no
+final local, Docker, independent-review, GitHub, public-TLS, or production
+evidence yet.**
+
+- [x] An optional strict `dashboard` object in the version-1 runtime secret.
+      It requires configured inboxes, an exact external HTTPS origin, one or
+      two unique signing keys, a separate session HMAC pepper, and configured
+      local principals scoped only to existing inbox IDs.
+- [x] Server-rendered, no-JavaScript `/operator` pages with no browser bearer,
+      provider credential, connection selector, or client-side inbox API.
+- [x] Exact-profile Argon2id (`m=19456,t=2,p=1`) password verification,
+      signed `Secure` `HttpOnly` `SameSite=Strict` cookies, same-origin forms,
+      anti-forgery tokens, a 30-minute idle timeout, eight-hour absolute
+      timeout, server-side revocation, and a bounded in-process login throttle.
+- [x] Forward-only PostgreSQL migration
+      <code>0008_dashboard_sessions</code> that stores only HMACs of random
+      browser tokens and session metadata, never raw token/password/provider
+      credential/inbox bearer values.
+- [ ] Freeze one candidate and run the full local verification, secret scan,
+      synthetic Compose proof, independent review, and fresh GitHub CI/CodeQL.
+- [ ] Configure and verify an external TLS reverse proxy, edge rate limiting,
+      cookie/header logging policy, and the exact public browser origin before
+      claiming a dashboard deployment.
+
 ### Later Phase 4 work
 
-- A browser dashboard, user accounts/organizations, tested authorization,
-  audit trail, and explicit secret-rotation operation.
+- Full user accounts/organizations, tested RBAC, invitation/password-reset
+  flow, audit trail, live session administration, and managed secret rotation.
 - Conversation summaries, read/unread state, assignment, labels, search,
   attachments, retention/deletion, backups/restore, and encryption-at-rest
   assurance.

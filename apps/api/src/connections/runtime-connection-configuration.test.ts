@@ -63,6 +63,241 @@ describe('loadRuntimeConnectionConfiguration', () => {
     }).toThrow(TypeError);
   });
 
+  it('loads, freezes, and canonicalizes an optional multi-principal dashboard scope', async () => {
+    const configuration = validDashboardConfiguration();
+    configuration.dashboard.publicOrigin = 'HTTPS://Dashboard.Example.Test:443/';
+    readFileMock.mockResolvedValue(JSON.stringify(configuration));
+
+    const result = await loadRuntimeConnectionConfiguration(CONFIGURATION_PATH);
+
+    expect(result).toEqual({
+      connections: configuration.connections,
+      dashboard: {
+        principals: [
+          {
+            id: 'support-agent',
+            inboxIds: ['sales-inbox', 'support-inbox'],
+            passwordHash:
+              '$argon2id$v=19$m=19456,p=1,t=2$c3ludGhldGljLXNhbHQ$c3ludGhldGljLXBhc3N3b3JkLWhhc2gtc3VwcG9ydA'
+          },
+          {
+            id: 'sales-agent',
+            inboxIds: ['sales-inbox'],
+            passwordHash:
+              '$argon2id$v=19$m=19456,t=2,p=1$c2FsZXMtc3ludGhldGljLXNhbHQ$c2FsZXMtcGFzc3dvcmQtaGFzaC1mb3ItdGVzdGluZw'
+          }
+        ],
+        publicOrigin: 'https://dashboard.example.test',
+        sessionCookieSigningKeys: [
+          'synthetic_dashboard_cookie_signing_key_current_012345678',
+          'synthetic_dashboard_cookie_signing_key_previous_01234567'
+        ],
+        sessionIdPepper: 'synthetic_dashboard_session_id_pepper_012345678901234'
+      },
+      inboxes: [
+        {
+          connectionIds: ['telegram-bot-primary', 'telegram-bot-secondary'],
+          id: 'support-inbox',
+          token: 'synthetic_inbox_support_token_01234567890123456789'
+        },
+        {
+          connectionIds: ['telegram-bot-primary'],
+          id: 'sales-inbox',
+          token: 'synthetic_inbox_sales_token_01234567890123456789012'
+        }
+      ]
+    });
+    const dashboard = result.dashboard;
+    const principal = dashboard?.principals[0];
+
+    expect(dashboard).toBeDefined();
+    expect(principal).toBeDefined();
+    expect(Object.isFrozen(dashboard)).toBe(true);
+    expect(Object.isFrozen(dashboard?.sessionCookieSigningKeys)).toBe(true);
+    expect(Object.isFrozen(dashboard?.principals)).toBe(true);
+    expect(Object.isFrozen(principal)).toBe(true);
+    expect(Object.isFrozen(principal?.inboxIds)).toBe(true);
+    expect(() => {
+      (dashboard?.sessionCookieSigningKeys as string[]).push('another-signing-key');
+    }).toThrow(TypeError);
+    expect(() => {
+      (principal?.inboxIds as string[]).push('another-inbox');
+    }).toThrow(TypeError);
+  });
+
+  it('rejects a dashboard without configured inboxes, inexact dashboard records, and non-public origins', async () => {
+    const dashboardWithoutInboxes =
+      validConfiguration() as MutableRuntimeConnectionConfiguration & {
+        dashboard: MutableRuntimeDashboard;
+      };
+    dashboardWithoutInboxes.dashboard = validDashboardConfiguration().dashboard;
+
+    const inexactDashboard = validDashboardConfiguration();
+    Object.assign(inexactDashboard.dashboard, { unexpected: true });
+
+    const missingDashboardField = validDashboardConfiguration();
+    delete (missingDashboardField.dashboard as unknown as Record<string, unknown>).principals;
+
+    const invalidOrigins = [
+      'http://dashboard.example.test/',
+      'https://operator:synthetic@dashboard.example.test/',
+      'https://dashboard.example.test/?next=synthetic',
+      'https://dashboard.example.test/#synthetic',
+      'https://dashboard.example.test/inbox',
+      'https://127.0.0.1/',
+      'https://[2606:4700:4700::1111]/',
+      'https://localhost/',
+      'https://dashboard.local/',
+      'https://dashboard.internal/',
+      'https://dashboard.private/'
+    ];
+
+    for (const configuration of [
+      dashboardWithoutInboxes,
+      inexactDashboard,
+      missingDashboardField
+    ]) {
+      readFileMock.mockResolvedValueOnce(JSON.stringify(configuration));
+      await expectGenericFailure(loadRuntimeConnectionConfiguration(CONFIGURATION_PATH));
+    }
+
+    for (const publicOrigin of invalidOrigins) {
+      const configuration = validDashboardConfiguration();
+      configuration.dashboard.publicOrigin = publicOrigin;
+      readFileMock.mockResolvedValueOnce(JSON.stringify(configuration));
+      await expectGenericFailure(loadRuntimeConnectionConfiguration(CONFIGURATION_PATH));
+    }
+  });
+
+  it('rejects malformed, duplicated, and credential-colliding dashboard session secrets', async () => {
+    const noSigningKeys = validDashboardConfiguration();
+    noSigningKeys.dashboard.sessionCookieSigningKeys = [];
+
+    const tooManySigningKeys = validDashboardConfiguration();
+    tooManySigningKeys.dashboard.sessionCookieSigningKeys.push(
+      'synthetic_dashboard_cookie_signing_key_retired_0123456789'
+    );
+
+    const duplicateSigningKey = validDashboardConfiguration();
+    duplicateSigningKey.dashboard.sessionCookieSigningKeys[1] =
+      duplicateSigningKey.dashboard.sessionCookieSigningKeys[0]!;
+
+    const malformedSigningKey = validDashboardConfiguration();
+    malformedSigningKey.dashboard.sessionCookieSigningKeys[0] = 'contains a space';
+
+    const malformedPepper = validDashboardConfiguration();
+    malformedPepper.dashboard.sessionIdPepper = 'contains a space';
+
+    const duplicatePepper = validDashboardConfiguration();
+    duplicatePepper.dashboard.sessionIdPepper =
+      duplicatePepper.dashboard.sessionCookieSigningKeys[0]!;
+
+    const providerCredentialCollision = validDashboardConfiguration();
+    providerCredentialCollision.connections[0]!.botToken =
+      'synthetic_dashboard_provider_token_01234567890123456789';
+    providerCredentialCollision.dashboard.sessionCookieSigningKeys[0] =
+      providerCredentialCollision.connections[0]!.botToken;
+
+    const webhookCredentialCollision = validDashboardConfiguration();
+    webhookCredentialCollision.dashboard.sessionCookieSigningKeys[0] =
+      webhookCredentialCollision.connections[0]!.webhookSecret;
+
+    const operatorCredentialCollision = validDashboardConfiguration();
+    operatorCredentialCollision.dashboard.sessionCookieSigningKeys[0] =
+      operatorCredentialCollision.connections[0]!.operatorApiToken;
+
+    const inboxCredentialCollision = validDashboardConfiguration();
+    inboxCredentialCollision.dashboard.sessionIdPepper = inboxCredentialCollision.inboxes[0]!.token;
+
+    for (const configuration of [
+      noSigningKeys,
+      tooManySigningKeys,
+      duplicateSigningKey,
+      malformedSigningKey,
+      malformedPepper,
+      duplicatePepper,
+      providerCredentialCollision,
+      webhookCredentialCollision,
+      operatorCredentialCollision,
+      inboxCredentialCollision
+    ]) {
+      readFileMock.mockResolvedValueOnce(JSON.stringify(configuration));
+      await expectGenericFailure(loadRuntimeConnectionConfiguration(CONFIGURATION_PATH));
+    }
+  });
+
+  it('rejects invalid dashboard principal identity, password-hash, and inbox scope records', async () => {
+    const noPrincipals = validDashboardConfiguration();
+    noPrincipals.dashboard.principals = [];
+
+    const duplicatePrincipalId = validDashboardConfiguration();
+    duplicatePrincipalId.dashboard.principals[1]!.id =
+      duplicatePrincipalId.dashboard.principals[0]!.id;
+
+    const unsafePrincipalId = validDashboardConfiguration();
+    unsafePrincipalId.dashboard.principals[0]!.id = '..';
+
+    const invalidPasswordHash = validDashboardConfiguration();
+    invalidPasswordHash.dashboard.principals[0]!.passwordHash =
+      '$argon2i$v=19$m=65536,t=3,p=4$c3ludGhldGljLXNhbHQ$c3ludGhldGljLWhhc2g';
+
+    const duplicatePasswordParameter = validDashboardConfiguration();
+    duplicatePasswordParameter.dashboard.principals[0]!.passwordHash =
+      '$argon2id$v=19$m=19456,p=1,p=2$c3ludGhldGljLXNhbHQ$c3ludGhldGljLXBhc3N3b3JkLWhhc2gtc3VwcG9ydA';
+
+    const unsupportedPasswordParameter = validDashboardConfiguration();
+    unsupportedPasswordParameter.dashboard.principals[0]!.passwordHash =
+      '$argon2id$v=19$m=19456,p=1,x=2$c3ludGhldGljLXNhbHQ$c3ludGhldGljLXBhc3N3b3JkLWhhc2gtc3VwcG9ydA';
+
+    const nonCanonicalPasswordEncoding = validDashboardConfiguration();
+    nonCanonicalPasswordEncoding.dashboard.principals[0]!.passwordHash =
+      '$argon2id$v=19$m=19456,p=1,t=2$c3ludGhldGljLXNhbHQA$c3ludGhldGljLXBhc3N3b3JkLWhhc2gtc3VwcG9yd';
+
+    const unsafePasswordCost = validDashboardConfiguration();
+    unsafePasswordCost.dashboard.principals[0]!.passwordHash =
+      '$argon2id$v=19$m=999999999,p=1,t=2$c3ludGhldGljLXNhbHQ$c3ludGhldGljLXBhc3N3b3JkLWhhc2gtc3VwcG9ydA';
+
+    const weakPasswordCost = validDashboardConfiguration();
+    weakPasswordCost.dashboard.principals[0]!.passwordHash =
+      '$argon2id$v=19$m=1024,p=1,t=1$c3ludGhldGljLXNhbHQ$c3ludGhldGljLXBhc3N3b3JkLWhhc2gtc3VwcG9ydA';
+
+    const divergentPasswordCost = validDashboardConfiguration();
+    divergentPasswordCost.dashboard.principals[0]!.passwordHash =
+      '$argon2id$v=19$m=65536,p=1,t=2$c3ludGhldGljLXNhbHQ$c3ludGhldGljLXBhc3N3b3JkLWhhc2gtc3VwcG9ydA';
+
+    const invalidPrincipalKeys = validDashboardConfiguration();
+    Object.assign(invalidPrincipalKeys.dashboard.principals[0]!, { unexpected: true });
+
+    const emptyInboxScope = validDashboardConfiguration();
+    emptyInboxScope.dashboard.principals[0]!.inboxIds = [];
+
+    const duplicateInboxScope = validDashboardConfiguration();
+    duplicateInboxScope.dashboard.principals[0]!.inboxIds = ['sales-inbox', 'sales-inbox'];
+
+    const unknownInboxScope = validDashboardConfiguration();
+    unknownInboxScope.dashboard.principals[0]!.inboxIds = ['not-configured'];
+
+    for (const configuration of [
+      noPrincipals,
+      duplicatePrincipalId,
+      unsafePrincipalId,
+      invalidPasswordHash,
+      duplicatePasswordParameter,
+      unsupportedPasswordParameter,
+      nonCanonicalPasswordEncoding,
+      unsafePasswordCost,
+      weakPasswordCost,
+      divergentPasswordCost,
+      invalidPrincipalKeys,
+      emptyInboxScope,
+      duplicateInboxScope,
+      unknownInboxScope
+    ]) {
+      readFileMock.mockResolvedValueOnce(JSON.stringify(configuration));
+      await expectGenericFailure(loadRuntimeConnectionConfiguration(CONFIGURATION_PATH));
+    }
+  });
+
   it('rejects invalid inbox scopes and every collision with a connection credential', async () => {
     const emptyScope = validInboxConfiguration();
     emptyScope.inboxes[0]!.connectionIds = [];
@@ -560,6 +795,41 @@ const validInboxConfiguration = (): MutableRuntimeInboxConfiguration => ({
   ]
 });
 
+const validDashboardConfiguration = (): MutableRuntimeDashboardConfiguration => {
+  const configuration = validInboxConfiguration();
+  configuration.inboxes.push({
+    connectionIds: ['telegram-bot-primary'],
+    id: 'sales-inbox',
+    token: 'synthetic_inbox_sales_token_01234567890123456789012'
+  });
+
+  return {
+    ...configuration,
+    dashboard: {
+      principals: [
+        {
+          id: 'support-agent',
+          inboxIds: ['support-inbox', 'sales-inbox'],
+          passwordHash:
+            '$argon2id$v=19$m=19456,p=1,t=2$c3ludGhldGljLXNhbHQ$c3ludGhldGljLXBhc3N3b3JkLWhhc2gtc3VwcG9ydA'
+        },
+        {
+          id: 'sales-agent',
+          inboxIds: ['sales-inbox'],
+          passwordHash:
+            '$argon2id$v=19$m=19456,t=2,p=1$c2FsZXMtc3ludGhldGljLXNhbHQ$c2FsZXMtcGFzc3dvcmQtaGFzaC1mb3ItdGVzdGluZw'
+        }
+      ],
+      publicOrigin: 'https://dashboard.example.test/',
+      sessionCookieSigningKeys: [
+        'synthetic_dashboard_cookie_signing_key_current_012345678',
+        'synthetic_dashboard_cookie_signing_key_previous_01234567'
+      ],
+      sessionIdPepper: 'synthetic_dashboard_session_id_pepper_012345678901234'
+    }
+  };
+};
+
 interface MutableRuntimeConnectionConfiguration {
   version: number;
   connections: MutableRuntimeTelegramBotConnection[];
@@ -567,6 +837,23 @@ interface MutableRuntimeConnectionConfiguration {
 
 interface MutableRuntimeInboxConfiguration extends MutableRuntimeConnectionConfiguration {
   inboxes: MutableRuntimeInbox[];
+}
+
+interface MutableRuntimeDashboardConfiguration extends MutableRuntimeInboxConfiguration {
+  dashboard: MutableRuntimeDashboard;
+}
+
+interface MutableRuntimeDashboard {
+  principals: MutableRuntimeDashboardPrincipal[];
+  publicOrigin: string;
+  sessionCookieSigningKeys: string[];
+  sessionIdPepper: string;
+}
+
+interface MutableRuntimeDashboardPrincipal {
+  id: string;
+  inboxIds: string[];
+  passwordHash: string;
 }
 
 interface MutableRuntimeInbox {

@@ -1,4 +1,12 @@
 export type { ConnectionRegistry } from './ports/connection-registry.js';
+export type {
+  DashboardSession,
+  DashboardSessionCreateInput,
+  DashboardSessionReadInput,
+  DashboardSessionRevokeInput,
+  DashboardSessionStore,
+  DashboardSessionTouchInput
+} from './ports/dashboard-session-store.js';
 export type { InboundEventStore } from './ports/inbound-event-store.js';
 export type {
   InboundEventFeedListInput,

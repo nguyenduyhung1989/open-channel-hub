@@ -1,18 +1,19 @@
 # Runtime multi-connection configuration
 
 This guide configures the current alpha's official Telegram Bot, Zalo Official
-Account (OA), Facebook Page, WhatsApp Business, and optional read-only inbox
-entries. It does not create a dashboard, user login, organization, public
-connection API, or full permission model. It has not been
-verified with a real provider account or public TLS endpoint.
+Account (OA), Facebook Page, WhatsApp Business, optional read-only inbox
+entries, and optional Phase 4b operator dashboard. The dashboard is a small
+server-rendered local-principal surface, not a full user, organization,
+public-connection, or permission model. It has not been verified with a real
+provider account or public TLS endpoint.
 
 ## What is configured
 
 One secret JSON document can configure one to one hundred Telegram Bot, Zalo
 OA, Facebook Page, and WhatsApp Business connections, plus up to one hundred
-optional configured read-only inboxes. It contains credentials, so treat the
-entire document as a secret even though connection and inbox IDs are opaque
-internal labels.
+optional configured read-only inboxes and up to one hundred optional dashboard
+principals. It contains credentials and password verifiers, so treat the
+entire document as a secret even though its IDs are opaque internal labels.
 
 The strict document shape is:
 
@@ -144,10 +145,49 @@ inbox is used.
 An inbox token grants canonical inbound-event reads only for its explicit
 connection set through `GET /v1/inbox/inbound-events`. It is distinct from the
 one-account operator bearer on each connection; neither token works for the
-other route. The inbox does not create a browser UI, user, organization, role,
-conversation summary, outbound action, or provider credential. See the
-[Phase 4a unified inbox guide](unified-inbox-4a.md) for its cursor and
-operational boundary.
+other route. Phase 4a itself did not create a browser UI; Phase 4b can add the
+separate server-rendered dashboard described below. Neither creates a full
+user, organization, role, conversation summary, outbound action, or provider
+credential. See the [Phase 4a unified inbox guide](unified-inbox-4a.md) for
+the API cursor boundary.
+
+The root document may additionally include `dashboard`, but only when
+`inboxes` is present:
+
+```json
+{
+  "dashboard": {
+    "publicOrigin": "https://hub.example.invalid/",
+    "sessionCookieSigningKeys": ["<current unique signing key>"],
+    "sessionIdPepper": "<unique session HMAC pepper>",
+    "principals": [
+      {
+        "id": "support-agent",
+        "passwordHash": "<Argon2id PHC value>",
+        "inboxIds": ["support-inbox"]
+      }
+    ]
+  }
+}
+```
+
+`publicOrigin` is an exact public HTTPS origin with `/` as its only path. It
+cannot use an IP address, local/private hostname, credentials, query, or
+fragment. `sessionCookieSigningKeys` has one or two unique printable
+32–512-character values; the current signing key is first. `sessionIdPepper`
+is a different printable 32–512-character value. These secrets must not collide
+with each other or any connection/inbox credential. Each of one to one hundred
+principals has a unique safe opaque ID, an Argon2id PHC password hash using the
+exact `m=19456,t=2,p=1` profile, and one to one hundred unique existing inbox
+IDs.
+
+Dashboard configuration creates no browser bearer. It enables only
+server-rendered `/operator` routes with signed `Secure` `HttpOnly`
+`SameSite=Strict` cookies and server-selected inbox scope. The supplied Compose
+runner is loopback HTTP and intentionally omits `dashboard`; a browser login
+must be deployed behind a real TLS proxy. Follow the
+[Phase 4b operator dashboard guide](operator-dashboard-4b.md) for password
+hashing, proxy controls, session rotation, and limits.
 
 Do not paste a real document in a terminal command, issue, pull request,
 screenshot, log, or repository file. The samples above contain placeholders,
@@ -239,6 +279,7 @@ token, webhook secret, or webhook URL. The temporary
 | WhatsApp Business ingress | <code>POST /v1/webhooks/whatsapp-business</code> or <code>/v1/webhooks/meta</code> | Every untrusted WABA ID must resolve to one configured App before raw-byte `X-Hub-Signature-256` HMAC is checked. A shared App selects the product from the signed envelope at `/meta`; unknown/cross-App identity and invalid signature return <code>401</code>.       |
 | Read WhatsApp events      | <code>GET /v1/whatsapp-business/inbound-events</code>                              | The unique <code>Authorization: Bearer</code> value maps to exactly one configured business phone. Cursor continuation is bound to that connection.                                                                                                                     |
 | Read configured inbox     | <code>GET /v1/inbox/inbound-events</code>                                          | The unique inbox <code>Authorization: Bearer</code> value maps to its configured connection allow-list. The caller supplies no inbox or connection ID. Cursor continuation is bound to that inbox and exact canonical connection set.                                   |
+| Read dashboard            | <code>GET /operator</code>                                                         | The signed-in configured dashboard principal selects only one of its preconfigured inboxes server side. The browser never receives an inbox bearer or connection credential.                                                                                            |
 
 The caller cannot select a connection ID on any read route. A cursor from one
 account is rejected when presented with another account's bearer token. An
@@ -291,6 +332,13 @@ or a credential, rejects a changed triple for an existing business-phone ID,
 and refuses a first WhatsApp binding when pre-registry history already uses that
 internal connection ID.
 
+When the optional dashboard is enabled, migration
+<code>0008_dashboard_sessions</code> creates a separate session table. It
+stores only HMACs of random browser session/anti-forgery values, a configured
+principal ID, and session times/revocation state. It does not store a raw
+browser token, password, password hash, inbox bearer, provider credential, or
+inbox membership.
+
 Migration <code>0004_inbound_events_connection_registry_fk</code> is a
 PostgreSQL foreign key marked <code>NOT VALID</code>. New event writes must
 reference a registered connection. Existing Phase 2a event rows can remain
@@ -327,13 +375,14 @@ The repository's disposable Compose smoke test uses two synthetic Telegram Bot
 connections, two synthetic Zalo OA connections, two synthetic Facebook Pages,
 and two synthetic WhatsApp business phones on one fake shared Meta App. It also
 configures separate support and sales inboxes, each spanning four of those
-accounts. It migrates the seven immutable schema entries twice, verifies
+accounts. It migrates the eight immutable schema entries twice, verifies
 registry rows and Zalo/Facebook/WhatsApp fingerprint presence without printing
 them, checks Telegram dynamic webhook behavior, proves Zalo raw-byte hashing
 and shared Meta raw-byte HMAC boundaries, checks duplicate idempotency within
 every connection, verifies account and inbox bearer scopes, and rejects both
-cross-account and cross-inbox cursors. It makes no provider network request and
-uses no real credential or message.
+cross-account and cross-inbox cursors. It deliberately omits `dashboard` and
+does not attempt browser login over HTTP. It makes no provider network request
+and uses no real credential or message.
 
 Before a real account is used, still complete TLS/proxy, rate limiting,
 monitoring, backup/restore, retention/deletion, secret rotation, access/audit,

@@ -3,12 +3,14 @@ import { readFile } from 'node:fs/promises';
 import { Pool } from 'pg';
 import type {
   ConnectionRegistry,
+  DashboardSessionStore,
   InboundEventFeedReader,
   InboundEventReader,
   InboundEventStore
 } from '@open-channel-hub/domain';
 
 import { PostgresConnectionRegistry } from './postgres-connection-registry.js';
+import { PostgresDashboardSessionStore } from './postgres-dashboard-session-store.js';
 import { PostgresStorageError } from './postgres-error.js';
 import { PostgresInboundEventFeedReader } from './postgres-inbound-event-feed-reader.js';
 import { PostgresInboundEventStore } from './postgres-inbound-event-store.js';
@@ -26,6 +28,7 @@ export interface PostgresDatabaseOptions {
 
 export interface PostgresDatabase {
   readonly connectionRegistry: ConnectionRegistry;
+  readonly dashboardSessionStore: DashboardSessionStore;
   readonly inboundEventFeedReader: InboundEventFeedReader;
   readonly inboundEventReader: InboundEventReader;
   readonly inboundEventStore: InboundEventStore;
@@ -62,12 +65,14 @@ export const createPostgresDatabase = async (
 
   const sqlPool = toSqlPool(pool);
   const connectionRegistry = new PostgresConnectionRegistry(sqlPool);
+  const dashboardSessionStore = new PostgresDashboardSessionStore(sqlPool);
   const inboundEventFeedReader = new PostgresInboundEventFeedReader(sqlPool);
   const inboundEventReader = new PostgresInboundEventReader(sqlPool);
   const inboundEventStore = new PostgresInboundEventStore(sqlPool);
 
   return Object.freeze({
     connectionRegistry,
+    dashboardSessionStore,
     inboundEventFeedReader,
     inboundEventReader,
     inboundEventStore,

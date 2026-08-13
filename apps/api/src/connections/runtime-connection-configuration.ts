@@ -75,8 +75,31 @@ export interface RuntimeInbox {
   readonly token: string;
 }
 
+/**
+ * One password-authenticated, deployment-local dashboard principal. Its inbox
+ * identifiers are immutable configuration scope, never browser input.
+ */
+export interface RuntimeDashboardPrincipal {
+  readonly id: string;
+  readonly inboxIds: readonly string[];
+  readonly passwordHash: string;
+}
+
+/**
+ * The optional server-rendered dashboard boundary. The loader only validates
+ * and freezes its secret material; password hashes are verified later by the
+ * dashboard authentication feature and are never logged from this boundary.
+ */
+export interface RuntimeDashboard {
+  readonly principals: readonly RuntimeDashboardPrincipal[];
+  readonly publicOrigin: string;
+  readonly sessionCookieSigningKeys: readonly string[];
+  readonly sessionIdPepper: string;
+}
+
 export interface RuntimeConnectionConfiguration {
   readonly connections: readonly RuntimeConnection[];
+  readonly dashboard?: RuntimeDashboard;
   readonly inboxes?: readonly RuntimeInbox[];
 }
 
@@ -96,8 +119,9 @@ const MAXIMUM_CONFIGURATION_SOURCE_LENGTH = 262_144;
 const MAXIMUM_BASE64URL_CONFIGURATION_SOURCE_LENGTH = 349_526;
 const MAXIMUM_CONNECTIONS = 100;
 const MAXIMUM_INBOXES = 100;
+const MAXIMUM_DASHBOARD_PRINCIPALS = 100;
 const ROOT_KEYS = Object.freeze(['version', 'connections']);
-const ROOT_OPTIONAL_KEYS = Object.freeze(['inboxes']);
+const ROOT_OPTIONAL_KEYS = Object.freeze(['inboxes', 'dashboard']);
 const TELEGRAM_BOT_CONNECTION_REQUIRED_KEYS = Object.freeze([
   'id',
   'type',
@@ -137,13 +161,38 @@ const WHATSAPP_BUSINESS_CONNECTION_REQUIRED_KEYS = Object.freeze([
 ]);
 const WHATSAPP_BUSINESS_CONNECTION_OPTIONAL_KEYS = Object.freeze(['webhookUrl']);
 const INBOX_REQUIRED_KEYS = Object.freeze(['id', 'token', 'connectionIds']);
+const DASHBOARD_REQUIRED_KEYS = Object.freeze([
+  'publicOrigin',
+  'sessionCookieSigningKeys',
+  'sessionIdPepper',
+  'principals'
+]);
+const DASHBOARD_PRINCIPAL_REQUIRED_KEYS = Object.freeze(['id', 'passwordHash', 'inboxIds']);
 const CONNECTION_ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
 const PRINTABLE_TOKEN_PATTERN = /^[!-~]+$/;
 const WEBHOOK_SECRET_PATTERN = /^[A-Za-z0-9_-]{32,256}$/;
+const ARGON2ID_PHC_PREFIX = '$argon2id$v=19$';
+const ARGON2ID_PHC_BASE64_PATTERN = /^[A-Za-z0-9+/]+$/;
+const ARGON2ID_PHC_POSITIVE_INTEGER_PATTERN = /^[1-9][0-9]*$/;
+const ARGON2ID_PHC_PARAMETER_KEYS = Object.freeze(['m', 'p', 't']);
+// Keep every configured principal on the same bounded verification cost as the
+// dashboard password-hash CLI and the unknown-principal dummy verifier.
+const DASHBOARD_ARGON2_MEMORY_COST = 19_456;
+const DASHBOARD_ARGON2_TIME_COST = 2;
+const DASHBOARD_ARGON2_PARALLELISM = 1;
 const ZALO_IDENTIFIER_PATTERN = /^[0-9]{1,32}$/;
 const FACEBOOK_IDENTIFIER_PATTERN = /^[0-9]{1,32}$/;
 const WHATSAPP_BUSINESS_IDENTIFIER_PATTERN = /^[0-9]{1,32}$/;
 const PRIVATE_HOSTNAME_SUFFIXES = Object.freeze(['.localhost', '.local', '.internal']);
+const DASHBOARD_PRIVATE_HOSTNAME_SUFFIXES = Object.freeze([
+  '.localhost',
+  '.local',
+  '.internal',
+  '.private',
+  '.lan',
+  '.home',
+  '.corp'
+]);
 
 /**
  * Loads one explicit, local runtime connection configuration file. The loader
@@ -355,15 +404,22 @@ const parseRuntimeConnectionConfiguration = (value: unknown): RuntimeConnectionC
     }
   }
 
+  const credentials = new Set([...exclusiveCredentials, ...zaloOaSecrets, ...metaCredentials]);
   const inboxes = parseInboxes({
     candidate: value.inboxes,
     connectionIds: identifiers,
-    credentials: new Set([...exclusiveCredentials, ...zaloOaSecrets, ...metaCredentials])
+    credentials
+  });
+  const dashboard = parseDashboard({
+    candidate: value.dashboard,
+    credentials: new Set([...credentials, ...(inboxes ?? []).map((inbox) => inbox.token)]),
+    inboxes
   });
 
   return Object.freeze({
     connections: Object.freeze(connections),
-    ...(inboxes === undefined ? {} : { inboxes })
+    ...(inboxes === undefined ? {} : { inboxes }),
+    ...(dashboard === undefined ? {} : { dashboard })
   });
 };
 
@@ -435,6 +491,173 @@ const parseInbox = (value: unknown, configuredConnectionIds: ReadonlySet<string>
     connectionIds: Object.freeze([...connectionIds].sort()),
     id: value.id,
     token: value.token
+  });
+};
+
+interface ParseDashboardInput {
+  readonly candidate: unknown;
+  readonly credentials: ReadonlySet<string>;
+  readonly inboxes: readonly RuntimeInbox[] | undefined;
+}
+
+const parseDashboard = ({
+  candidate,
+  credentials,
+  inboxes
+}: ParseDashboardInput): RuntimeDashboard | undefined => {
+  if (candidate === undefined) {
+    return undefined;
+  }
+
+  if (
+    inboxes === undefined ||
+    !hasExactKeys(candidate, DASHBOARD_REQUIRED_KEYS, []) ||
+    !Array.isArray(candidate.sessionCookieSigningKeys) ||
+    candidate.sessionCookieSigningKeys.length < 1 ||
+    candidate.sessionCookieSigningKeys.length > 2
+  ) {
+    throw new RuntimeConnectionConfigurationError();
+  }
+
+  const publicOrigin = parseDashboardPublicOrigin(candidate.publicOrigin);
+  const dashboardSecrets = parseDashboardSecrets(
+    candidate.sessionCookieSigningKeys,
+    candidate.sessionIdPepper,
+    credentials
+  );
+  const principals = parseDashboardPrincipals(
+    candidate.principals,
+    new Set(inboxes.map(({ id }) => id))
+  );
+
+  return Object.freeze({
+    principals,
+    publicOrigin,
+    sessionCookieSigningKeys: dashboardSecrets.sessionCookieSigningKeys,
+    sessionIdPepper: dashboardSecrets.sessionIdPepper
+  });
+};
+
+const parseDashboardPublicOrigin = (value: unknown): string => {
+  if (!isString(value)) {
+    throw new RuntimeConnectionConfigurationError();
+  }
+
+  try {
+    const url = new URL(value);
+
+    if (
+      url.protocol !== 'https:' ||
+      url.username !== '' ||
+      url.password !== '' ||
+      url.search !== '' ||
+      url.hash !== '' ||
+      url.pathname !== '/' ||
+      !isDashboardPublicHostname(url.hostname)
+    ) {
+      throw new RuntimeConnectionConfigurationError();
+    }
+
+    return url.origin;
+  } catch {
+    throw new RuntimeConnectionConfigurationError();
+  }
+};
+
+const parseDashboardSecrets = (
+  candidateSigningKeys: readonly unknown[],
+  candidatePepper: unknown,
+  credentials: ReadonlySet<string>
+): Readonly<{
+  sessionCookieSigningKeys: readonly string[];
+  sessionIdPepper: string;
+}> => {
+  if (!isPrintableToken(candidatePepper, 32)) {
+    throw new RuntimeConnectionConfigurationError();
+  }
+
+  const secrets = new Set<string>();
+  const signingKeys: string[] = [];
+
+  for (const signingKey of candidateSigningKeys) {
+    if (
+      !isPrintableToken(signingKey, 32) ||
+      secrets.has(signingKey) ||
+      credentials.has(signingKey)
+    ) {
+      throw new RuntimeConnectionConfigurationError();
+    }
+
+    secrets.add(signingKey);
+    signingKeys.push(signingKey);
+  }
+
+  if (secrets.has(candidatePepper) || credentials.has(candidatePepper)) {
+    throw new RuntimeConnectionConfigurationError();
+  }
+
+  return Object.freeze({
+    sessionCookieSigningKeys: Object.freeze(signingKeys),
+    sessionIdPepper: candidatePepper
+  });
+};
+
+const parseDashboardPrincipals = (
+  candidate: unknown,
+  configuredInboxIds: ReadonlySet<string>
+): readonly RuntimeDashboardPrincipal[] => {
+  if (
+    !Array.isArray(candidate) ||
+    candidate.length < 1 ||
+    candidate.length > MAXIMUM_DASHBOARD_PRINCIPALS
+  ) {
+    throw new RuntimeConnectionConfigurationError();
+  }
+
+  const principalIds = new Set<string>();
+  const principals = candidate.map((value) => {
+    const principal = parseDashboardPrincipal(value, configuredInboxIds);
+
+    if (principalIds.has(principal.id)) {
+      throw new RuntimeConnectionConfigurationError();
+    }
+
+    principalIds.add(principal.id);
+    return principal;
+  });
+
+  return Object.freeze(principals);
+};
+
+const parseDashboardPrincipal = (
+  value: unknown,
+  configuredInboxIds: ReadonlySet<string>
+): RuntimeDashboardPrincipal => {
+  if (
+    !hasExactKeys(value, DASHBOARD_PRINCIPAL_REQUIRED_KEYS, []) ||
+    !isDashboardPrincipalId(value.id) ||
+    !isArgon2idPhcPasswordHash(value.passwordHash) ||
+    !Array.isArray(value.inboxIds) ||
+    value.inboxIds.length < 1 ||
+    value.inboxIds.length > MAXIMUM_INBOXES
+  ) {
+    throw new RuntimeConnectionConfigurationError();
+  }
+
+  const inboxIds = new Set<string>();
+
+  for (const inboxId of value.inboxIds) {
+    if (!isInboxId(inboxId) || !configuredInboxIds.has(inboxId) || inboxIds.has(inboxId)) {
+      throw new RuntimeConnectionConfigurationError();
+    }
+
+    inboxIds.add(inboxId);
+  }
+
+  return Object.freeze({
+    id: value.id,
+    inboxIds: Object.freeze([...inboxIds].sort()),
+    passwordHash: value.passwordHash
   });
 };
 
@@ -716,6 +939,9 @@ const isConnectionId = (value: unknown): value is string =>
 const isInboxId = (value: unknown): value is string =>
   isString(value) && CONNECTION_ID_PATTERN.test(value) && value !== '.' && value !== '..';
 
+const isDashboardPrincipalId = (value: unknown): value is string =>
+  isString(value) && CONNECTION_ID_PATTERN.test(value) && value !== '.' && value !== '..';
+
 const isPrintableToken = (value: unknown, minimumLength: number): value is string =>
   isString(value) &&
   value.length >= minimumLength &&
@@ -724,6 +950,85 @@ const isPrintableToken = (value: unknown, minimumLength: number): value is strin
 
 const isWebhookSecret = (value: unknown): value is string =>
   isString(value) && WEBHOOK_SECRET_PATTERN.test(value);
+
+const isArgon2idPhcPasswordHash = (value: unknown): value is string => {
+  if (!isString(value) || value.length > 512 || !value.startsWith(ARGON2ID_PHC_PREFIX)) {
+    return false;
+  }
+
+  const segments = value.split('$');
+
+  if (
+    segments.length !== 6 ||
+    segments[0] !== '' ||
+    segments[1] !== 'argon2id' ||
+    segments[2] !== 'v=19' ||
+    !isArgon2idPhcParameters(segments[3]) ||
+    !isArgon2idPhcBase64Segment(segments[4], 8) ||
+    !isArgon2idPhcBase64Segment(segments[5], 16)
+  ) {
+    return false;
+  }
+
+  return true;
+};
+
+const isArgon2idPhcParameters = (value: string | undefined): boolean => {
+  if (value === undefined) {
+    return false;
+  }
+
+  const values = value.split(',');
+
+  if (values.length !== ARGON2ID_PHC_PARAMETER_KEYS.length) {
+    return false;
+  }
+
+  const parameters = new Map<string, number>();
+
+  for (const parameter of values) {
+    const [key, parameterValue, ...remaining] = parameter.split('=');
+
+    if (
+      key === undefined ||
+      parameterValue === undefined ||
+      remaining.length !== 0 ||
+      !ARGON2ID_PHC_PARAMETER_KEYS.includes(key) ||
+      !ARGON2ID_PHC_POSITIVE_INTEGER_PATTERN.test(parameterValue) ||
+      parameters.has(key)
+    ) {
+      return false;
+    }
+
+    const numericValue = Number(parameterValue);
+
+    if (!Number.isSafeInteger(numericValue)) {
+      return false;
+    }
+
+    parameters.set(key, numericValue);
+  }
+
+  const memoryCost = parameters.get('m');
+  const parallelism = parameters.get('p');
+  const timeCost = parameters.get('t');
+
+  return (
+    parameters.size === ARGON2ID_PHC_PARAMETER_KEYS.length &&
+    memoryCost !== undefined &&
+    parallelism !== undefined &&
+    timeCost !== undefined &&
+    memoryCost === DASHBOARD_ARGON2_MEMORY_COST &&
+    timeCost === DASHBOARD_ARGON2_TIME_COST &&
+    parallelism === DASHBOARD_ARGON2_PARALLELISM
+  );
+};
+
+const isArgon2idPhcBase64Segment = (value: string | undefined, minimumLength: number): boolean =>
+  value !== undefined &&
+  value.length >= minimumLength &&
+  ARGON2ID_PHC_BASE64_PATTERN.test(value) &&
+  Buffer.from(value, 'base64').toString('base64').replace(/=+$/, '') === value;
 
 const isZaloIdentifier = (value: unknown): value is string =>
   isString(value) && ZALO_IDENTIFIER_PATTERN.test(value);
@@ -841,6 +1146,17 @@ const isPublicHostname = (hostname: string): boolean => {
   }
 
   return normalized.includes('.') && !normalized.startsWith('.') && !normalized.endsWith('.');
+};
+
+const isDashboardPublicHostname = (hostname: string): boolean => {
+  const normalized = normalizeHostname(hostname);
+
+  return (
+    !DASHBOARD_PRIVATE_HOSTNAME_SUFFIXES.some((suffix) => normalized.endsWith(suffix)) &&
+    !DASHBOARD_PRIVATE_HOSTNAME_SUFFIXES.some((suffix) => normalized === suffix.slice(1)) &&
+    isPublicHostname(normalized) &&
+    isIP(normalized) === 0
+  );
 };
 
 const normalizeHostname = (hostname: string): string =>

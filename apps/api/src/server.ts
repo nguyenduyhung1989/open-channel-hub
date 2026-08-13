@@ -5,6 +5,8 @@ import { createFacebookPageFeature } from './facebook-page/create-facebook-page-
 import { toFacebookPageConnectionConfigurations } from './facebook-page/facebook-page-connection-configurations.js';
 import { createRuntimeInboxFeatures } from './inbox/create-runtime-inbox-features.js';
 import type { InboxFeature } from './inbox/inbox-feature.js';
+import { createRuntimeDashboardFeature } from './dashboard/create-runtime-dashboard-feature.js';
+import type { DashboardFeature } from './dashboard/dashboard-feature.js';
 import { createTelegramBotFeature } from './telegram-bot/create-telegram-bot-feature.js';
 import {
   loadTelegramBotConnectionConfigurations,
@@ -34,6 +36,7 @@ try {
   let whatsappBusinesses:
     readonly Awaited<ReturnType<typeof createWhatsAppBusinessFeature>>[] | undefined;
   let inboxes: readonly InboxFeature[] | undefined;
+  let dashboard: DashboardFeature | undefined;
 
   if (environment.connectorRuntime.enabled) {
     const inboundEventReader = postgres?.inboundEventReader;
@@ -145,6 +148,22 @@ try {
         }
 
         inboxes = createRuntimeInboxFeatures(configuredInboxes, inboundEventFeedReader);
+
+        const dashboardConfiguration = configuredConnectionConfiguration?.dashboard;
+
+        if (dashboardConfiguration !== undefined) {
+          const dashboardSessionStore = postgres?.dashboardSessionStore;
+
+          if (dashboardSessionStore === undefined) {
+            throw new EnvironmentConfigurationError();
+          }
+
+          dashboard = createRuntimeDashboardFeature(
+            dashboardConfiguration,
+            inboxes,
+            dashboardSessionStore
+          );
+        }
       }
     } else {
       const feature = telegramFeatures[0];
@@ -170,6 +189,7 @@ try {
     ...(zaloOas === undefined ? {} : { zaloOas }),
     ...(facebookPages === undefined ? {} : { facebookPages }),
     ...(inboxes === undefined ? {} : { inboxes }),
+    ...(dashboard === undefined ? {} : { dashboard }),
     ...(whatsappBusinesses === undefined ? {} : { whatsappBusinesses })
   });
 

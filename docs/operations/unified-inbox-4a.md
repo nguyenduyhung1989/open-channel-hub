@@ -2,9 +2,11 @@
 
 Phase 4a adds one deliberately small aggregate read API. A configured inbox
 can return canonical inbound events from an explicit set of existing
-connections through one bearer credential. It does not add a web dashboard,
-user account, organization, role model, conversation summary, search, outbound
-message, provider token, or live-provider operation.
+connections through one bearer credential. Phase 4a itself does not add a web
+dashboard, user account, organization, role model, conversation summary,
+search, outbound message, provider token, or live-provider operation. A later,
+separate Phase 4b server-rendered dashboard can consume only this same bounded
+scope; see the [operator dashboard guide](operator-dashboard-4b.md).
 
 The word "inbox" in this phase means a server-selected read scope, not a
 complete customer-support product. The PostgreSQL ledger remains the source of
@@ -135,9 +137,10 @@ inbox membership metadata, database ledger IDs, or an account listing.
 
 ## What remains outside Phase 4a
 
-- No browser UI, user identity, organization, role-based access control,
-  invitation flow, audit log, public connection administration, or token
-  rotation endpoint.
+- No full user identity, organization, role-based access control, invitation
+  flow, audit log, public connection administration, or token rotation
+  endpoint. The separate Phase 4b browser dashboard is a configured-local
+  principal view, not a replacement for those capabilities.
 - No conversation aggregation, read/unread state, assignment, labels, search,
   attachment handling, retention/deletion workflow, backup/restore proof, or
   encryption-at-rest assurance.

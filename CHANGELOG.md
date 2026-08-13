@@ -117,6 +117,15 @@ follows [Semantic Versioning](https://semver.org/).
   multiple fake provider accounts. It checks aggregate scope, bearer isolation,
   cursor-scope rejection, canonical-only output, secret-file mode, and
   PostgreSQL role safety without provider network access.
+- Phase 4b candidate: an optional server-rendered, no-JavaScript operator
+  dashboard scoped to existing configured inboxes. It exposes HTML/CSS only;
+  browser code never receives an inbox bearer, provider credential, or
+  connection-selection capability.
+- Phase 4b candidate: an Argon2id password-hash CLI using the exact
+  `m=19456,t=2,p=1` profile, configured local principals, signed secure
+  browser cookies, anti-forgery forms, bounded session lifetime, and forward
+  migration <code>0008_dashboard_sessions</code> for HMAC-only session
+  metadata.
 
 ### Changed
 
@@ -158,6 +167,9 @@ follows [Semantic Versioning](https://semver.org/).
   rejected with <code>400</code>. The durable ledger now orders by its numeric
   sequence rather than a text alias; callers must restart from page one after
   upgrading so a mixed ordering cannot silently skip events.
+- The supplied loopback-only HTTP Compose smoke remains intentionally dashboard
+  free. It now verifies all eight immutable schema migrations but does not
+  attempt a browser login whose `Secure` cookies and exact origin require TLS.
 
 ### Security
 
@@ -198,6 +210,13 @@ follows [Semantic Versioning](https://semver.org/).
   parsing or storage access, never accepts a caller-selected scope, keeps inbox
   tokens distinct from connection credentials, and binds cursors to the inbox
   ID plus canonical connection set. It returns canonical events only.
+- The optional dashboard stores Argon2id password hashes only in the runtime
+  secret, and PostgreSQL stores only HMACs of random browser token values. Its
+  cookie signing keys and session pepper must be distinct from each other and
+  every provider, webhook, account-operator, and inbox credential. Login and
+  logout enforce the exact configured external HTTPS origin and anti-forgery
+  tokens. This candidate has not yet verified a TLS proxy or production
+  deployment.
 - The <code>main</code> branch now blocks force pushes and deletion, including
   for administrators. Required checks and pull-request reviews remain
   intentionally unset for the owner-controlled direct-push workflow.

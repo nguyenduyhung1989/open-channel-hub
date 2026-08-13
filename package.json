@@ -16,6 +16,8 @@
     "build": "tsup --config tsup.config.ts",
     "db:migrate": "node --env-file-if-exists=.env apps/api/dist/db/migrate.js",
     "db:migrate:dev": "node --env-file-if-exists=.env --import tsx apps/api/src/db/migrate.ts",
+    "dashboard:password:hash": "node apps/api/dist/dashboard/password-hash-cli.js",
+    "dashboard:password:hash:dev": "node --import tsx apps/api/src/dashboard/password-hash-cli.ts",
     "dev": "node --env-file-if-exists=.env --import tsx apps/api/src/server.ts",
     "start": "node --env-file-if-exists=.env apps/api/dist/server.js",
     "telegram:webhook:set": "node --env-file-if-exists=.env apps/api/dist/telegram-bot/set-webhook.js",
@@ -28,7 +30,9 @@
     "check": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build"
   },
   "dependencies": {
+    "@fastify/cookie": "11.1.2",
     "@fastify/helmet": "13.1.0",
+    "argon2": "0.45.1",
     "fastify": "5.11.3",
     "zod": "4.4.3"
   },

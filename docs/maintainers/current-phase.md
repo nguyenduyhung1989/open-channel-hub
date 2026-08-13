@@ -1,12 +1,15 @@
-# Public checkpoint: Phase 4a verified
+# Public checkpoint: Phase 4a verified; Phase 4b candidate active
 
-**Scope:** a configured, read-only aggregate feed across an explicit set of
-existing official connections. It builds on the Telegram Bot, Zalo OA, Facebook
-Page, and WhatsApp Business runtime configuration and durable PostgreSQL
-inbound-event ledger. It is not a browser dashboard, user login, organization,
-RBAC model, conversation/thread model, search service, attachment store,
-outbound queue, provider credential manager, real provider test, or production
-deployment.
+**Verified scope:** Phase 4a is a configured, read-only aggregate feed across
+an explicit set of existing official connections. It builds on the Telegram
+Bot, Zalo OA, Facebook Page, and WhatsApp Business runtime configuration and
+durable PostgreSQL inbound-event ledger.
+
+**Active candidate:** Phase 4b adds an optional server-rendered local-principal
+browser view over that same inbox scope. It is not yet final-verified or
+deployed. It is not a full user login, organization/RBAC model,
+conversation/thread model, search service, attachment store, outbound queue,
+provider credential manager, real provider test, or production deployment.
 
 ## Exact verified history
 
@@ -81,15 +84,52 @@ cross-inbox cursor rejection, unchanged per-account cursor isolation,
 secret-file permission, and PostgreSQL role safety. It is not a live-provider,
 TLS, dashboard, or production-authorization proof.
 
+## Active Phase 4b candidate
+
+The current source adds a bounded browser surface without moving a bearer into
+the browser:
+
+- The optional root `dashboard` object is accepted only with configured
+  `inboxes` and PostgreSQL. It requires an exact public HTTPS origin, one or
+  two distinct cookie-signing keys, a distinct session HMAC pepper, and one to
+  one hundred configured principals. A principal has an opaque ID, an exact
+  Argon2id `m=19456,t=2,p=1` PHC hash, and an explicit allow-list of existing
+  inbox IDs.
+- `/operator/login`, `/operator`, and same-origin CSS are server-rendered with
+  no dashboard JavaScript, browser bearer, provider credential, or
+  caller-selected connection scope. The server uses the Phase 4a inbox reader
+  only after it authenticates and scopes the configured principal.
+- Session cookies are signed `__Host-` cookies with `Secure`, `HttpOnly`,
+  `SameSite=Strict`, and `Path=/`. Login/logout require an exact `Origin` and a
+  hidden anti-forgery token. Sessions use a 30-minute idle limit, an eight-hour
+  absolute limit, server-side revocation, and a bounded in-process failed-login
+  throttle.
+- `0008_dashboard_sessions` retains only HMACs of random browser session and
+  anti-forgery tokens plus principal ID and lifecycle timestamps. It contains
+  no raw token, password, password hash, inbox bearer, provider credential, or
+  inbox membership.
+- The local Compose smoke is intentionally HTTP on loopback and leaves
+  `dashboard` absent. It verifies the eighth migration but cannot prove a
+  browser login that depends on external HTTPS cookies and origin semantics.
+
+This candidate has no frozen commit or final verification evidence yet. Before
+calling it complete, freeze the source; run formatting, lint, strict type
+checking, complete tests, build, dependency/secret scans, Compose
+configuration, and the synthetic Docker proof; obtain independent review; then
+record fresh GitHub CI and CodeQL for the exact candidate. An external TLS
+proxy, edge rate limit, cookie/header log policy, and real public origin remain
+separate operational proof.
+
 ## Explicitly not proven or not implemented
 
 - No owner-authorized Telegram Bot, Zalo OA, Facebook Page, Meta App, WABA,
   business phone, public HTTPS endpoint, webhook subscription, signed live
   delivery, or real customer message has been used.
-- No browser UI, user identity, organization, RBAC, invitation flow, audit
-  log, public connection management, token rotation endpoint, or multi-host
-  authorization model exists. A configured inbox bearer is only a bounded
-  local runtime principal.
+- No full user identity, organization/RBAC, invitation/password-reset flow,
+  audit log, public connection management, token rotation endpoint, live
+  session administration, or multi-host authorization model exists. Phase 4b
+  principals are configured-local dashboard entries, not a substitute for
+  those capabilities.
 - No conversation summary, read/unread state, assignment, labels, search,
   attachment, retention/deletion workflow, backup/restore proof,
   encryption-at-rest assurance, rate-limit, structured observability,
@@ -104,7 +144,8 @@ TLS, dashboard, or production-authorization proof.
 ## Next authorized work
 
 Keep all live provider use separate: require explicit owner authorization before
-connecting a real account or exposing public TLS. A later browser dashboard,
-user/organization authorization, conversation model, or outbound engine must
-start with its own bounded design, migration/security review, and verification
-criteria rather than being implied by this configured read-only API.
+connecting a real account or exposing public TLS. Finish the Phase 4b candidate
+only with its own frozen verification and external TLS/proxy evidence. Any
+later full user/organization authorization, conversation model, or outbound
+engine must start with its own bounded design, migration/security review, and
+verification criteria.

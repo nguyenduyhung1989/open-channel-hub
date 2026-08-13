@@ -192,6 +192,59 @@ ALTER TABLE ${POSTGRES_SCHEMA}.connection_registry
 `
 ]);
 
+/**
+ * Dashboard sessions retain only HMACs of random browser tokens. The strict
+ * time constraints make malformed or impossible state fail inside PostgreSQL
+ * even if a future writer bypasses this adapter.
+ */
+const DASHBOARD_SESSIONS_ID = '0008_dashboard_sessions';
+
+const DASHBOARD_SESSIONS_STATEMENTS = Object.freeze([
+  `
+CREATE TABLE ${POSTGRES_SCHEMA}.dashboard_sessions (
+  session_id text PRIMARY KEY,
+  principal_id text NOT NULL,
+  session_token_hmac text NOT NULL UNIQUE,
+  csrf_token_hmac text NOT NULL,
+  issued_at timestamptz NOT NULL,
+  last_seen_at timestamptz NOT NULL,
+  idle_expires_at timestamptz NOT NULL,
+  absolute_expires_at timestamptz NOT NULL,
+  revoked_at timestamptz,
+  CONSTRAINT dashboard_sessions_session_id_format CHECK (
+    session_id ~ '^[A-Za-z0-9._:-]{1,128}$'
+    AND session_id NOT IN ('.', '..')
+  ),
+  CONSTRAINT dashboard_sessions_principal_id_format CHECK (
+    principal_id ~ '^[A-Za-z0-9._:-]{1,128}$'
+    AND principal_id NOT IN ('.', '..')
+  ),
+  CONSTRAINT dashboard_sessions_session_token_hmac_format CHECK (
+    session_token_hmac ~ '^[a-f0-9]{64}$'
+  ),
+  CONSTRAINT dashboard_sessions_csrf_token_hmac_format CHECK (
+    csrf_token_hmac ~ '^[a-f0-9]{64}$'
+  ),
+  CONSTRAINT dashboard_sessions_distinct_token_hmacs CHECK (
+    session_token_hmac <> csrf_token_hmac
+  ),
+  CONSTRAINT dashboard_sessions_time_order CHECK (
+    issued_at <= last_seen_at
+    AND last_seen_at < idle_expires_at
+    AND idle_expires_at <= absolute_expires_at
+  ),
+  CONSTRAINT dashboard_sessions_revocation_order CHECK (
+    revoked_at IS NULL OR revoked_at >= issued_at
+  )
+)
+`,
+  `
+CREATE INDEX dashboard_sessions_active_expiry
+  ON ${POSTGRES_SCHEMA}.dashboard_sessions (idle_expires_at, absolute_expires_at)
+  WHERE revoked_at IS NULL
+`
+]);
+
 const MIGRATIONS = Object.freeze([
   Object.freeze({
     id: INBOUND_EVENT_LEDGER_ID,
@@ -242,6 +295,11 @@ const MIGRATIONS = Object.freeze([
       CONNECTION_REGISTRY_WHATSAPP_BUSINESS_PROVIDER_IDENTITY_STATEMENTS
     ),
     statements: CONNECTION_REGISTRY_WHATSAPP_BUSINESS_PROVIDER_IDENTITY_STATEMENTS
+  }),
+  Object.freeze({
+    id: DASHBOARD_SESSIONS_ID,
+    checksum: checksumFor(DASHBOARD_SESSIONS_ID, DASHBOARD_SESSIONS_STATEMENTS),
+    statements: DASHBOARD_SESSIONS_STATEMENTS
   })
 ]);
 

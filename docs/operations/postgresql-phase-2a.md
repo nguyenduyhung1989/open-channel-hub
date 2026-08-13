@@ -19,11 +19,12 @@ The supplied Compose stack creates three services:
 The database and schema are both named <code>open_channel_hub</code>. The
 application schema contains:
 
-| Object                           | Purpose                                                                                                                                                                                                     |
-| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| <code>schema_migrations</code>   | Immutable record of forward schema migrations applied by this binary.                                                                                                                                       |
-| <code>connection_registry</code> | Opaque connection ID, immutable connector metadata, registration timestamp, and a non-secret Zalo OA, Facebook Page, or WhatsApp Business provider-identity fingerprint when those channels are configured. |
-| <code>inbound_events</code>      | Canonical inbound text-event ledger. Its primary key is <code>(connection_id, provider_event_id)</code>.                                                                                                    |
+| Object                           | Purpose                                                                                                                                                                                                            |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| <code>schema_migrations</code>   | Immutable record of forward schema migrations applied by this binary.                                                                                                                                              |
+| <code>connection_registry</code> | Opaque connection ID, immutable connector metadata, registration timestamp, and a non-secret Zalo OA, Facebook Page, or WhatsApp Business provider-identity fingerprint when those channels are configured.        |
+| <code>inbound_events</code>      | Canonical inbound text-event ledger. Its primary key is <code>(connection_id, provider_event_id)</code>.                                                                                                           |
+| <code>dashboard_sessions</code>  | Optional Phase 4b browser-session metadata: only HMACs of random session/anti-forgery values, principal ID, timestamps, and revocation state. It contains no raw token, password, credential, or inbox membership. |
 
 The ledger stores a canonical event ID, channel/type/timestamps, conversation
 and sender/message identifiers, and message text. It intentionally does **not**
@@ -52,6 +53,12 @@ an equivalent non-secret Bot account identity. The subsequent foreign key from
 <code>NOT VALID</code>: PostgreSQL enforces new rows, while older Phase 2a
 history can be reconciled and explicitly validated later. Do not manually
 backfill, delete, or alter the registry in a deployed database.
+
+Phase 4b's additive <code>0008_dashboard_sessions</code> migration is separate
+from both the event ledger and registry. It records only HMACs of random
+browser-token values, a configured principal ID, session times, and revocation
+state. It does not record a raw browser token, password, password hash, inbox
+bearer, provider credential, or inbox membership.
 
 ## Configure without exposing passwords
 
