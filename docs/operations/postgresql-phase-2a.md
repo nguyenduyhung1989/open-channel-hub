@@ -6,10 +6,12 @@ implemented. The verified Phase 4e server-rendered queued-history source and
 verified Phase 4f dashboard reply-intent source add no schema change. The
 Phase 4g append-only delivery-evidence migration is a verified source at exact
 commit <code>6444699</code>; it has no provider dispatch or production
-verification claim. Phase 4h adds a candidate authorization-provenance migration,
-Phase 4i adds candidate Telegram private-reply evidence, and Phase 4j adds
-candidate Telegram delivery-authorization evidence; none is verified source
-evidence or a provider-dispatch claim.
+verification claim. Phase 4h adds verified authorization-provenance migration,
+Phase 4i adds verified Telegram private-reply evidence, and Phase 4j adds
+verified Telegram delivery-authorization evidence. The combined source passed
+final local checks, independent audit, synthetic Compose/PostgreSQL proof,
+GitHub CI, and CodeQL at exact commit <code>52608e0</code>; it remains no
+provider-dispatch claim.
 Phase 4e's final local
 verification includes a synthetic Compose proof, but that loopback HTTP proof
 does not establish external HTTPS cookie behavior. Phase 4f source verification
@@ -34,15 +36,15 @@ application schema contains:
 | Object                                                 | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | <code>schema_migrations</code>                         | Immutable record of forward schema migrations applied by this binary.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| <code>connection_registry</code>                       | Opaque connection ID, immutable connector metadata, registration timestamp, and a non-secret provider-identity fingerprint when Zalo OA, Facebook Page, WhatsApp Business, or candidate Telegram private-reply eligibility is configured.                                                                                                                                                                                                                                                                                                                                                                 |
-| <code>inbound_events</code>                            | Canonical inbound text-event ledger. Its primary key is <code>(connection_id, provider_event_id)</code>. Candidate Phase 4i adds an internal Telegram chat-type field for new Telegram rows only.                                                                                                                                                                                                                                                                                                                                                                                                         |
+| <code>connection_registry</code>                       | Opaque connection ID, immutable connector metadata, registration timestamp, and a non-secret provider-identity fingerprint when Zalo OA, Facebook Page, WhatsApp Business, or verified Telegram private-reply eligibility is configured.                                                                                                                                                                                                                                                                                                                                                                  |
+| <code>inbound_events</code>                            | Canonical inbound text-event ledger. Its primary key is <code>(connection_id, provider_event_id)</code>. Verified Phase 4i adds an internal Telegram chat-type field for new Telegram rows only.                                                                                                                                                                                                                                                                                                                                                                                                          |
 | <code>dashboard_sessions</code>                        | Optional Phase 4b browser-session metadata: only HMACs of random session/anti-forgery values, principal ID, timestamps, and revocation state. It contains no raw token, password, credential, or inbox membership.                                                                                                                                                                                                                                                                                                                                                                                        |
 | <code>outbound_commands</code>                         | Phase 4c immutable source-bound reply intents. It retains a private target derived from canonical inbound `conversation_id`, source message/channel, message text, client operation ID, `queued` state, and timestamps. Phase 4d reads a safe scoped projection of queued rows without changing this table; the Phase 4e source reuses that reader for a smaller server-rendered dashboard projection. The verified Phase 4f source reuses the existing source-bound store through an explicitly granted dashboard form. It has no provider credential, raw payload, attempt, receipt, or delivery state. |
 | <code>outbound_delivery_attempts</code>                | Verified Phase 4g append-only evidence that one command has a durable local attempt fact. One command can have at most one such row. It contains no target, message text, credential, provider response, HTTP detail, retry field, or mutable delivery state.                                                                                                                                                                                                                                                                                                                                             |
 | <code>outbound_delivery_attempt_receipts</code>        | Verified Phase 4g append-only recorded-outcome evidence for one stored attempt. Its constraint permits exactly `provider_accepted`, `provider_rejected`, or `outcome_unknown`; only acceptance has a provider message ID. It proves neither network delivery nor read status.                                                                                                                                                                                                                                                                                                                             |
-| <code>outbound_command_authorizations</code>           | Candidate Phase 4h immutable provenance for a newly created command. It records only authority kind, configured inbox ID, optional dashboard principal ID, scope fingerprint, and recording time. It has no bearer, browser session, password/hash, target, text, provider data, delivery result, retry, or mutable state.                                                                                                                                                                                                                                                                                |
-| <code>outbound_telegram_command_eligibility</code>     | Candidate Phase 4i immutable evidence for one new Telegram command: command ID, opaque Bot fingerprint, `private`, and recording time. It has no token, Bot ID, target, text, provider response, attempt, receipt, or mutable state.                                                                                                                                                                                                                                                                                                                                                                      |
-| <code>outbound_telegram_delivery_authorizations</code> | Candidate Phase 4j immutable human authorization evidence for one already eligible Telegram command: command ID, configured inbox/principal, scope fingerprint, opaque Bot fingerprint, and recording time. It has no target, text, bearer/session, token, provider response, attempt, receipt, retry, or mutable state.                                                                                                                                                                                                                                                                                  |
+| <code>outbound_command_authorizations</code>           | Verified Phase 4h immutable provenance for a newly created command. It records only authority kind, configured inbox ID, optional dashboard principal ID, scope fingerprint, and recording time. It has no bearer, browser session, password/hash, target, text, provider data, delivery result, retry, or mutable state.                                                                                                                                                                                                                                                                                 |
+| <code>outbound_telegram_command_eligibility</code>     | Verified Phase 4i immutable evidence for one new Telegram command: command ID, opaque Bot fingerprint, `private`, and recording time. It has no token, Bot ID, target, text, provider response, attempt, receipt, or mutable state.                                                                                                                                                                                                                                                                                                                                                                       |
+| <code>outbound_telegram_delivery_authorizations</code> | Verified Phase 4j immutable human authorization evidence for one already eligible Telegram command: command ID, configured inbox/principal, scope fingerprint, opaque Bot fingerprint, and recording time. It has no target, text, bearer/session, token, provider response, attempt, receipt, retry, or mutable state.                                                                                                                                                                                                                                                                                   |
 
 The ledger stores a canonical event ID, channel/type/timestamps, conversation
 and sender/message identifiers, and message text. It intentionally does **not**
@@ -64,7 +66,7 @@ silently rebound to a different pair. Phase 3b's additive <code>0006</code>
 migration requires the same kind of fingerprint for each Facebook Page
 <code>(appId, pageId)</code> pair. Phase 3c's additive <code>0007</code>
 migration requires the same kind of fingerprint for each WhatsApp Business
-<code>(appId, wabaId, phoneNumberId)</code> triple. Candidate Phase 4i's
+<code>(appId, wabaId, phoneNumberId)</code> triple. Verified Phase 4i's
 <code>0012</code> migration requires a Telegram fingerprint derived from the
 numeric Bot-ID prefix of the configured token only. It does not retain the
 prefix or token and refuses to attach a first Telegram fingerprint to a
@@ -134,7 +136,7 @@ worker, provider HTTP request, credential, retry policy, or command state
 transition. See the dedicated
 [Phase 4g delivery-evidence guide](outbound-delivery-evidence-4g.md).
 
-The Phase 4h candidate adds forward migration
+The verified Phase 4h source adds forward migration
 <code>0011_outbound_command_authorizations</code>. `command_id` is both its
 primary key and foreign key to <code>outbound_commands</code>, so a new command
 has at most one immutable provenance row. Its exact authority kind is either
@@ -145,24 +147,24 @@ scope evaluated at command creation. The PostgreSQL adapter writes it in the
 same transaction as a new command and never accepts it from HTTP/browser input.
 The migration does not backfill old commands. A row is historical evidence, not
 current permission, and it adds no provider request, delivery behavior, worker,
-or command state transition. See the candidate
+or command state transition. See the verified
 [Phase 4h authorization-provenance guide](outbound-command-authorization-provenance-4h.md).
 
-The Phase 4i candidate adds forward migration
+The verified Phase 4i source adds forward migration
 <code>0012_telegram_private_reply_eligibility</code>. New Telegram inbound rows
 must carry one recognized chat type; non-Telegram rows carry none. A new Telegram
 command must derive from a private source with a current registry fingerprint,
 then writes an immutable one-to-one eligibility row in the same transaction as
 the command and Phase 4h provenance. Historic rows and commands are not
-backfilled. See the candidate
+backfilled. See the verified
 [Phase 4i private-reply guide](telegram-private-reply-eligibility-4i.md).
 
-The Phase 4j candidate adds forward migration
+The verified Phase 4j source adds forward migration
 <code>0013_outbound_telegram_delivery_authorizations</code>. A row can exist
 only for a Phase 4i eligibility row and records a configured dashboard
 principal's approval fact after current source/provenance/Bot/no-attempt
 rechecks. It is append-only, never backfills historic commands, and does not
-authorize provider I/O. See the candidate
+authorize provider I/O. See the verified
 [Phase 4j delivery-authorization guide](telegram-delivery-authorization-4j.md).
 
 ## Configure without exposing passwords
@@ -287,18 +289,17 @@ and <code>Analyze JavaScript and TypeScript</code>. This verifies frozen source
 and synthetic local evidence only; it does not prove public TLS, live provider
 I/O, provider acceptance, delivery, read status, or production deployment.
 
-The Phase 4h candidate advances the expected migration count to eleven. Its
+The verified Phase 4h source advances the expected migration count to eleven. Its
 Compose addition checks only the migration, exact column shape, foreign key,
 primary key, named constraints, and immutable trigger. The existing Phase 4c
 API command checks remain and may create provenance atomically with their
 source-bound commands; the Phase 4h smoke adds no direct SQL/DML or semantic
-assertion for authorization rows. It makes no provider call. The Phase 4i
-candidate advances the expected count to twelve. Its synthetic extension uses
+assertion for authorization rows. It makes no provider call. The verified Phase 4i
+source advances the expected count to twelve. Its synthetic extension uses
 only fake Telegram-shaped tokens and private/supergroup payloads, checks the
 new table/constraints/trigger plus opaque fingerprints, and confirms that a
-supergroup source cannot create a command. It makes no provider call. Final
-Phase 4h–4i local and GitHub verification remains pending. The Phase 4j
-candidate advances the expected count to thirteen. Its Compose extension uses
+supergroup source cannot create a command. It makes no provider call. The verified Phase 4j
+source advances the expected count to thirteen. Its Compose extension uses
 a disposable synthetic dashboard configuration and manually returns a signed
 `Secure` cookie to `curl` so the server-rendered authorization route reaches
 the actual PostgreSQL writer. It checks the table's exact structural boundary
@@ -307,7 +308,9 @@ Bot-drifted, non-private, and already-attempted synthetic commands. The
 fixture directly seeds only disposable synthetic rows needed to reach those
 unavailable branches; the writer itself creates no attempt. This remains no
 browser-over-HTTP or external HTTPS-cookie proof and makes no provider call.
-Final Phase 4h–4j local and GitHub verification remains pending.
+The combined Phase 4h–4j source is verified at exact commit <code>52608e0</code>
+after final local checks, independent audit, the synthetic Compose/PostgreSQL
+proof, GitHub CI, and CodeQL.
 
 ## Container and network boundary
 
@@ -356,7 +359,7 @@ any data you need to keep.
   TLS/proxy, real Telegram, Zalo OA, Facebook Page, or WhatsApp Business
   confirmation, or production monitoring. The verified Phase 4g source stores only
   a narrow append-only evidence foundation; it is not a dispatcher or delivery
-  feature. The Phase 4h candidate stores historical authority provenance only;
+  feature. The verified Phase 4h source stores historical authority provenance only;
   it is not current authorization or a send feature. The Phase 4e source renders
   queued intent through an authenticated dashboard session, and the Phase 4f
   source can record that existing source-bound intent through an explicit

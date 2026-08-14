@@ -337,7 +337,7 @@ domain-separated SHA-256 fingerprint of the configured
 <code>(appId, oaId)</code> pair. It is not the raw pair or a credential. It
 binds a Zalo connection ID to that pair after registration: an existing Zalo ID
 cannot be restarted with a different fingerprint, and a first Zalo binding is
-refused if pre-registry history already uses that ID. The candidate Phase 4i
+refused if pre-registry history already uses that ID. The verified Phase 4i
 migration <code>0012_telegram_private_reply_eligibility</code> requires an
 equivalent opaque fingerprint for new Telegram registry registrations. It
 derives only from the configured token's numeric Bot-ID prefix, never stores the
@@ -345,7 +345,7 @@ prefix or token, and refuses to add a first fingerprint to a Telegram connection
 ID that already has durable inbound history. Use a new connection ID for that
 Bot rather than manually editing or backfilling PostgreSQL.
 
-Candidate Phase 4j adds an optional
+Verified Phase 4j adds an optional
 `dashboard.principals[].telegramDeliveryAuthorizationInboxIds` array. It is a
 strict unique subset of that principal's readable `inboxIds`; omission becomes
 an empty immutable set. It is separate from `replyIntentInboxIds`, so read,

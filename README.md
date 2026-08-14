@@ -2,13 +2,13 @@
 
 > A self-hosted, official-first multichannel messaging hub.
 
-**Status: Phase 4g alpha source verified; Phases 4h–4j candidate source.** The repository contains a durable
+**Status: Phase 4j alpha source verified.** The repository contains a durable
 PostgreSQL inbound-event ledger, account-scoped operator read APIs, a
 configured multi-connection inbox API, an optional server-rendered read-only
 operator dashboard, a durable source-bound reply-command ledger, a scoped
 queued-command history API, a verified server-rendered queued-command history
 page, a verified opt-in server-rendered reply-intent form, secret-backed
-runtime configuration for official accounts, candidate immutable
+runtime configuration for official accounts, verified immutable
 authorization-provenance, Telegram private-reply eligibility, and Telegram
 delivery-authorization evidence for newly created reply commands, and narrow
 official Zalo Official Account (OA), Facebook Page, and WhatsApp Business
@@ -40,7 +40,16 @@ exact commit <code>6444699</code>. It records narrow local evidence for a
 future dispatcher; it does not create a provider request, provider acceptance,
 delivery, or read result.
 
-Phase 4h is a candidate source extension, not verified source evidence yet.
+The combined Phase 4h–4j source passed <code>npm run check</code> (56 test
+files / 390 tests and build), a zero-finding dependency audit, Gitleaks,
+<code>git diff --check</code>, a synthetic Compose/PostgreSQL proof, and an
+independent audit with no high- or medium-severity finding. GitHub's
+<code>Continuous Integration</code> and <code>CodeQL</code> checks both passed
+for exact commit <code>52608e0</code>. This verifies frozen source and
+synthetic local behavior only; it does not prove public TLS, a live Telegram
+request, provider acceptance, delivery, or production deployment.
+
+Phase 4h is a verified source extension.
 Migration <code>0011_outbound_command_authorizations</code> records one
 immutable authority-provenance row at most for each newly created command:
 whether the server used a configured inbox bearer or an explicitly writable
@@ -51,7 +60,7 @@ not backfilled and remain provenance-free no-dispatch candidates. This does
 not add a provider request, worker, dispatch, retry, browser send control, or
 delivery claim.
 
-Phase 4i is a second candidate source extension. It records Telegram
+Phase 4i is a second verified source extension. It records Telegram
 `message.chat.type` only as internal durable evidence, requires a non-secret
 SHA-256 Bot-identity fingerprint derived from the token's numeric Bot-ID prefix,
 and writes a one-to-one immutable `private` eligibility record with each new
@@ -61,7 +70,7 @@ Historic Telegram data and commands are not backfilled or adopted. This creates
 no sender, provider request, worker, retry, delivery result, or live Telegram
 claim.
 
-Phase 4j is a third candidate source extension. It adds a separately scoped
+Phase 4j is a third verified source extension. It adds a separately scoped
 dashboard-principal `telegramDeliveryAuthorizationInboxIds` grant and one
 immutable Telegram authorization fact for a still-eligible queued command. The
 server rechecks the configured inbox scope, Phase 4h provenance, Phase 4i
@@ -114,7 +123,7 @@ plain provider identity or a credential; it prevents an opaque Zalo connection
 ID with durable history from silently being reused for a different OA. Facebook
 Page uses the same mechanism for its configured <code>(appId, pageId)</code>
 pair. WhatsApp Business uses it for its configured
-<code>(appId, wabaId, phoneNumberId)</code> triple. The Phase 4i candidate
+<code>(appId, wabaId, phoneNumberId)</code> triple. The verified Phase 4i source
 derives a Telegram fingerprint from the configured token's numeric Bot-ID
 prefix for new or history-free registry bindings only. It deliberately refuses
 to attach that fingerprint to an old Telegram connection ID that already has
@@ -250,7 +259,7 @@ GitHub checks <code>Verify Node 24.18.1</code> and
 and synthetic local path only; it does not prove public TLS, live provider I/O,
 provider acceptance, delivery, read status, or production deployment.
 
-Phase 4h adds candidate immutable authorization provenance before any provider
+Phase 4h adds verified immutable authorization provenance before any provider
 dispatch. The new row is created atomically with a new source-bound command,
 but it remains historical evidence rather than a current permission or send
 authorization. A replay must prove the same authority kind, configured inbox,
@@ -258,14 +267,14 @@ optional dashboard principal, and evaluated scope fingerprint; it cannot fill
 or alter provenance. A later sender must still separately recheck current
 authorization and provider-specific eligibility.
 
-Phase 4i adds candidate Telegram private-reply evidence before any provider
+Phase 4i adds verified Telegram private-reply evidence before any provider
 dispatch. A new Telegram reply-intent needs both a source recorded as a private
 chat and the current connection's opaque Bot fingerprint. The browser and public
 read APIs do not receive the chat type or fingerprint. Existing Telegram inbound
 rows with no chat type and old commands with no eligibility row remain
 no-dispatch candidates; this phase neither guesses nor backfills either fact.
 
-Phase 4j adds candidate immutable Telegram delivery-authorization evidence. A
+Phase 4j adds verified Telegram delivery-authorization evidence. A
 dashboard principal remains unable to record it unless its optional
 `telegramDeliveryAuthorizationInboxIds` subset explicitly includes the selected
 readable inbox. For an already eligible queued command only, the server renders
@@ -323,10 +332,10 @@ CAPTCHA bypass, fingerprint spoofing, session theft, or bulk-spam capabilities.
 - A PostgreSQL adapter behind a domain-owned inbound-event port. It writes
   canonical incoming text events with parameterized SQL and conflict-safe
   idempotency; raw Telegram payloads are deliberately not stored.
-- Candidate Phase 4i internal evidence for a future Telegram private-reply
+- Verified Phase 4i internal evidence for a future Telegram private-reply
   decision: chat type, a non-secret Bot-account fingerprint, and an immutable
   command eligibility snapshot. It is not a sender or provider integration.
-- Candidate Phase 4j internal evidence for one configured dashboard principal's
+- Verified Phase 4j internal evidence for one configured dashboard principal's
   Telegram delivery authorization of a still-eligible command. It records no
   provider request and is not a sender or provider integration.
 - An operator-authenticated, connection-scoped inbound-event read API with
@@ -589,13 +598,13 @@ records the verified source's explicit opt-in write scope, per-principal local r
 guard, and no-send boundary. The [Phase 4g delivery-evidence guide](docs/operations/outbound-delivery-evidence-4g.md)
 records the separate verified source attempt/receipt foundation; it adds no dashboard
 delivery result or provider action. The [Phase 4h authorization-provenance guide](docs/operations/outbound-command-authorization-provenance-4h.md)
-records candidate historical authority evidence for new commands only; it grants
+records verified historical authority evidence for new commands only; it grants
 no browser or provider send capability. The
 [Phase 4i Telegram private-reply eligibility guide](docs/operations/telegram-private-reply-eligibility-4i.md)
-records the separate candidate chat/identity evidence; it grants no provider
+records the separate verified chat/identity evidence; it grants no provider
 send capability either. The
 [Phase 4j Telegram delivery-authorization guide](docs/operations/telegram-delivery-authorization-4j.md)
-records one candidate human-authorization fact after current durable rechecks;
+records one verified human-authorization fact after current durable rechecks;
 it grants no provider send capability either.
 
 ## Corresponding-source offer

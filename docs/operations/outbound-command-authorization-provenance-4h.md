@@ -1,8 +1,12 @@
 # Phase 4h immutable outbound-command authorization provenance
 
-**Status: candidate source; not yet verified.** Phase 4h records a narrow,
+**Status: source verified at exact commit `52608e0`.** Phase 4h records a narrow,
 append-only answer to “which server-side authority path created this command?”
 It does **not** send a message, authorize a future send, or prove delivery.
+The combined Phase 4h–4j revision passed final local checks, an independent
+audit, a synthetic Compose/PostgreSQL proof, GitHub Continuous Integration,
+and CodeQL. This remains source evidence only, not public TLS, provider I/O,
+or production proof.
 
 ## What migration `0011` adds
 
@@ -87,7 +91,7 @@ call.
 ## What remains before provider dispatch
 
 - A current authorization recheck and an explicit policy for legacy commands.
-- Provider-specific account identity and private-recipient eligibility. Candidate
+- Provider-specific account identity and private-recipient eligibility. Verified
   Phase 4i records the narrow Telegram private-chat/Bot-identity evidence, but
   it is not a current policy or dispatch capability.
 - Credential isolation, capability policy, attempt-write ordering, timeout

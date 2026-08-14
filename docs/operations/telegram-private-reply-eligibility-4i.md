@@ -1,9 +1,12 @@
 # Phase 4i Telegram private-reply eligibility
 
-**Status: candidate source; verification is not complete.** This phase records
+**Status: source verified at exact commit `52608e0`.** This phase records
 the minimum durable evidence a future Telegram-specific sender would need to
 consider a reply. It does **not** send a message, start a worker, call Telegram,
-or make an existing `queued` command dispatchable.
+or make an existing `queued` command dispatchable. The combined Phase 4h–4j
+revision passed final local checks, an independent audit, a synthetic
+Compose/PostgreSQL proof, GitHub Continuous Integration, and CodeQL. It is not
+public-TLS, live-provider, or production evidence.
 
 ## What changes
 

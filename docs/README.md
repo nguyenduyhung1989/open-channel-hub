@@ -39,14 +39,14 @@
 - [Phase 4g outbound delivery evidence](operations/outbound-delivery-evidence-4g.md):
   verified append-only attempt/receipt evidence with no provider dispatch.
 - [Phase 4h command authorization provenance](operations/outbound-command-authorization-provenance-4h.md):
-  candidate immutable authority evidence with no provider dispatch.
+  verified immutable authority evidence with no provider dispatch.
 - [Phase 4i Telegram private-reply eligibility](operations/telegram-private-reply-eligibility-4i.md):
-  candidate private-chat and Bot-identity evidence with no provider dispatch.
+  verified private-chat and Bot-identity evidence with no provider dispatch.
 - [Phase 4j Telegram delivery authorization](operations/telegram-delivery-authorization-4j.md):
-  candidate immutable human authorization evidence with no provider dispatch.
+  verified immutable human authorization evidence with no provider dispatch.
 - [Phase 0–4j threat model](security/threat-model.md): assets, trust
   boundaries, current controls, and planned work.
 - [Open-source readiness](maintainers/oss-readiness.md): an honest operating
   checklist for maintainers.
 - [Phase 4a–4j checkpoint](maintainers/current-phase.md): verified milestones,
-  the Phase 4h–4j candidate boundaries, risks, and next design work.
+  the Phase 4h–4j no-dispatch boundaries, risks, and next design work.

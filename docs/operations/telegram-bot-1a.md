@@ -79,7 +79,7 @@ When <code>TELEGRAM_BOT_ENABLED=true</code>, the server must refuse to start if
 <code>TELEGRAM_WEBHOOK_SECRET</code> is missing, if the two Telegram
 authentication values are the same, or if PostgreSQL storage is not configured.
 
-The candidate Phase 4i private-reply boundary also rejects a legacy Telegram
+The verified Phase 4i private-reply boundary also rejects a legacy Telegram
 connection ID with durable inbound history but no Bot fingerprint. Do not
 backfill it or alter PostgreSQL manually: retain the historical connection and
 configure the Bot under a new connection ID. This is only internal evidence for
@@ -162,7 +162,7 @@ Before a real-token test, the operator must confirm:
   backup, restore drill, or retention/deletion policy.
 - No proof of real network communication or Telegram acceptance during this
   work.
-- No provider-send authorization from a `queued` intent. The candidate Phase 4i
+- No provider-send authorization from a `queued` intent. The verified Phase 4i
   private-chat/Bot-identity record is not a worker, dispatch, retry, or delivery
   capability; see the
   [Phase 4i guide](telegram-private-reply-eligibility-4i.md).

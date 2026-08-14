@@ -181,33 +181,33 @@ follows [Semantic Versioning](https://semver.org/).
   row supports a derived `not_attempted`-in-this-ledger label only; it never
   proves no external call happened. A stored attempt with no receipt is
   conservatively unknown.
-- Phase 4h candidate: forward migration
+- Phase 4h: forward migration
   <code>0011_outbound_command_authorizations</code> adds one immutable
   authorization-provenance row at most per new source-bound command. It records
   only `inbox_bearer` or `dashboard_principal`, configured inbox ID, optional
   dashboard principal ID, a scope fingerprint, and recording time.
-- Phase 4h candidate: the server supplies provenance only inside the inbox
+- Phase 4h: the server supplies provenance only inside the inbox
   feature boundary. The PostgreSQL adapter derives the fingerprint from the
   sorted allowed connection scope, writes the row atomically with a new
   command, and treats a mismatched authority provenance on replay as a
   conflict. It adds no provider I/O, provider credential, worker, dispatch,
   retry, browser send control, or delivery/read claim.
-- Phase 4i candidate: forward migration
+- Phase 4i: forward migration
   <code>0012_telegram_private_reply_eligibility</code> retains a recognized
   Telegram chat type only for newly stored Telegram inbound rows, requires an
   opaque Bot fingerprint from the numeric prefix of a configured token, and
   writes immutable `private` eligibility evidence with each new Telegram reply
   command. Historic Telegram rows/commands are not backfilled or adopted.
-- Phase 4i candidate: group, supergroup, channel, unknown historic chat type,
+- Phase 4i: group, supergroup, channel, unknown historic chat type,
   and missing/changed Bot identity fail closed before a Telegram intent can be
   created. The field/fingerprint stay out of public readers and dashboard HTML;
   this adds no Telegram request, worker, dispatch, retry, attempt/receipt,
   delivery state, or live-provider claim.
-- Phase 4j candidate: optional strict
+- Phase 4j: optional strict
   `dashboard.principals[].telegramDeliveryAuthorizationInboxIds` grants a
   separate immutable-authorization capability only for an already readable
   inbox. Omission is read-only and does not grant approval authority.
-- Phase 4j candidate: forward migration
+- Phase 4j: forward migration
   <code>0013_outbound_telegram_delivery_authorizations</code> records one
   immutable approval fact at most for a current private Telegram command with
   matching Phase 4h provenance, current Bot identity, and no delivery attempt.
@@ -257,8 +257,8 @@ follows [Semantic Versioning](https://semver.org/).
   rejected with <code>400</code>. The durable ledger now orders by its numeric
   sequence rather than a text alias; callers must restart from page one after
   upgrading so a mixed ordering cannot silently skip events.
-- The supplied loopback-only HTTP Compose smoke advances the Phase 4h–4j
-  candidate to thirteen immutable schema migrations. Its disposable synthetic
+- The supplied loopback-only HTTP Compose smoke verifies the Phase 4h–4j
+  source through thirteen immutable schema migrations. Its disposable synthetic
   dashboard configuration manually forwards a signed `Secure` cookie to `curl`
   so the server-rendered authorization route exercises the PostgreSQL writer.
   It checks the authorization-provenance, Telegram private-reply eligibility,
@@ -270,6 +270,13 @@ follows [Semantic Versioning](https://semver.org/).
   and one existing attempt; the authorization writer never creates an attempt
   or provider receipt. This is not browser-over-HTTP or external HTTPS-cookie
   proof, and it does not contact a provider.
+- Exact commit <code>52608e0</code> completed combined Phase 4h–4j source
+  verification: <code>npm run check</code> (56 test files / 390 tests and
+  build), <code>npm audit --audit-level=low</code> with zero findings, Gitleaks
+  with no secrets, <code>git diff --check</code>, a synthetic Compose/PostgreSQL
+  proof, an independent audit APPROVE with zero high/medium findings, and
+  GitHub Continuous Integration plus CodeQL. This is not public-TLS,
+  live-provider, delivery, or production evidence.
 - Exact commit <code>465186e</code> completed Phase 4e local verification:
   formatting, lint, strict type checking, 53 test files / 351 tests, build,
   low-threshold dependency audit, secret scan, diff check, and synthetic

@@ -1,9 +1,12 @@
 # Phase 4j Telegram delivery authorization evidence
 
-**Status: candidate source; verification is not complete.** Phase 4j records
+**Status: source verified at exact commit `52608e0`.** Phase 4j records
 one immutable human authorization fact for a narrowly eligible Telegram reply
 command. It does **not** send a message, create an attempt, start a worker,
-call Telegram, retry, or make `queued` mean delivered.
+call Telegram, retry, or make `queued` mean delivered. The combined Phase 4h–4j
+revision passed final local checks, an independent audit, a synthetic
+Compose/PostgreSQL proof, GitHub Continuous Integration, and CodeQL. It is not
+public-TLS, live-provider, or production evidence.
 
 ## Configuration boundary
 

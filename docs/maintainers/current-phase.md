@@ -1,4 +1,4 @@
-# Public checkpoint: Phase 4a–4g verified source; Phases 4h–4j candidate
+# Public checkpoint: Phase 4a–4j verified source
 
 **Verified scope:** Phase 4a is a configured, read-only aggregate feed across
 an explicit set of existing official connections. It builds on the Telegram
@@ -69,9 +69,9 @@ GitHub checks <code>Verify Node 24.18.1</code> and
 synthetic local evidence only; it does not prove public TLS, live provider I/O,
 provider acceptance, delivery, read status, or production deployment.
 
-## Phase 4h candidate source
+## Verified Phase 4h source
 
-Phase 4h is not verified yet. It adds one forward-only PostgreSQL migration,
+Phase 4h is source verified at exact commit <code>52608e0</code>. It adds one forward-only PostgreSQL migration,
 `0011_outbound_command_authorizations`, for immutable historical provenance of
 new reply commands. A command can have at most one row because `command_id` is
 both the primary key and foreign key to `outbound_commands`.
@@ -102,9 +102,9 @@ provenance row also is not current authorization and never authorizes provider
 I/O. Phase 4h adds no provider request, worker, queue, dispatcher, retry,
 browser send control, delivery/read state, or live-provider test.
 
-## Phase 4i candidate source
+## Verified Phase 4i source
 
-Phase 4i is not verified yet. Its forward-only migration
+Phase 4i is source verified at exact commit <code>52608e0</code>. Its forward-only migration
 `0012_telegram_private_reply_eligibility` preserves Telegram's documented chat
 type as internal canonical evidence for new inbound rows, requires an opaque
 non-secret Bot fingerprint in new Telegram registry registrations, and captures
@@ -125,9 +125,9 @@ missing/changed identity, absent source, and out-of-scope source fail closed.
 This adds no provider call, sender, worker, retry, attempt/receipt write,
 delivery result, browser field, or live-provider test.
 
-## Phase 4j candidate source
+## Verified Phase 4j source
 
-Phase 4j is not verified yet. Its forward-only migration
+Phase 4j is source verified at exact commit <code>52608e0</code>. Its forward-only migration
 `0013_outbound_telegram_delivery_authorizations` records one immutable human
 authorization fact at most for a command that already has Phase 4i Telegram
 private-chat/Bot-identity evidence. The row records only command ID, configured
@@ -188,10 +188,15 @@ mutation, delivery/read state, or live-provider test.
 - Phase 4g's append-only delivery-evidence migration passed final local
   evidence, independent security review, a synthetic Compose smoke with
   cleanup, and fresh GitHub checks for exact commit <code>6444699</code>.
+- The combined Phase 4h–4j provenance, private-reply eligibility, and
+  delivery-authorization revision passed <code>npm run check</code> (56 test
+  files / 390 tests and build), a zero-finding dependency audit, Gitleaks,
+  <code>git diff --check</code>, a synthetic Compose/PostgreSQL proof, an
+  independent audit with no high/medium findings, GitHub Continuous
+  Integration, and CodeQL for exact commit <code>52608e0</code>.
 - Historical evidence proves only those exact revisions. It does not verify any
   live provider account, provider send, public TLS endpoint, production
-  deployment, any Phase 4g provider result beyond its exact verified commit, or
-  the Phase 4h, Phase 4i, or Phase 4j candidates.
+  deployment, or any provider result beyond its exact verified revision.
 
 ## Verified Phase 4g source
 
@@ -478,12 +483,10 @@ public TLS, a real provider send, or production deployment.
 
 ## Next authorized work
 
-Keep the verified Phase 4e, Phase 4f, and Phase 4g evidence frozen at
-<code>465186e</code>, <code>74fca30</code>, and <code>6444699</code>. First
-close Phase 4h with its frozen candidate, final local checks, independent
-review, synthetic Compose proof, and exact GitHub CI/CodeQL. Keep all live
-provider use separate: require explicit owner authorization before connecting a
-real account or exposing public TLS. Any later full user/organization
+Keep the verified Phase 4e–4j evidence frozen at <code>465186e</code>,
+<code>74fca30</code>, <code>6444699</code>, and <code>52608e0</code>. Keep all
+live provider use separate: require explicit owner authorization before
+connecting a real account or exposing public TLS. Any later full user/organization
 authorization, conversation model, dispatcher, retry policy, or dashboard
 deployment must start with its own bounded design, migration/security review,
 and verification criteria.

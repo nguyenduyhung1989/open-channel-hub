@@ -106,5 +106,6 @@ receipt, retry, and production-verification design.
 - A future dispatcher must require both a suitable immutable provenance row and
   a fresh authorization decision. Neither condition by itself authorizes a
   provider call.
-- Phase 4h remains a source candidate until its frozen code, local checks,
-  independent review, synthetic Compose proof, and GitHub checks are complete.
+- Phase 4h source verification completed at exact commit <code>52608e0</code>
+  with frozen-code local checks, independent audit, synthetic Compose/PostgreSQL
+  proof, GitHub Continuous Integration, and CodeQL.

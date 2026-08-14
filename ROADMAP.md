@@ -168,7 +168,7 @@ independent review, and fresh GitHub CI/CodeQL are complete for exact commit
       non-secret SHA-256 fingerprint of its configured `(appId, oaId)` pair. It
       prevents an ID with durable Zalo history from being silently rebound; it
       did not itself assert an equivalent Telegram provider-account identity;
-      candidate Phase 4i adds that separate Telegram-specific boundary.
+      verified Phase 4i adds that separate Telegram-specific boundary.
 - [x] No OAuth, access-token storage/refresh, provider HTTP client, outbound
       messages, attachments, Zalo User, automatic webhook registration, or live
       provider request.
@@ -481,7 +481,7 @@ deployment.
 
 ### 4h — immutable reply-command authorization provenance
 
-**Status: candidate source; verification is not complete.**
+**Status: source verified at exact commit <code>52608e0</code>.**
 
 - [x] Forward migration
       <code>0011_outbound_command_authorizations</code> adds one immutable,
@@ -507,13 +507,15 @@ deployment.
 - [x] No provider request, SDK, credential/OAuth storage, worker, queue,
       dispatcher, retry, browser bearer, dashboard send control, command
       mutation, delivery/read state, or live-provider test is introduced.
-- [ ] Freeze the exact source, run final local verification, complete
-      independent review, run the synthetic Compose proof, and verify GitHub
-      CI/CodeQL before calling this source verified.
+- [x] The combined Phase 4h–4j revision at exact commit <code>52608e0</code>
+      passed final local verification, independent audit, a synthetic
+      Compose/PostgreSQL proof, GitHub Continuous Integration, and CodeQL.
+      This remains source-only evidence, not a public-TLS, live-provider, or
+      production claim.
 
 ### 4i — Telegram private-reply eligibility evidence
 
-**Status: candidate source; verification is not complete.**
+**Status: source verified at exact commit <code>52608e0</code>.**
 
 - [x] Forward migration
       <code>0012_telegram_private_reply_eligibility</code> preserves one of
@@ -537,13 +539,15 @@ deployment.
 - [x] No provider request, SDK, credential/OAuth storage, worker, dispatcher,
       retry, attempt write, receipt write, browser field, command mutation,
       delivery/read state, or live-provider test is introduced.
-- [ ] Freeze the exact source, run final local verification, complete
-      independent review, run the synthetic Compose proof, and verify GitHub
-      CI/CodeQL before calling this source verified.
+- [x] The combined Phase 4h–4j revision at exact commit <code>52608e0</code>
+      passed final local verification, independent audit, a synthetic
+      Compose/PostgreSQL proof, GitHub Continuous Integration, and CodeQL.
+      This remains source-only evidence, not a public-TLS, live-provider, or
+      production claim.
 
 ### 4j — Telegram delivery-authorization evidence
 
-**Status: candidate source; verification is not complete.**
+**Status: source verified at exact commit <code>52608e0</code>.**
 
 - [x] Optional strict
       `dashboard.principals[].telegramDeliveryAuthorizationInboxIds` is an
@@ -566,9 +570,11 @@ deployment.
       write, command mutation, delivery/read state, or live-provider test is
       introduced. The one-operator alpha permits self-authorization and is not
       dual control.
-- [ ] Freeze the exact source, run final local verification, complete
-      independent review, run the synthetic Compose proof, and verify GitHub
-      CI/CodeQL before calling this source verified.
+- [x] The combined Phase 4h–4j revision at exact commit <code>52608e0</code>
+      passed final local verification, independent audit, a synthetic
+      Compose/PostgreSQL proof, GitHub Continuous Integration, and CodeQL.
+      This remains source-only evidence, not a public-TLS, live-provider, or
+      production claim.
 
 ### Later Phase 4 work
 

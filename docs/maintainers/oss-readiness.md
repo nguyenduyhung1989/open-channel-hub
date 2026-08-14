@@ -68,11 +68,14 @@ organization has accepted the project.
   delivery/read state. An absent attempt row supports only a derived
   `not_attempted`-in-this-ledger label; it never proves no external call
   happened. A stored attempt without a receipt remains unknown.
-- Phases 4h–4j are candidate-only source changes. Phase 4h records immutable
+- Phases 4h–4j are verified source changes at exact commit <code>52608e0</code>.
+  Phase 4h records immutable
   authority provenance with a new command; Phase 4i records internal Telegram
   private-chat/Bot-identity evidence; and Phase 4j records a separately scoped
-  immutable dashboard-principal Telegram authorization fact. None is verified
-  source evidence, dispatches a provider message, retains a Telegram token/Bot
+  immutable dashboard-principal Telegram authorization fact. The combined
+  revision passed final local checks, an independent audit, synthetic
+  Compose/PostgreSQL proof, GitHub CI, and CodeQL. It does not dispatch a
+  provider message, retain a Telegram token/Bot
   ID, backfills historic rows, or establishes production eligibility.
 
 ## Verified Phase 4e source
@@ -172,6 +175,8 @@ organization has accepted the project.
 - GitHub checks <code>Verify Node 24.18.1</code> and
   <code>Analyze JavaScript and TypeScript</code> succeeded for the Phase 4f
   dashboard reply-intent source at exact commit <code>74fca30</code>.
+- GitHub Continuous Integration and CodeQL succeeded for the combined Phase
+  4h–4j source at exact commit <code>52608e0</code>.
 - GitHub Private Vulnerability Reporting, secret scanning, Dependabot alerts,
   and automatic security fixes are enabled.
 - The <code>main</code> branch blocks force pushes and deletion, including by
