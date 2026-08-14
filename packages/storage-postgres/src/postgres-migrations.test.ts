@@ -170,8 +170,12 @@ describe('PostgreSQL migrations', () => {
     const telegramEligibilityStart = sql.indexOf(
       'CREATE TABLE open_channel_hub.outbound_telegram_command_eligibility'
     );
+    const telegramEligibilityEnd = sql.indexOf(
+      'INSERT INTO open_channel_hub.schema_migrations',
+      telegramEligibilityStart
+    );
     const commandAuthorizationSql = sql.slice(commandAuthorizationStart, commandAuthorizationEnd);
-    const telegramEligibilitySql = sql.slice(telegramEligibilityStart);
+    const telegramEligibilitySql = sql.slice(telegramEligibilityStart, telegramEligibilityEnd);
 
     for (const forbiddenField of [
       'reply_target_id',
@@ -231,13 +235,77 @@ describe('PostgreSQL migrations', () => {
     ]) {
       expect(telegramEligibilitySql).not.toContain(forbiddenTelegramEligibilityField);
     }
+    const telegramDeliveryAuthorizationStart = sql.indexOf(
+      'CREATE TABLE open_channel_hub.outbound_telegram_delivery_authorizations'
+    );
+    const telegramDeliveryAuthorizationEnd = sql.indexOf(
+      'INSERT INTO open_channel_hub.schema_migrations',
+      telegramDeliveryAuthorizationStart
+    );
+    const telegramDeliveryAuthorizationSql = sql.slice(
+      telegramDeliveryAuthorizationStart,
+      telegramDeliveryAuthorizationEnd
+    );
+
+    expect(telegramDeliveryAuthorizationSql).toContain(
+      'CREATE TABLE open_channel_hub.outbound_telegram_delivery_authorizations'
+    );
+    expect(telegramDeliveryAuthorizationSql).toContain('command_id bigint PRIMARY KEY');
+    expect(telegramDeliveryAuthorizationSql).toContain('inbox_id text NOT NULL');
+    expect(telegramDeliveryAuthorizationSql).toContain('dashboard_principal_id text NOT NULL');
+    expect(telegramDeliveryAuthorizationSql).toContain('scope_fingerprint text NOT NULL');
+    expect(telegramDeliveryAuthorizationSql).toContain('bot_identity_fingerprint text NOT NULL');
+    expect(telegramDeliveryAuthorizationSql).toContain('authorized_at timestamptz NOT NULL');
+    expect(telegramDeliveryAuthorizationSql).toContain(
+      'outbound_telegram_delivery_authorizations_command_fk FOREIGN KEY (command_id)'
+    );
+    expect(telegramDeliveryAuthorizationSql).toContain(
+      'REFERENCES open_channel_hub.outbound_telegram_command_eligibility (command_id)'
+    );
+    expect(telegramDeliveryAuthorizationSql).toContain(
+      'outbound_telegram_delivery_authorizations_inbox_id_format CHECK'
+    );
+    expect(telegramDeliveryAuthorizationSql).toContain(
+      'outbound_telegram_delivery_authorizations_dashboard_principal_id_format CHECK'
+    );
+    expect(telegramDeliveryAuthorizationSql).toContain(
+      'outbound_telegram_delivery_authorizations_scope_fingerprint_format CHECK'
+    );
+    expect(telegramDeliveryAuthorizationSql).toContain(
+      'outbound_telegram_delivery_authorizations_bot_identity_fingerprint_format CHECK'
+    );
+    expect(telegramDeliveryAuthorizationSql).toContain(
+      'CREATE FUNCTION open_channel_hub.reject_outbound_telegram_delivery_authorization_mutation()'
+    );
+    expect(telegramDeliveryAuthorizationSql).toContain(
+      'CREATE TRIGGER outbound_telegram_delivery_authorizations_immutable'
+    );
+    expect(telegramDeliveryAuthorizationSql).toContain(
+      'BEFORE UPDATE OR DELETE ON open_channel_hub.outbound_telegram_delivery_authorizations'
+    );
+    for (const forbiddenTelegramDeliveryAuthorizationField of [
+      'reply_target_id',
+      'message_text',
+      'provider_event_id',
+      'source_message_id',
+      'credential',
+      'token',
+      'raw_response',
+      'outcome',
+      'retry',
+      'state'
+    ]) {
+      expect(telegramDeliveryAuthorizationSql).not.toContain(
+        forbiddenTelegramDeliveryAuthorizationField
+      );
+    }
     expect(sql).toContain('INSERT INTO open_channel_hub.schema_migrations');
     expect(sql).not.toContain('public.');
     const recordedMigrationIds = pool.queries
       .filter((query) => query.sql.includes('INSERT INTO open_channel_hub.schema_migrations'))
       .map((query) => query.values[0]);
 
-    expect(recordedMigrationIds).toHaveLength(12);
+    expect(recordedMigrationIds).toHaveLength(13);
     expect(recordedMigrationIds).toEqual([
       '0001_inbound_event_ledger',
       '0002_inbound_event_ledger_sequence',
@@ -250,7 +318,8 @@ describe('PostgreSQL migrations', () => {
       '0009_outbound_reply_commands',
       '0010_outbound_delivery_attempt_receipts',
       '0011_outbound_command_authorizations',
-      '0012_telegram_private_reply_eligibility'
+      '0012_telegram_private_reply_eligibility',
+      '0013_outbound_telegram_delivery_authorizations'
     ]);
     expect(pool.releaseCount).toBe(1);
   });
@@ -307,6 +376,18 @@ describe('PostgreSQL migrations', () => {
       'CREATE FUNCTION open_channel_hub.reject_outbound_command_authorization_mutation()'
     );
     expect(secondRunSql).not.toContain('CREATE TRIGGER outbound_command_authorizations_immutable');
+    expect(secondRunSql).not.toContain(
+      'CREATE TABLE open_channel_hub.outbound_telegram_command_eligibility'
+    );
+    expect(secondRunSql).not.toContain(
+      'CREATE TABLE open_channel_hub.outbound_telegram_delivery_authorizations'
+    );
+    expect(secondRunSql).not.toContain(
+      'CREATE TRIGGER outbound_telegram_command_eligibility_immutable'
+    );
+    expect(secondRunSql).not.toContain(
+      'CREATE TRIGGER outbound_telegram_delivery_authorizations_immutable'
+    );
     expect(secondRunSql).not.toContain('INSERT INTO open_channel_hub.schema_migrations');
     expect(pool.releaseCount).toBe(2);
   });

@@ -30,6 +30,8 @@ const MAX_CURSOR_LENGTH = 512;
 const OPAQUE_TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const IDENTIFIER_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
 const PROVIDER_EVENT_ID_PATTERN = /^[!-~]{1,512}$/;
+const POSTGRES_BIGINT_PATTERN = /^[1-9][0-9]{0,18}$/;
+const MAX_POSTGRES_BIGINT = '9223372036854775807';
 const UUID_V4_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const loginQuerySchema = z.object({ error: z.enum(['invalid', 'throttled']).optional() }).strict();
 const operatorQuerySchema = z
@@ -63,6 +65,23 @@ const replyIntentFormSchema = z
       .string()
       .max(2_000)
       .refine((value) => value.trim().length > 0)
+  })
+  .strict();
+const telegramDeliveryAuthorizationFormSchema = z
+  .object({
+    commandId: z
+      .string()
+      .regex(POSTGRES_BIGINT_PATTERN)
+      .refine(
+        (value) =>
+          value.length < MAX_POSTGRES_BIGINT.length ||
+          (value.length === MAX_POSTGRES_BIGINT.length && value <= MAX_POSTGRES_BIGINT)
+      ),
+    csrf: z.string().regex(OPAQUE_TOKEN_PATTERN),
+    inbox: z
+      .string()
+      .regex(IDENTIFIER_PATTERN)
+      .refine((value) => value !== '.' && value !== '..')
   })
   .strict();
 
@@ -284,6 +303,75 @@ export const registerDashboardRoutes = async (
     }
   });
 
+  app.post<{ Body: string }>(
+    '/operator/telegram-delivery-authorizations',
+    async (request, reply) => {
+      if (!hasExpectedOrigin(request, feature.publicOrigin)) {
+        return sendDashboardFailure(reply.code(403));
+      }
+
+      const form = parseForm(request.body, telegramDeliveryAuthorizationFormSchema);
+
+      if (form === undefined) {
+        return sendDashboardFailure(reply.code(400));
+      }
+
+      let authenticated: AuthenticatedDashboardSession | undefined;
+
+      try {
+        authenticated = await readDashboardSession(request, manager);
+      } catch {
+        return sendDashboardFailure(reply.code(500));
+      }
+
+      if (authenticated === undefined) {
+        clearSessionCookie(reply);
+        return redirectDashboard(reply, '/operator/login?error=invalid');
+      }
+
+      if (
+        !matchesSecret(form.csrf, authenticated.csrfToken) ||
+        !manager.matchesCsrf(authenticated.session, form.csrf)
+      ) {
+        return sendDashboardFailure(reply.code(403));
+      }
+
+      const authorizationInbox = feature.findTelegramDeliveryAuthorizationInbox(
+        authenticated.session.principalId,
+        form.inbox
+      );
+
+      if (authorizationInbox === undefined) {
+        return sendDashboardFailure(reply.code(404));
+      }
+
+      if (!replyIntentThrottle.reserve(authenticated.session.principalId)) {
+        return sendDashboardFailure(reply.code(429));
+      }
+
+      try {
+        const result = await authorizationInbox.recordTelegramDeliveryAuthorization(
+          Object.freeze({ commandId: form.commandId })
+        );
+
+        if (result.kind === 'created' || result.kind === 'idempotent_replay') {
+          return redirectDashboard(
+            reply,
+            `/operator/outbound-commands?inbox=${encodeURIComponent(form.inbox)}`
+          );
+        }
+
+        if (result.kind === 'authorization_conflict') {
+          return sendDashboardFailure(reply.code(409));
+        }
+
+        return sendDashboardFailure(reply.code(404));
+      } catch {
+        return sendDashboardFailure(reply.code(500));
+      }
+    }
+  );
+
   app.get('/operator', async (request, reply) => {
     const context = await resolveDashboardPageRequest(request, reply, manager, feature);
 
@@ -362,7 +450,11 @@ export const registerDashboardRoutes = async (
                 )
               }),
           principalId: context.authenticated.session.principalId,
-          selectedInboxId: context.selectedInboxId
+          selectedInboxId: context.selectedInboxId,
+          telegramDeliveryAuthorizationEnabled:
+            feature
+              .findPrincipal(context.authenticated.session.principalId)
+              ?.telegramDeliveryAuthorizationInboxIds.includes(context.selectedInboxId) ?? false
         })
       );
     } catch {

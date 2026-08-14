@@ -1,5 +1,3 @@
-import { createHash } from 'node:crypto';
-
 import { CHANNELS, type Channel, type TelegramChatType } from '@open-channel-hub/contracts';
 import type {
   CreateOutboundReplyCommandResult,
@@ -14,6 +12,7 @@ import {
   INBOUND_EVENT_APPEND_LOCK_KEY,
   OUTBOUND_REPLY_COMMAND_CREATE_LOCK_KEY
 } from './postgres-lock-keys.js';
+import { createOutboundCommandScopeFingerprint } from './outbound-command-scope-fingerprint.js';
 import { POSTGRES_SCHEMA } from './postgres-migrations.js';
 import type { SqlClient, SqlPool } from './sql.js';
 
@@ -25,8 +24,6 @@ const PROVIDER_IDENTIFIER_PATTERN = /^[!-~]{1,512}$/;
 const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/;
 const ISO_UTC_MILLISECOND_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 const MAX_POSTGRES_BIGINT = '9223372036854775807';
-const AUTHORIZATION_SCOPE_FINGERPRINT_PREFIX =
-  'open-channel-hub/outbound-command-authorization-scope/v1\u0000';
 
 const COMMAND_COLUMNS_SQL = `
   outbound_command.command_id::text AS command_id,
@@ -383,7 +380,7 @@ const validateCreateInput = (input: OutboundReplyCommandCreateInput): ValidatedC
     allowedConnectionIds,
     authorization,
     clientOperationId: input.clientOperationId,
-    scopeFingerprint: createScopeFingerprint(allowedConnectionIds),
+    scopeFingerprint: createOutboundCommandScopeFingerprint(allowedConnectionIds),
     sourceConnectionId: input.sourceConnectionId,
     sourceProviderEventId: input.sourceProviderEventId,
     text: input.text
@@ -713,12 +710,6 @@ const validateAuthorization = (value: unknown): OutboundReplyCommandAuthorizatio
 
   return undefined;
 };
-
-const createScopeFingerprint = (allowedConnectionIds: readonly string[]): string =>
-  createHash('sha256')
-    .update(AUTHORIZATION_SCOPE_FINGERPRINT_PREFIX)
-    .update(allowedConnectionIds.join('\u0000'))
-    .digest('hex');
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;

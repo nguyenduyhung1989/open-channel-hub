@@ -81,6 +81,7 @@ const isFeature = (value: unknown): value is InboxFeature => {
     value === null ||
     !('connectionIds' in value) ||
     !('createDashboardReplyIntentCapability' in value) ||
+    !('createDashboardTelegramDeliveryAuthorizationCapability' in value) ||
     !('createOutboundReplyCommand' in value) ||
     !('id' in value) ||
     !('readInboundEvents' in value) ||
@@ -92,6 +93,7 @@ const isFeature = (value: unknown): value is InboxFeature => {
     typeof value.id !== 'string' ||
     !isIdentifier(value.id) ||
     typeof value.createDashboardReplyIntentCapability !== 'function' ||
+    typeof value.createDashboardTelegramDeliveryAuthorizationCapability !== 'function' ||
     typeof value.createOutboundReplyCommand !== 'function' ||
     typeof value.readInboundEvents !== 'function' ||
     typeof value.readOutboundReplyCommandHistory !== 'function' ||

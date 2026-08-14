@@ -544,6 +544,64 @@ CREATE TRIGGER outbound_telegram_command_eligibility_immutable
 BEFORE UPDATE OR DELETE ON ${POSTGRES_SCHEMA}.outbound_telegram_command_eligibility
 FOR EACH ROW
 EXECUTE FUNCTION ${POSTGRES_SCHEMA}.reject_outbound_telegram_command_eligibility_mutation()
+  `
+]);
+
+/**
+ * A separate, immutable human authorization is required before any future
+ * Telegram delivery attempt can even be considered. This migration does not
+ * create a worker, provider request, attempt, receipt, or mutable command
+ * state; it only captures the current dashboard-principal approval facts.
+ */
+const OUTBOUND_TELEGRAM_DELIVERY_AUTHORIZATIONS_ID =
+  '0013_outbound_telegram_delivery_authorizations';
+
+const OUTBOUND_TELEGRAM_DELIVERY_AUTHORIZATIONS_STATEMENTS = Object.freeze([
+  `
+CREATE TABLE ${POSTGRES_SCHEMA}.outbound_telegram_delivery_authorizations (
+  command_id bigint PRIMARY KEY,
+  inbox_id text NOT NULL,
+  dashboard_principal_id text NOT NULL,
+  scope_fingerprint text NOT NULL,
+  bot_identity_fingerprint text NOT NULL,
+  authorized_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT outbound_telegram_delivery_authorizations_command_fk FOREIGN KEY (command_id)
+    REFERENCES ${POSTGRES_SCHEMA}.outbound_telegram_command_eligibility (command_id),
+  CONSTRAINT outbound_telegram_delivery_authorizations_inbox_id_format CHECK (
+    char_length(inbox_id) BETWEEN 1 AND 128
+    AND inbox_id ~ '^[A-Za-z0-9._:-]{1,128}$'
+    AND inbox_id NOT IN ('.', '..')
+  ),
+  CONSTRAINT outbound_telegram_delivery_authorizations_dashboard_principal_id_format CHECK (
+    char_length(dashboard_principal_id) BETWEEN 1 AND 128
+    AND dashboard_principal_id ~ '^[A-Za-z0-9._:-]{1,128}$'
+    AND dashboard_principal_id NOT IN ('.', '..')
+  ),
+  CONSTRAINT outbound_telegram_delivery_authorizations_scope_fingerprint_format CHECK (
+    char_length(scope_fingerprint) = 64
+    AND scope_fingerprint ~ '^[a-f0-9]{64}$'
+  ),
+  CONSTRAINT outbound_telegram_delivery_authorizations_bot_identity_fingerprint_format CHECK (
+    char_length(bot_identity_fingerprint) = 64
+    AND bot_identity_fingerprint ~ '^[a-f0-9]{64}$'
+  )
+)
+`,
+  `
+CREATE FUNCTION ${POSTGRES_SCHEMA}.reject_outbound_telegram_delivery_authorization_mutation()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RAISE EXCEPTION 'Outbound Telegram delivery authorizations are immutable.';
+END;
+$$
+`,
+  `
+CREATE TRIGGER outbound_telegram_delivery_authorizations_immutable
+BEFORE UPDATE OR DELETE ON ${POSTGRES_SCHEMA}.outbound_telegram_delivery_authorizations
+FOR EACH ROW
+EXECUTE FUNCTION ${POSTGRES_SCHEMA}.reject_outbound_telegram_delivery_authorization_mutation()
 `
 ]);
 
@@ -631,6 +689,14 @@ const MIGRATIONS = Object.freeze([
       TELEGRAM_PRIVATE_REPLY_ELIGIBILITY_STATEMENTS
     ),
     statements: TELEGRAM_PRIVATE_REPLY_ELIGIBILITY_STATEMENTS
+  }),
+  Object.freeze({
+    id: OUTBOUND_TELEGRAM_DELIVERY_AUTHORIZATIONS_ID,
+    checksum: checksumFor(
+      OUTBOUND_TELEGRAM_DELIVERY_AUTHORIZATIONS_ID,
+      OUTBOUND_TELEGRAM_DELIVERY_AUTHORIZATIONS_STATEMENTS
+    ),
+    statements: OUTBOUND_TELEGRAM_DELIVERY_AUTHORIZATIONS_STATEMENTS
   })
 ]);
 

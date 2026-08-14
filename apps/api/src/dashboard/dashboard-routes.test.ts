@@ -1,6 +1,7 @@
 import argon2 from 'argon2';
 import type {
   CreateOutboundReplyCommandResult,
+  CreateOutboundTelegramDeliveryAuthorizationResult,
   DashboardSession,
   DashboardSessionCreateInput,
   DashboardSessionReadInput,
@@ -19,7 +20,8 @@ import type {
   DashboardInbox,
   DashboardPrincipal,
   DashboardReplyIntentInput,
-  DashboardReplyIntentInbox
+  DashboardReplyIntentInbox,
+  DashboardTelegramDeliveryAuthorizationInbox
 } from './dashboard-feature.js';
 
 const PUBLIC_ORIGIN = 'https://dashboard.example.test';
@@ -27,6 +29,9 @@ const SUPPORT_INBOX_TOKEN = 'synthetic_inbox_support_token_01234567890123456789'
 const SALES_INBOX_TOKEN = 'synthetic_inbox_sales_token_01234567890123456789012';
 const SUPPORT_CONNECTION_IDS = Object.freeze(['telegram-bot-support']);
 type ReplyIntentRecord = Mock<DashboardReplyIntentInbox['recordReplyIntent']>;
+type TelegramDeliveryAuthorizationRecord = Mock<
+  DashboardTelegramDeliveryAuthorizationInbox['recordTelegramDeliveryAuthorization']
+>;
 
 describe('dashboard routes', () => {
   const applications: Awaited<ReturnType<typeof buildApp>>[] = [];
@@ -143,6 +148,235 @@ describe('dashboard routes', () => {
     expect(response.body).toContain('Yêu cầu không thể xử lý an toàn.');
     expect(response.body).not.toContain('synthetic durable history failure');
     expect(historyRead).toHaveBeenCalledWith({ pageSize: 50 });
+  });
+
+  it('renders and records only a server-eligible Telegram delivery authorization fact', async () => {
+    const historyRead = vi.fn(async (): Promise<OutboundReplyCommandHistoryPage> => ({
+      commands: [unsafeHistoryEntry({ telegramDeliveryAuthorizationEligible: true })]
+    }));
+    const telegramDeliveryAuthorizationRecord = vi.fn<
+      DashboardTelegramDeliveryAuthorizationInbox['recordTelegramDeliveryAuthorization']
+    >(async (): Promise<CreateOutboundTelegramDeliveryAuthorizationResult> =>
+      Object.freeze({
+        authorization: Object.freeze({
+          authorizedAt: '2026-08-14T00:00:00.000Z',
+          commandId: '42',
+          dashboardPrincipalId: 'support-agent',
+          inboxId: 'support-inbox'
+        }),
+        kind: 'created' as const
+      })
+    );
+    const harness = await createHarness({
+      historyRead,
+      telegramDeliveryAuthorizationInboxIds: ['support-inbox'],
+      telegramDeliveryAuthorizationRecord
+    });
+    applications.push(harness.app);
+    const sessionCookie = await loginAndGetSessionCookie(harness.app);
+
+    const history = await harness.app.inject({
+      headers: { cookie: cookiePair(sessionCookie) },
+      method: 'GET',
+      url: '/operator/outbound-commands'
+    });
+
+    expect(history.statusCode).toBe(200);
+    expect(history.headers['cache-control']).toBe('no-store');
+    expect(history.body).toContain('action="/operator/telegram-delivery-authorizations"');
+    expect(history.body).toContain('Ghi chấp thuận Telegram');
+    expect(history.body).toContain('Thao tác này chưa gửi tin.');
+    expect(history.body).not.toContain(SUPPORT_INBOX_TOKEN);
+    expect(history.body).not.toContain('synthetic-private-reply-target');
+    expect(history.body).not.toContain('synthetic-private-source-message');
+    expect(history.body).not.toContain('synthetic-private-source-channel');
+    expect(history.body).not.toContain('synthetic-private-client-operation');
+    expect(history.body).not.toContain('synthetic-bot-identity-fingerprint');
+    expect(history.body).not.toContain('name="recipientId"');
+    expect(history.body).not.toContain('name="text"');
+    expect(history.body).not.toContain('name="attempt"');
+    expect(history.body).not.toContain('name="send"');
+    expect(history.body).not.toContain('name="retry"');
+
+    const form = telegramDeliveryAuthorizationFormFrom(history.body);
+
+    expect(form).toEqual({
+      commandId: '42',
+      csrf: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/),
+      inbox: 'support-inbox'
+    });
+
+    const response = await harness.app.inject({
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        cookie: cookiePair(sessionCookie),
+        origin: PUBLIC_ORIGIN
+      },
+      method: 'POST',
+      payload: telegramDeliveryAuthorizationPayload(form),
+      url: '/operator/telegram-delivery-authorizations'
+    });
+
+    expect(response.statusCode).toBe(303);
+    expect(response.headers.location).toBe('/operator/outbound-commands?inbox=support-inbox');
+    expect(telegramDeliveryAuthorizationRecord).toHaveBeenCalledWith({ commandId: '42' });
+    expect(Object.keys(telegramDeliveryAuthorizationRecord.mock.calls[0]?.[0] ?? {})).toEqual([
+      'commandId'
+    ]);
+    expect(JSON.stringify(telegramDeliveryAuthorizationRecord.mock.calls)).not.toContain(
+      'synthetic-private-reply-target'
+    );
+  });
+
+  it('keeps Telegram delivery authorization unavailable or malformed requests away from its recorder', async () => {
+    const eligibleHistory = vi.fn(async (): Promise<OutboundReplyCommandHistoryPage> => ({
+      commands: [unsafeHistoryEntry({ telegramDeliveryAuthorizationEligible: true })]
+    }));
+    const unavailableHarness = await createHarness({
+      historyRead: eligibleHistory,
+      telegramDeliveryAuthorizationInboxIds: ['support-inbox']
+    });
+    const readOnlyHarness = await createHarness({ historyRead: eligibleHistory });
+    const conflictHarness = await createHarness({
+      historyRead: eligibleHistory,
+      telegramDeliveryAuthorizationInboxIds: ['support-inbox'],
+      telegramDeliveryAuthorizationRecord: vi.fn(
+        async (): Promise<CreateOutboundTelegramDeliveryAuthorizationResult> =>
+          Object.freeze({ kind: 'authorization_conflict' })
+      )
+    });
+    applications.push(unavailableHarness.app, readOnlyHarness.app, conflictHarness.app);
+
+    const sessionCookie = await loginAndGetSessionCookie(unavailableHarness.app);
+    const history = await unavailableHarness.app.inject({
+      headers: { cookie: cookiePair(sessionCookie) },
+      method: 'GET',
+      url: '/operator/outbound-commands'
+    });
+    const form = telegramDeliveryAuthorizationFormFrom(history.body);
+    const payload = telegramDeliveryAuthorizationPayload(form);
+
+    const originFailure = await unavailableHarness.app.inject({
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        cookie: cookiePair(sessionCookie),
+        origin: 'https://attacker.example.test'
+      },
+      method: 'POST',
+      payload,
+      url: '/operator/telegram-delivery-authorizations'
+    });
+    const csrfFailure = await unavailableHarness.app.inject({
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        cookie: cookiePair(sessionCookie),
+        origin: PUBLIC_ORIGIN
+      },
+      method: 'POST',
+      payload: telegramDeliveryAuthorizationPayload({
+        ...form,
+        csrf: Buffer.alloc(32, 3).toString('base64url')
+      }),
+      url: '/operator/telegram-delivery-authorizations'
+    });
+    const malformed = await unavailableHarness.app.inject({
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        cookie: cookiePair(sessionCookie),
+        origin: PUBLIC_ORIGIN
+      },
+      method: 'POST',
+      payload: `${payload}&recipientId=forbidden`,
+      url: '/operator/telegram-delivery-authorizations'
+    });
+    const outOfRangeCommandId = await unavailableHarness.app.inject({
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        cookie: cookiePair(sessionCookie),
+        origin: PUBLIC_ORIGIN
+      },
+      method: 'POST',
+      payload: telegramDeliveryAuthorizationPayload({
+        ...form,
+        commandId: '9223372036854775808'
+      }),
+      url: '/operator/telegram-delivery-authorizations'
+    });
+    expect(outOfRangeCommandId.statusCode).toBe(400);
+    expect(unavailableHarness.telegramDeliveryAuthorizationRecord).not.toHaveBeenCalled();
+    const unavailable = await unavailableHarness.app.inject({
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        cookie: cookiePair(sessionCookie),
+        origin: PUBLIC_ORIGIN
+      },
+      method: 'POST',
+      payload,
+      url: '/operator/telegram-delivery-authorizations'
+    });
+
+    const readOnlySession = await loginAndGetSessionCookie(readOnlyHarness.app);
+    const readOnlyPage = await readOnlyHarness.app.inject({
+      headers: { cookie: cookiePair(readOnlySession) },
+      method: 'GET',
+      url: '/operator/outbound-commands'
+    });
+    const readOnly = await readOnlyHarness.app.inject({
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        cookie: cookiePair(readOnlySession),
+        origin: PUBLIC_ORIGIN
+      },
+      method: 'POST',
+      payload: telegramDeliveryAuthorizationPayload({
+        ...form,
+        csrf: hiddenCsrf(readOnlyPage.body)
+      }),
+      url: '/operator/telegram-delivery-authorizations'
+    });
+
+    const conflict = await submitRenderedTelegramDeliveryAuthorization(conflictHarness.app);
+
+    expect(originFailure.statusCode).toBe(403);
+    expect(csrfFailure.statusCode).toBe(403);
+    expect(malformed.statusCode).toBe(400);
+    expect(outOfRangeCommandId.statusCode).toBe(400);
+    expect(unavailable.statusCode).toBe(404);
+    expect(readOnly.statusCode).toBe(404);
+    expect(conflict.statusCode).toBe(409);
+    expect(unavailableHarness.telegramDeliveryAuthorizationRecord).toHaveBeenCalledOnce();
+    expect(readOnlyHarness.telegramDeliveryAuthorizationRecord).not.toHaveBeenCalled();
+
+    for (const response of [
+      originFailure,
+      csrfFailure,
+      malformed,
+      outOfRangeCommandId,
+      unavailable,
+      readOnly,
+      conflict
+    ]) {
+      expect(response.body).toContain('Yêu cầu không thể xử lý an toàn.');
+      expect(response.body).not.toContain('synthetic-private-reply-target');
+    }
+
+    const ineligibleHarness = await createHarness({
+      historyRead: vi.fn(async (): Promise<OutboundReplyCommandHistoryPage> => ({
+        commands: [unsafeHistoryEntry({ telegramDeliveryAuthorizationEligible: false })]
+      })),
+      telegramDeliveryAuthorizationInboxIds: ['support-inbox']
+    });
+    applications.push(ineligibleHarness.app);
+    const ineligibleSession = await loginAndGetSessionCookie(ineligibleHarness.app);
+    const ineligibleHistory = await ineligibleHarness.app.inject({
+      headers: { cookie: cookiePair(ineligibleSession) },
+      method: 'GET',
+      url: '/operator/outbound-commands'
+    });
+
+    expect(ineligibleHistory.body).not.toContain(
+      'action="/operator/telegram-delivery-authorizations"'
+    );
   });
 
   it('uses signed secure HttpOnly cookies, server-only inbox reads, and escaped HTML', async () => {
@@ -865,6 +1099,8 @@ const createHarness = async (
     historyRead?: ReturnType<typeof vi.fn>;
     replyIntentInboxIds?: readonly string[];
     replyIntentRecord?: ReplyIntentRecord;
+    telegramDeliveryAuthorizationInboxIds?: readonly string[];
+    telegramDeliveryAuthorizationRecord?: TelegramDeliveryAuthorizationRecord;
     supportRead?: ReturnType<typeof vi.fn>;
   }> = {}
 ): Promise<
@@ -872,6 +1108,7 @@ const createHarness = async (
     app: Awaited<ReturnType<typeof buildApp>>;
     historyRead: ReturnType<typeof vi.fn>;
     replyIntentRecord: ReplyIntentRecord;
+    telegramDeliveryAuthorizationRecord: TelegramDeliveryAuthorizationRecord;
     store: ReturnType<typeof createSessionStore>;
   }>
 > => {
@@ -905,6 +1142,12 @@ const createHarness = async (
       }
     );
   const store = createSessionStore();
+  const telegramDeliveryAuthorizationRecord =
+    options.telegramDeliveryAuthorizationRecord ??
+    vi.fn<DashboardTelegramDeliveryAuthorizationInbox['recordTelegramDeliveryAuthorization']>(
+      async (): Promise<CreateOutboundTelegramDeliveryAuthorizationResult> =>
+        Object.freeze({ kind: 'command_unavailable' })
+    );
   const supportInbox = inbox(
     'support-inbox',
     SUPPORT_CONNECTION_IDS,
@@ -915,12 +1158,20 @@ const createHarness = async (
     id: 'support-agent',
     inboxIds: Object.freeze(['support-inbox']),
     passwordHash,
-    replyIntentInboxIds: Object.freeze([...(options.replyIntentInboxIds ?? [])])
+    replyIntentInboxIds: Object.freeze([...(options.replyIntentInboxIds ?? [])]),
+    telegramDeliveryAuthorizationInboxIds: Object.freeze([
+      ...(options.telegramDeliveryAuthorizationInboxIds ?? [])
+    ])
   });
   const replyIntentInbox: DashboardReplyIntentInbox = Object.freeze({
     id: supportInbox.id,
     recordReplyIntent: replyIntentRecord
   });
+  const telegramDeliveryAuthorizationInbox: DashboardTelegramDeliveryAuthorizationInbox =
+    Object.freeze({
+      id: supportInbox.id,
+      recordTelegramDeliveryAuthorization: telegramDeliveryAuthorizationRecord
+    });
   const feature: DashboardFeature = Object.freeze({
     findInbox: (principalId: string, inboxId: string): DashboardInbox | undefined =>
       principalId === principal.id && inboxId === supportInbox.id ? supportInbox : undefined,
@@ -932,6 +1183,15 @@ const createHarness = async (
       principal.replyIntentInboxIds.includes(inboxId) &&
       inboxId === replyIntentInbox.id
         ? replyIntentInbox
+        : undefined,
+    findTelegramDeliveryAuthorizationInbox: (
+      principalId: string,
+      inboxId: string
+    ): DashboardTelegramDeliveryAuthorizationInbox | undefined =>
+      principalId === principal.id &&
+      principal.telegramDeliveryAuthorizationInboxIds.includes(inboxId) &&
+      inboxId === telegramDeliveryAuthorizationInbox.id
+        ? telegramDeliveryAuthorizationInbox
         : undefined,
     findPrincipal: (principalId: string): DashboardPrincipal | undefined =>
       principalId === principal.id ? principal : undefined,
@@ -949,6 +1209,7 @@ const createHarness = async (
     app: await buildApp({ dashboard: feature }),
     historyRead,
     replyIntentRecord,
+    telegramDeliveryAuthorizationRecord,
     store
   });
 };
@@ -1058,9 +1319,14 @@ const canonicalEvent = (
 
 /** Deliberately adds forbidden fields to prove the HTML renderer ignores them. */
 const unsafeHistoryEntry = (
-  overrides: Readonly<Partial<Pick<OutboundReplyCommandHistoryEntry, 'text'>>> = {}
+  overrides: Readonly<
+    Partial<
+      Pick<OutboundReplyCommandHistoryEntry, 'telegramDeliveryAuthorizationEligible' | 'text'>
+    >
+  > = {}
 ): OutboundReplyCommandHistoryEntry =>
   Object.freeze({
+    botIdentityFingerprint: 'synthetic-bot-identity-fingerprint',
     clientOperationId: 'synthetic-private-client-operation',
     createdAt: '2026-08-13T00:00:00.000Z',
     id: '42',
@@ -1070,6 +1336,7 @@ const unsafeHistoryEntry = (
     sourceMessageId: 'synthetic-private-source-message',
     sourceProviderEventId: 'synthetic-provider-event-should-not-render',
     state: 'queued' as const,
+    telegramDeliveryAuthorizationEligible: overrides.telegramDeliveryAuthorizationEligible ?? false,
     text: overrides.text ?? 'Synthetic queued dashboard history'
   }) as unknown as OutboundReplyCommandHistoryEntry;
 
@@ -1158,6 +1425,35 @@ const replyIntentPayload = (form: ReplyIntentForm, text: string): string =>
     text
   }).toString();
 
+interface TelegramDeliveryAuthorizationForm {
+  readonly commandId: string;
+  readonly csrf: string;
+  readonly inbox: string;
+}
+
+const telegramDeliveryAuthorizationFormFrom = (html: string): TelegramDeliveryAuthorizationForm => {
+  const form = html.match(
+    /<form action="\/operator\/telegram-delivery-authorizations" method="post" class="reply-intent-form">([\s\S]*?)<\/form>/
+  )?.[1];
+
+  if (form === undefined) {
+    throw new Error('Missing synthetic Telegram delivery-authorization form.');
+  }
+
+  return Object.freeze({
+    commandId: hiddenInputValue(form, 'commandId'),
+    csrf: hiddenInputValue(form, 'csrf'),
+    inbox: hiddenInputValue(form, 'inbox')
+  });
+};
+
+const telegramDeliveryAuthorizationPayload = (form: TelegramDeliveryAuthorizationForm): string =>
+  new URLSearchParams({
+    commandId: form.commandId,
+    csrf: form.csrf,
+    inbox: form.inbox
+  }).toString();
+
 const submitRenderedReplyIntent = async (
   app: Awaited<ReturnType<typeof buildApp>>
 ): Promise<Awaited<ReturnType<Awaited<ReturnType<typeof buildApp>>['inject']>>> => {
@@ -1178,5 +1474,28 @@ const submitRenderedReplyIntent = async (
     method: 'POST',
     payload: replyIntentPayload(form, 'synthetic text must never be echoed'),
     url: '/operator/reply-intents'
+  });
+};
+
+const submitRenderedTelegramDeliveryAuthorization = async (
+  app: Awaited<ReturnType<typeof buildApp>>
+): Promise<Awaited<ReturnType<Awaited<ReturnType<typeof buildApp>>['inject']>>> => {
+  const sessionCookie = await loginAndGetSessionCookie(app);
+  const page = await app.inject({
+    headers: { cookie: cookiePair(sessionCookie) },
+    method: 'GET',
+    url: '/operator/outbound-commands'
+  });
+  const form = telegramDeliveryAuthorizationFormFrom(page.body);
+
+  return app.inject({
+    headers: {
+      'content-type': 'application/x-www-form-urlencoded',
+      cookie: cookiePair(sessionCookie),
+      origin: PUBLIC_ORIGIN
+    },
+    method: 'POST',
+    payload: telegramDeliveryAuthorizationPayload(form),
+    url: '/operator/telegram-delivery-authorizations'
   });
 };

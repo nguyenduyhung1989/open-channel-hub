@@ -10,3 +10,9 @@ export const CONNECTION_REGISTRY_LOCK_KEY = 1_864_659_703;
  * throughput; provider dispatch does not exist at this boundary yet.
  */
 export const OUTBOUND_REPLY_COMMAND_CREATE_LOCK_KEY = 1_864_659_704;
+
+/**
+ * Serializes immutable Telegram delivery-authorization decisions after the
+ * inbound and reply-command locks. It never covers provider HTTP work.
+ */
+export const OUTBOUND_TELEGRAM_DELIVERY_AUTHORIZATION_CREATE_LOCK_KEY = 1_864_659_705;

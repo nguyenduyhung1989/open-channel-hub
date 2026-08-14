@@ -3,7 +3,8 @@ import type {
   InboundEventPage,
   OutboundReplyCommandHistoryPage,
   OutboundReplyCommandHistoryReader,
-  OutboundReplyCommandStore
+  OutboundReplyCommandStore,
+  OutboundTelegramDeliveryAuthorizationStore
 } from '@open-channel-hub/domain';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -39,11 +40,17 @@ describe('createRuntimeInboxFeatures', () => {
     const outboundHistoryReader: OutboundReplyCommandHistoryReader = Object.freeze({
       list: listOutboundHistory
     });
+    const createTelegramDeliveryAuthorization = vi.fn(async () =>
+      Object.freeze({ kind: 'command_unavailable' } as const)
+    );
+    const telegramDeliveryAuthorizationStore: OutboundTelegramDeliveryAuthorizationStore =
+      Object.freeze({ create: createTelegramDeliveryAuthorization });
     const features = createRuntimeInboxFeatures(
       [RUNTIME_INBOX],
       reader,
       commandStore,
-      outboundHistoryReader
+      outboundHistoryReader,
+      telegramDeliveryAuthorizationStore
     );
     const feature = features[0];
 
@@ -76,6 +83,7 @@ describe('createRuntimeInboxFeatures', () => {
     expect(listOutboundHistory).toHaveBeenCalledWith({
       allowedConnectionIds: RUNTIME_INBOX.connectionIds,
       cursor: { beforeSequence: '3', snapshotMaxSequence: '7' },
+      inboxId: 'support',
       pageSize: 25
     });
 
@@ -121,6 +129,23 @@ describe('createRuntimeInboxFeatures', () => {
       sourceConnectionId: 'telegram-bot-support',
       sourceProviderEventId: '9002',
       text: 'A server-bound dashboard reply intent.'
+    });
+
+    const telegramDeliveryAuthorizationCapability =
+      feature?.createDashboardTelegramDeliveryAuthorizationCapability('support-approver');
+
+    expect(telegramDeliveryAuthorizationCapability).toBeDefined();
+    expect(Object.isFrozen(telegramDeliveryAuthorizationCapability)).toBe(true);
+
+    await telegramDeliveryAuthorizationCapability?.recordTelegramDeliveryAuthorization({
+      commandId: '42'
+    });
+
+    expect(createTelegramDeliveryAuthorization).toHaveBeenCalledWith({
+      allowedConnectionIds: RUNTIME_INBOX.connectionIds,
+      commandId: '42',
+      dashboardPrincipalId: 'support-approver',
+      inboxId: 'support'
     });
   });
 });

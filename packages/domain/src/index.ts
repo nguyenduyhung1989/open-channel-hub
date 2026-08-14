@@ -33,6 +33,12 @@ export type {
   OutboundReplyCommandCreateInput,
   OutboundReplyCommandStore
 } from './ports/outbound-reply-command-store.js';
+export type {
+  CreateOutboundTelegramDeliveryAuthorizationResult,
+  OutboundTelegramDeliveryAuthorization,
+  OutboundTelegramDeliveryAuthorizationCreateInput,
+  OutboundTelegramDeliveryAuthorizationStore
+} from './ports/outbound-telegram-delivery-authorization-store.js';
 export { SendMessage } from './send-message.js';
 export type {
   SendMessageConnectionMismatchError,

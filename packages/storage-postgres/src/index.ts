@@ -8,4 +8,5 @@ export { PostgresInboundEventReader } from './postgres-inbound-event-reader.js';
 export { PostgresInboundEventStore } from './postgres-inbound-event-store.js';
 export { PostgresOutboundReplyCommandStore } from './postgres-outbound-reply-command-store.js';
 export { PostgresOutboundReplyCommandHistoryReader } from './postgres-outbound-reply-command-history-reader.js';
+export { PostgresOutboundTelegramDeliveryAuthorizationStore } from './postgres-outbound-telegram-delivery-authorization-store.js';
 export { POSTGRES_SCHEMA } from './postgres-migrations.js';

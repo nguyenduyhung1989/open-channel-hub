@@ -1,5 +1,6 @@
 import type {
   CreateOutboundReplyCommandResult,
+  CreateOutboundTelegramDeliveryAuthorizationResult,
   InboundEventPage,
   InboundEventPageCursor,
   OutboundReplyCommandHistoryPage,
@@ -33,6 +34,21 @@ export interface InboxDashboardReplyIntentCapability {
   readonly recordReplyIntent: (
     input: InboxOutboundReplyCommandInput
   ) => Promise<CreateOutboundReplyCommandResult>;
+}
+
+/**
+ * A separate dashboard-only capability for recording human approval of one
+ * already-queued Telegram command. It has no attempt or provider behavior.
+ */
+export interface InboxDashboardTelegramDeliveryAuthorizationCapability {
+  readonly recordTelegramDeliveryAuthorization: (
+    input: InboxTelegramDeliveryAuthorizationInput
+  ) => Promise<CreateOutboundTelegramDeliveryAuthorizationResult>;
+}
+
+/** The only untrusted command reference a browser form may transport. */
+export interface InboxTelegramDeliveryAuthorizationInput {
+  readonly commandId: string;
 }
 
 /** An inbox-local outbound-command history request with no caller-selected scope. */
@@ -73,4 +89,11 @@ export interface InboxFeature extends InboxBearerFeature {
   readonly createDashboardReplyIntentCapability: (
     dashboardPrincipalId: string
   ) => InboxDashboardReplyIntentCapability;
+  /**
+   * A distinct closure used only after server-side dashboard configuration has
+   * granted this principal the separate Telegram-delivery authorization scope.
+   */
+  readonly createDashboardTelegramDeliveryAuthorizationCapability: (
+    dashboardPrincipalId: string
+  ) => InboxDashboardTelegramDeliveryAuthorizationCapability;
 }

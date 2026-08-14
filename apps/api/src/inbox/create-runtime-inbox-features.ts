@@ -2,16 +2,19 @@ import type {
   InboundEventFeedReader,
   OutboundReplyCommandHistoryReader,
   OutboundReplyCommandAuthorization,
-  OutboundReplyCommandStore
+  OutboundReplyCommandStore,
+  OutboundTelegramDeliveryAuthorizationStore
 } from '@open-channel-hub/domain';
 
 import type { RuntimeInbox } from '../connections/runtime-connection-configuration.js';
 import type {
   InboxFeature,
   InboxDashboardReplyIntentCapability,
+  InboxDashboardTelegramDeliveryAuthorizationCapability,
   InboxInboundEventListInput,
   InboxOutboundReplyCommandHistoryListInput,
-  InboxOutboundReplyCommandInput
+  InboxOutboundReplyCommandInput,
+  InboxTelegramDeliveryAuthorizationInput
 } from './inbox-feature.js';
 
 /**
@@ -23,7 +26,8 @@ export const createRuntimeInboxFeatures = (
   inboxes: readonly RuntimeInbox[],
   inboundEventFeedReader: InboundEventFeedReader,
   outboundReplyCommandStore: OutboundReplyCommandStore,
-  outboundReplyCommandHistoryReader: OutboundReplyCommandHistoryReader
+  outboundReplyCommandHistoryReader: OutboundReplyCommandHistoryReader,
+  outboundTelegramDeliveryAuthorizationStore: OutboundTelegramDeliveryAuthorizationStore
 ): readonly InboxFeature[] =>
   Object.freeze(
     inboxes.map((inbox) => {
@@ -33,7 +37,11 @@ export const createRuntimeInboxFeatures = (
       const readOutboundReplyCommandHistory = async (
         input: InboxOutboundReplyCommandHistoryListInput
       ) =>
-        outboundReplyCommandHistoryReader.list({ ...input, allowedConnectionIds: connectionIds });
+        outboundReplyCommandHistoryReader.list({
+          ...input,
+          allowedConnectionIds: connectionIds,
+          inboxId: inbox.id
+        });
       const createCommand = async (
         input: InboxOutboundReplyCommandInput,
         authorization: OutboundReplyCommandAuthorization
@@ -70,10 +78,27 @@ export const createRuntimeInboxFeatures = (
               })
             )
         });
+      const createDashboardTelegramDeliveryAuthorizationCapability = (
+        dashboardPrincipalId: string
+      ): InboxDashboardTelegramDeliveryAuthorizationCapability =>
+        Object.freeze({
+          recordTelegramDeliveryAuthorization: async (
+            input: InboxTelegramDeliveryAuthorizationInput
+          ) =>
+            outboundTelegramDeliveryAuthorizationStore.create(
+              Object.freeze({
+                allowedConnectionIds: connectionIds,
+                commandId: input.commandId,
+                dashboardPrincipalId,
+                inboxId: inbox.id
+              })
+            )
+        });
 
       return Object.freeze({
         connectionIds,
         createDashboardReplyIntentCapability,
+        createDashboardTelegramDeliveryAuthorizationCapability,
         createOutboundReplyCommand,
         id: inbox.id,
         readInboundEvents,

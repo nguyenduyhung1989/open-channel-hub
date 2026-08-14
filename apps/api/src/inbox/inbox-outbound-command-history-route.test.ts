@@ -57,7 +57,8 @@ describe('Inbox outbound-command history route', () => {
       raw: 'synthetic-private-raw-payload',
       replyTargetId: 'synthetic-private-reply-target',
       sourceChannel: 'telegram_bot',
-      sourceMessageId: 'synthetic-private-source-message'
+      sourceMessageId: 'synthetic-private-source-message',
+      telegramDeliveryAuthorizationEligible: true
     }) as OutboundReplyCommandHistoryEntry;
     const { feature, readOutboundReplyCommandHistory } = createFeature({
       readOutboundReplyCommandHistory: vi.fn(
@@ -80,7 +81,7 @@ describe('Inbox outbound-command history route', () => {
     expect(firstPage.json()).toEqual({
       success: true,
       data: {
-        commands: [command()],
+        commands: [publicCommand()],
         nextCursor: expect.any(String)
       }
     });
@@ -90,6 +91,7 @@ describe('Inbox outbound-command history route', () => {
     expect(firstPage.body).not.toContain('replyTargetId');
     expect(firstPage.body).not.toContain('sourceChannel');
     expect(firstPage.body).not.toContain('sourceMessageId');
+    expect(firstPage.body).not.toContain('telegramDeliveryAuthorizationEligible');
     expect(firstPage.body).not.toContain('synthetic-private-client-operation');
     expect(firstPage.body).not.toContain('synthetic-private-raw-payload');
     expect(firstPage.body).not.toContain('synthetic-private-reply-target');
@@ -253,6 +255,24 @@ const command = (): OutboundReplyCommandHistoryEntry =>
     sourceConnectionId: 'telegram-bot-support',
     sourceProviderEventId: '9001',
     state: 'queued',
+    telegramDeliveryAuthorizationEligible: false,
+    text: 'Synthetic queued operator reply'
+  });
+
+const publicCommand = (): Readonly<{
+  createdAt: string;
+  id: string;
+  sourceConnectionId: string;
+  sourceProviderEventId: string;
+  state: 'queued';
+  text: string;
+}> =>
+  Object.freeze({
+    createdAt: '2026-08-13T00:00:00.000Z',
+    id: '42',
+    sourceConnectionId: 'telegram-bot-support',
+    sourceProviderEventId: '9001',
+    state: 'queued',
     text: 'Synthetic queued operator reply'
   });
 
@@ -280,7 +300,15 @@ const createFeature = (
     readInboundEvents: vi.fn(async (): Promise<InboundEventPage> => ({ events: [] })),
     readOutboundReplyCommandHistory,
     token: SUPPORT_TOKEN,
-    ...overrides
+    ...overrides,
+    createDashboardTelegramDeliveryAuthorizationCapability:
+      overrides.createDashboardTelegramDeliveryAuthorizationCapability ??
+      vi.fn(() =>
+        Object.freeze({
+          recordTelegramDeliveryAuthorization: async () =>
+            Object.freeze({ kind: 'command_unavailable' } as const)
+        })
+      )
   });
 
   return Object.freeze({

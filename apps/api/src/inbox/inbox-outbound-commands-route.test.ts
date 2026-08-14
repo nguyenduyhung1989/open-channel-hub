@@ -292,7 +292,15 @@ const createFeature = (
       commands: []
     })),
     token: SUPPORT_TOKEN,
-    ...overrides
+    ...overrides,
+    createDashboardTelegramDeliveryAuthorizationCapability:
+      overrides.createDashboardTelegramDeliveryAuthorizationCapability ??
+      vi.fn(() =>
+        Object.freeze({
+          recordTelegramDeliveryAuthorization: async () =>
+            Object.freeze({ kind: 'command_unavailable' } as const)
+        })
+      )
   });
 
   return Object.freeze({

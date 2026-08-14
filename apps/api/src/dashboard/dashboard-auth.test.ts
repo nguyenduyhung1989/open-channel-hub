@@ -16,7 +16,8 @@ describe('dashboard authentication helpers', () => {
       id: 'support-agent',
       inboxIds: ['support-inbox'],
       passwordHash,
-      replyIntentInboxIds: []
+      replyIntentInboxIds: [],
+      telegramDeliveryAuthorizationInboxIds: []
     };
 
     await expect(verifyDashboardPassword(principal, 'synthetic dashboard password')).resolves.toBe(

@@ -66,7 +66,14 @@ export const registerInboxOutboundCommandHistoryRoute = async (
 
 const toPublicOutboundReplyCommandHistoryEntry = (
   command: OutboundReplyCommandHistoryEntry
-): OutboundReplyCommandHistoryEntry =>
+): Readonly<{
+  createdAt: string;
+  id: string;
+  sourceConnectionId: string;
+  sourceProviderEventId: string;
+  state: 'queued';
+  text: string;
+}> =>
   Object.freeze({
     createdAt: command.createdAt,
     id: command.id,

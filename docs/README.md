@@ -42,9 +42,11 @@
   candidate immutable authority evidence with no provider dispatch.
 - [Phase 4i Telegram private-reply eligibility](operations/telegram-private-reply-eligibility-4i.md):
   candidate private-chat and Bot-identity evidence with no provider dispatch.
-- [Phase 0–4i threat model](security/threat-model.md): assets, trust
+- [Phase 4j Telegram delivery authorization](operations/telegram-delivery-authorization-4j.md):
+  candidate immutable human authorization evidence with no provider dispatch.
+- [Phase 0–4j threat model](security/threat-model.md): assets, trust
   boundaries, current controls, and planned work.
 - [Open-source readiness](maintainers/oss-readiness.md): an honest operating
   checklist for maintainers.
-- [Phase 4a–4i checkpoint](maintainers/current-phase.md): verified milestones,
-  the Phase 4h–4i candidate boundaries, risks, and next design work.
+- [Phase 4a–4j checkpoint](maintainers/current-phase.md): verified milestones,
+  the Phase 4h–4j candidate boundaries, risks, and next design work.

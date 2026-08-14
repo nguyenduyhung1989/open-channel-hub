@@ -1,5 +1,6 @@
 import type {
   CreateOutboundReplyCommandResult,
+  CreateOutboundTelegramDeliveryAuthorizationResult,
   DashboardSessionStore,
   InboundEventPage,
   InboundEventPageCursor,
@@ -14,6 +15,8 @@ export interface DashboardPrincipal {
   readonly passwordHash: string;
   /** The configured subset allowed to record source-bound reply intent. */
   readonly replyIntentInboxIds: readonly string[];
+  /** The separate configured subset allowed to record Telegram approval evidence. */
+  readonly telegramDeliveryAuthorizationInboxIds: readonly string[];
 }
 
 /**
@@ -49,6 +52,22 @@ export interface DashboardReplyIntentInbox {
   ) => Promise<CreateOutboundReplyCommandResult>;
 }
 
+/** The only dashboard input accepted for immutable Telegram approval evidence. */
+export interface DashboardTelegramDeliveryAuthorizationInput {
+  readonly commandId: string;
+}
+
+/**
+ * A server-only capability to record human Telegram delivery authorization.
+ * It contains no provider client, attempt writer, credential, or bearer.
+ */
+export interface DashboardTelegramDeliveryAuthorizationInbox {
+  readonly id: string;
+  readonly recordTelegramDeliveryAuthorization: (
+    input: DashboardTelegramDeliveryAuthorizationInput
+  ) => Promise<CreateOutboundTelegramDeliveryAuthorizationResult>;
+}
+
 /** A dashboard page request whose effective connection scope is immutable. */
 export interface DashboardInboxReadInput {
   readonly cursor?: InboundEventPageCursor;
@@ -76,6 +95,10 @@ export interface DashboardFeature {
     principalId: string,
     inboxId: string
   ) => DashboardReplyIntentInbox | undefined;
+  findTelegramDeliveryAuthorizationInbox: (
+    principalId: string,
+    inboxId: string
+  ) => DashboardTelegramDeliveryAuthorizationInbox | undefined;
   findPrincipal: (principalId: string) => DashboardPrincipal | undefined;
   listInboxes: (principalId: string) => readonly DashboardInbox[];
 }

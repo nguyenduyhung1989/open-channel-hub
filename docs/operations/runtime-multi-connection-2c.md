@@ -345,6 +345,14 @@ prefix or token, and refuses to add a first fingerprint to a Telegram connection
 ID that already has durable inbound history. Use a new connection ID for that
 Bot rather than manually editing or backfilling PostgreSQL.
 
+Candidate Phase 4j adds an optional
+`dashboard.principals[].telegramDeliveryAuthorizationInboxIds` array. It is a
+strict unique subset of that principal's readable `inboxIds`; omission becomes
+an empty immutable set. It is separate from `replyIntentInboxIds`, so read,
+intent-recording, and Telegram-authorization authority are independently
+configured. The list creates no provider credential, dispatcher, or send
+permission.
+
 For Facebook Page, migration
 <code>0006_connection_registry_facebook_page_provider_identity</code> requires
 the same opaque fingerprint field for every `facebook_page` row. It derives

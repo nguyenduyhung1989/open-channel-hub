@@ -25,6 +25,7 @@ export interface DashboardOutboundCommandHistoryPageInput {
   readonly nextCursor?: string;
   readonly principalId: string;
   readonly selectedInboxId: string;
+  readonly telegramDeliveryAuthorizationEnabled: boolean;
 }
 
 /** Renders a no-script login page with an explicit anti-forgery form token. */
@@ -120,7 +121,7 @@ export const renderDashboardPage = (input: DashboardPageInput): string => {
   });
 };
 
-/** Renders queued reply intents without adding a browser write or bearer surface. */
+/** Renders queued reply intents without exposing a bearer or delivery path. */
 export const renderDashboardOutboundCommandHistoryPage = (
   input: DashboardOutboundCommandHistoryPageInput
 ): string => {
@@ -137,7 +138,9 @@ export const renderDashboardOutboundCommandHistoryPage = (
   const commandRows =
     input.commands.length === 0
       ? '<p class="empty-state">Chưa có ý định trả lời nào đang chờ trong phạm vi này.</p>'
-      : `<ol class="command-list">${input.commands.map(renderOutboundCommand).join('')}</ol>`;
+      : `<ol class="command-list">${input.commands
+          .map((command) => renderOutboundCommand(command, input))
+          .join('')}</ol>`;
   const nextPage =
     input.nextCursor === undefined
       ? ''
@@ -150,7 +153,7 @@ export const renderDashboardOutboundCommandHistoryPage = (
       <main class="dashboard-shell" aria-labelledby="dashboard-title">
         <header class="dashboard-header">
           <div>
-            <p class="eyebrow">OPEN CHANNEL HUB / READ ONLY</p>
+            <p class="eyebrow">OPEN CHANNEL HUB / HÀNG ĐỢI</p>
             <h1 id="dashboard-title">Bảng tín hiệu</h1>
           </div>
           <form action="/operator/logout" method="post">
@@ -213,7 +216,10 @@ const renderReplyIntentForm = (event: CanonicalEvent, input: DashboardPageInput)
     <button type="submit">Ghi ý định trả lời</button>
   </form>`;
 
-const renderOutboundCommand = (command: OutboundReplyCommandHistoryEntry): string => `
+const renderOutboundCommand = (
+  command: OutboundReplyCommandHistoryEntry,
+  input: DashboardOutboundCommandHistoryPageInput
+): string => `
   <li class="command-card">
     <div class="event-meta">
       <span>ĐÃ GHI, CHƯA GỬI</span>
@@ -223,7 +229,29 @@ const renderOutboundCommand = (command: OutboundReplyCommandHistoryEntry): strin
     <dl>
       <div><dt>Kết nối</dt><dd>${escapeHtml(command.sourceConnectionId)}</dd></div>
     </dl>
+    ${
+      input.telegramDeliveryAuthorizationEnabled && command.telegramDeliveryAuthorizationEligible
+        ? renderTelegramDeliveryAuthorizationForm(command, input)
+        : ''
+    }
   </li>`;
+
+/**
+ * The command ID is a non-secret, server-validated transport reference. This
+ * form records only an immutable approval fact; it cannot send, retry, or
+ * create a delivery attempt.
+ */
+const renderTelegramDeliveryAuthorizationForm = (
+  command: OutboundReplyCommandHistoryEntry,
+  input: DashboardOutboundCommandHistoryPageInput
+): string => `
+  <form action="/operator/telegram-delivery-authorizations" method="post" class="reply-intent-form">
+    <input type="hidden" name="csrf" value="${escapeAttribute(input.csrfToken)}">
+    <input type="hidden" name="inbox" value="${escapeAttribute(input.selectedInboxId)}">
+    <input type="hidden" name="commandId" value="${escapeAttribute(command.id)}">
+    <p class="ledger-note">Có thể ghi chấp thuận Telegram cho mục này. Thao tác này chưa gửi tin.</p>
+    <button type="submit">Ghi chấp thuận Telegram</button>
+  </form>`;
 
 const renderDocument = (input: Readonly<{ body: string }>): string => `<!doctype html>
 <html lang="vi">

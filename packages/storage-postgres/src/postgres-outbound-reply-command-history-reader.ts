@@ -8,6 +8,7 @@ import type {
 
 import { PostgresStorageError } from './postgres-error.js';
 import { POSTGRES_SCHEMA } from './postgres-migrations.js';
+import { createOutboundCommandScopeFingerprint } from './outbound-command-scope-fingerprint.js';
 import type { SqlPool } from './sql.js';
 
 const MAXIMUM_ALLOWED_CONNECTION_IDS = 100;
@@ -27,9 +28,9 @@ WHERE outbound_command.connection_id = ANY($1::text[])
 `;
 
 /**
- * The projection intentionally stops at safe command-history fields. Private
- * reply targets, source-message metadata, source channel, and client
- * idempotency keys must never enter this reader's process memory.
+ * The public fields stop at safe command-history material. The dashboard-only
+ * eligibility boolean is computed from immutable provenance and current
+ * binding, but private targets and message metadata never enter this reader.
  */
 const COMMAND_HISTORY_COLUMNS_SQL = `
   outbound_command.command_id::text AS command_id,
@@ -37,6 +38,27 @@ const COMMAND_HISTORY_COLUMNS_SQL = `
   outbound_command.source_provider_event_id,
   outbound_command.message_text,
   outbound_command.state,
+  CASE WHEN
+    command_authorization.inbox_id = $2
+    AND command_authorization.scope_fingerprint = $3
+    AND outbound_command.source_channel = 'telegram_bot'
+    AND source.channel = 'telegram_bot'
+    AND source.telegram_chat_type = 'private'
+    AND telegram_eligibility.source_chat_type = 'private'
+    AND connection_registry.channel = 'telegram_bot'
+    AND connection_registry.provider_identity_fingerprint ~ '^[a-f0-9]{64}$'
+    AND telegram_eligibility.bot_identity_fingerprint = connection_registry.provider_identity_fingerprint
+    AND NOT EXISTS (
+      SELECT 1
+      FROM ${POSTGRES_SCHEMA}.outbound_delivery_attempts AS delivery_attempt
+      WHERE delivery_attempt.command_id = outbound_command.command_id
+    )
+    AND NOT EXISTS (
+      SELECT 1
+      FROM ${POSTGRES_SCHEMA}.outbound_telegram_delivery_authorizations AS delivery_authorization
+      WHERE delivery_authorization.command_id = outbound_command.command_id
+    )
+  THEN true ELSE false END AS telegram_delivery_authorization_eligible,
   to_char(
     outbound_command.created_at AT TIME ZONE 'UTC',
     'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
@@ -47,29 +69,49 @@ const FIRST_PAGE_SQL = `
 SELECT
 ${COMMAND_HISTORY_COLUMNS_SQL}
 FROM ${POSTGRES_SCHEMA}.outbound_commands AS outbound_command
+LEFT JOIN ${POSTGRES_SCHEMA}.outbound_command_authorizations AS command_authorization
+  ON command_authorization.command_id = outbound_command.command_id
+LEFT JOIN ${POSTGRES_SCHEMA}.outbound_telegram_command_eligibility AS telegram_eligibility
+  ON telegram_eligibility.command_id = outbound_command.command_id
+LEFT JOIN ${POSTGRES_SCHEMA}.inbound_events AS source
+  ON source.connection_id = outbound_command.connection_id
+  AND source.provider_event_id = outbound_command.source_provider_event_id
+LEFT JOIN ${POSTGRES_SCHEMA}.connection_registry AS connection_registry
+  ON connection_registry.connection_id = outbound_command.connection_id
 WHERE outbound_command.connection_id = ANY($1::text[])
   AND outbound_command.state = 'queued'
-  AND outbound_command.command_id <= $2::bigint
+  AND outbound_command.command_id <= $4::bigint
 ORDER BY outbound_command.command_id DESC
-LIMIT $3
+LIMIT $5
 `;
 
 const CONTINUATION_PAGE_SQL = `
 SELECT
 ${COMMAND_HISTORY_COLUMNS_SQL}
 FROM ${POSTGRES_SCHEMA}.outbound_commands AS outbound_command
+LEFT JOIN ${POSTGRES_SCHEMA}.outbound_command_authorizations AS command_authorization
+  ON command_authorization.command_id = outbound_command.command_id
+LEFT JOIN ${POSTGRES_SCHEMA}.outbound_telegram_command_eligibility AS telegram_eligibility
+  ON telegram_eligibility.command_id = outbound_command.command_id
+LEFT JOIN ${POSTGRES_SCHEMA}.inbound_events AS source
+  ON source.connection_id = outbound_command.connection_id
+  AND source.provider_event_id = outbound_command.source_provider_event_id
+LEFT JOIN ${POSTGRES_SCHEMA}.connection_registry AS connection_registry
+  ON connection_registry.connection_id = outbound_command.connection_id
 WHERE outbound_command.connection_id = ANY($1::text[])
   AND outbound_command.state = 'queued'
-  AND outbound_command.command_id <= $2::bigint
-  AND outbound_command.command_id < $3::bigint
+  AND outbound_command.command_id <= $4::bigint
+  AND outbound_command.command_id < $5::bigint
 ORDER BY outbound_command.command_id DESC
-LIMIT $4
+LIMIT $6
 `;
 
 interface ValidatedHistoryListInput {
   readonly allowedConnectionIds: readonly string[];
   readonly cursor?: OutboundReplyCommandHistoryPageCursor;
+  readonly inboxId: string;
   readonly pageSize: number;
+  readonly scopeFingerprint: string;
 }
 
 interface ParsedCommandHistoryRow {
@@ -103,11 +145,15 @@ export class PostgresOutboundReplyCommandHistoryReader implements OutboundReplyC
         validated.cursor === undefined
           ? await this.pool.query(FIRST_PAGE_SQL, [
               validated.allowedConnectionIds,
+              validated.inboxId,
+              validated.scopeFingerprint,
               snapshotMaxSequence,
               validated.pageSize + 1
             ])
           : await this.pool.query(CONTINUATION_PAGE_SQL, [
               validated.allowedConnectionIds,
+              validated.inboxId,
+              validated.scopeFingerprint,
               snapshotMaxSequence,
               validated.cursor.beforeSequence,
               validated.pageSize + 1
@@ -188,15 +234,22 @@ const validateHistoryListInput = (
   if (
     !isRecord(input) ||
     !isSortedConnectionScope(input.allowedConnectionIds) ||
+    !isConnectionIdentifier(input.inboxId) ||
     !isPageSize(input.pageSize)
   ) {
     throw new PostgresStorageError();
   }
 
   const allowedConnectionIds = Object.freeze([...input.allowedConnectionIds]);
+  const scopeFingerprint = createOutboundCommandScopeFingerprint(allowedConnectionIds);
 
   if (input.cursor === undefined) {
-    return Object.freeze({ allowedConnectionIds, pageSize: input.pageSize });
+    return Object.freeze({
+      allowedConnectionIds,
+      inboxId: input.inboxId,
+      pageSize: input.pageSize,
+      scopeFingerprint
+    });
   }
 
   if (!isValidCursor(input.cursor)) {
@@ -209,7 +262,9 @@ const validateHistoryListInput = (
       beforeSequence: input.cursor.beforeSequence,
       snapshotMaxSequence: input.cursor.snapshotMaxSequence
     }),
-    pageSize: input.pageSize
+    inboxId: input.inboxId,
+    pageSize: input.pageSize,
+    scopeFingerprint
   });
 };
 
@@ -251,6 +306,7 @@ const parseCommandHistoryRow = (
   const sourceProviderEventId = row.source_provider_event_id;
   const text = row.message_text;
   const state = row.state;
+  const telegramDeliveryAuthorizationEligible = row.telegram_delivery_authorization_eligible;
   const createdAt = row.created_at;
 
   if (
@@ -260,6 +316,7 @@ const parseCommandHistoryRow = (
     !isProviderIdentifier(sourceProviderEventId) ||
     !isMessageText(text) ||
     state !== 'queued' ||
+    typeof telegramDeliveryAuthorizationEligible !== 'boolean' ||
     !isCanonicalIsoUtc(createdAt) ||
     compareDecimalStrings(sequence, snapshotMaxSequence) > 0 ||
     (cursor !== undefined && compareDecimalStrings(sequence, cursor.beforeSequence) >= 0)
@@ -274,6 +331,7 @@ const parseCommandHistoryRow = (
       sourceConnectionId,
       sourceProviderEventId,
       state: 'queued',
+      telegramDeliveryAuthorizationEligible,
       text
     }),
     sequence

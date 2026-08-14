@@ -144,11 +144,14 @@ try {
         const inboundEventFeedReader = postgres?.inboundEventFeedReader;
         const outboundReplyCommandStore = postgres?.outboundReplyCommandStore;
         const outboundReplyCommandHistoryReader = postgres?.outboundReplyCommandHistoryReader;
+        const outboundTelegramDeliveryAuthorizationStore =
+          postgres?.outboundTelegramDeliveryAuthorizationStore;
 
         if (
           inboundEventFeedReader === undefined ||
           outboundReplyCommandStore === undefined ||
-          outboundReplyCommandHistoryReader === undefined
+          outboundReplyCommandHistoryReader === undefined ||
+          outboundTelegramDeliveryAuthorizationStore === undefined
         ) {
           throw new EnvironmentConfigurationError();
         }
@@ -157,7 +160,8 @@ try {
           configuredInboxes,
           inboundEventFeedReader,
           outboundReplyCommandStore,
-          outboundReplyCommandHistoryReader
+          outboundReplyCommandHistoryReader,
+          outboundTelegramDeliveryAuthorizationStore
         );
 
         const dashboardConfiguration = configuredConnectionConfiguration?.dashboard;

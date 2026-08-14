@@ -7,6 +7,7 @@ import type { SqlPool, SqlQueryResult } from './sql.js';
 const CONNECTION_A = 'connection-a';
 const CONNECTION_B = 'connection-b';
 const CONNECTION_IDS = Object.freeze([CONNECTION_A, CONNECTION_B]);
+const INBOX_ID = 'support-inbox';
 
 describe('PostgresOutboundReplyCommandHistoryReader', () => {
   it('returns a parameterized, inbox-scoped history with only its safe read model', async () => {
@@ -23,6 +24,7 @@ describe('PostgresOutboundReplyCommandHistoryReader', () => {
 
     const result = await new PostgresOutboundReplyCommandHistoryReader(pool).list({
       allowedConnectionIds: CONNECTION_IDS,
+      inboxId: INBOX_ID,
       pageSize: 2
     });
 
@@ -46,15 +48,15 @@ describe('PostgresOutboundReplyCommandHistoryReader', () => {
     });
     expect(pool.queries[1]).toMatchObject({
       sql: expect.stringContaining('outbound_command.connection_id = ANY($1::text[])'),
-      values: [CONNECTION_IDS, '12', 3]
+      values: [CONNECTION_IDS, INBOX_ID, expect.any(String), '12', 3]
     });
-    expect(pool.queries[1]?.sql).toContain('outbound_command.command_id <= $2::bigint');
+    expect(pool.queries[1]?.sql).toContain('outbound_command.command_id <= $4::bigint');
     expect(pool.queries[1]?.sql).toContain('ORDER BY outbound_command.command_id DESC');
     expect(pool.queries[1]?.sql).not.toContain(CONNECTION_A);
     expect(pool.queries[1]?.sql).not.toContain("Queued reply '; DROP TABLE outbound_commands; --");
     expect(pool.queries[1]?.sql).not.toContain('reply_target_id');
     expect(pool.queries[1]?.sql).not.toContain('source_message_id');
-    expect(pool.queries[1]?.sql).not.toContain('source_channel');
+    expect(pool.queries[1]?.sql).not.toContain('AS source_channel');
     expect(pool.queries[1]?.sql).not.toContain('client_operation_id');
     expect(result.commands[0]).not.toHaveProperty('replyTargetId');
     expect(result.commands[0]).not.toHaveProperty('sourceMessageId');
@@ -76,6 +78,7 @@ describe('PostgresOutboundReplyCommandHistoryReader', () => {
     await expect(
       new PostgresOutboundReplyCommandHistoryReader(pool).list({
         allowedConnectionIds: CONNECTION_IDS,
+        inboxId: INBOX_ID,
         pageSize: 4
       })
     ).resolves.toEqual({
@@ -101,7 +104,11 @@ describe('PostgresOutboundReplyCommandHistoryReader', () => {
     });
     const reader = new PostgresOutboundReplyCommandHistoryReader(pool);
 
-    const first = await reader.list({ allowedConnectionIds: CONNECTION_IDS, pageSize: 2 });
+    const first = await reader.list({
+      allowedConnectionIds: CONNECTION_IDS,
+      inboxId: INBOX_ID,
+      pageSize: 2
+    });
     pool.addCommittedAfterSnapshot(row('13', CONNECTION_A));
 
     expect(first).toEqual({
@@ -121,6 +128,7 @@ describe('PostgresOutboundReplyCommandHistoryReader', () => {
     await expect(
       reader.list({
         allowedConnectionIds: CONNECTION_IDS,
+        inboxId: INBOX_ID,
         pageSize: 2,
         cursor: firstCursor
       })
@@ -130,10 +138,10 @@ describe('PostgresOutboundReplyCommandHistoryReader', () => {
     expect(pool.committedAfterSnapshot).toEqual([row('13', CONNECTION_A)]);
     expect(pool.queries).toHaveLength(3);
     expect(pool.queries[2]).toMatchObject({
-      sql: expect.stringContaining('outbound_command.command_id < $3::bigint'),
-      values: [CONNECTION_IDS, '12', '11', 3]
+      sql: expect.stringContaining('outbound_command.command_id < $5::bigint'),
+      values: [CONNECTION_IDS, INBOX_ID, expect.any(String), '12', '11', 3]
     });
-    expect(pool.queries[2]?.sql).toContain('outbound_command.command_id <= $2::bigint');
+    expect(pool.queries[2]?.sql).toContain('outbound_command.command_id <= $4::bigint');
   });
 
   it('returns an empty first page when no authorized connection has a committed command snapshot', async () => {
@@ -142,6 +150,7 @@ describe('PostgresOutboundReplyCommandHistoryReader', () => {
     await expect(
       new PostgresOutboundReplyCommandHistoryReader(pool).list({
         allowedConnectionIds: CONNECTION_IDS,
+        inboxId: INBOX_ID,
         pageSize: 1
       })
     ).resolves.toEqual({ commands: [] });
@@ -160,6 +169,7 @@ describe('PostgresOutboundReplyCommandHistoryReader', () => {
     await expect(
       new PostgresOutboundReplyCommandHistoryReader(pool).list({
         allowedConnectionIds: CONNECTION_IDS,
+        inboxId: INBOX_ID,
         pageSize: 2
       })
     ).resolves.toEqual({
@@ -177,6 +187,7 @@ describe('PostgresOutboundReplyCommandHistoryReader', () => {
     await expect(
       new PostgresOutboundReplyCommandHistoryReader(outsideScopePool).list({
         allowedConnectionIds: CONNECTION_IDS,
+        inboxId: INBOX_ID,
         pageSize: 1
       })
     ).rejects.toMatchObject({
@@ -191,6 +202,7 @@ describe('PostgresOutboundReplyCommandHistoryReader', () => {
     await expect(
       new PostgresOutboundReplyCommandHistoryReader(malformedRowPool).list({
         allowedConnectionIds: CONNECTION_IDS,
+        inboxId: INBOX_ID,
         pageSize: 1
       })
     ).rejects.toBeInstanceOf(PostgresStorageError);
@@ -205,6 +217,7 @@ describe('PostgresOutboundReplyCommandHistoryReader', () => {
     await expect(
       new PostgresOutboundReplyCommandHistoryReader(malformedLookAheadPool).list({
         allowedConnectionIds: CONNECTION_IDS,
+        inboxId: INBOX_ID,
         pageSize: 1
       })
     ).rejects.toBeInstanceOf(PostgresStorageError);
@@ -216,6 +229,7 @@ describe('PostgresOutboundReplyCommandHistoryReader', () => {
     await expect(
       new PostgresOutboundReplyCommandHistoryReader(unorderedPool).list({
         allowedConnectionIds: CONNECTION_IDS,
+        inboxId: INBOX_ID,
         pageSize: 2
       })
     ).rejects.toBeInstanceOf(PostgresStorageError);
@@ -228,16 +242,18 @@ describe('PostgresOutboundReplyCommandHistoryReader', () => {
       Object.freeze({ allowedConnectionIds: [CONNECTION_A, CONNECTION_A], pageSize: 1 }),
       Object.freeze({ allowedConnectionIds: [CONNECTION_B, CONNECTION_A], pageSize: 1 }),
       Object.freeze({ allowedConnectionIds: ['  '], pageSize: 1 }),
-      Object.freeze({ allowedConnectionIds: CONNECTION_IDS, pageSize: 0 }),
-      Object.freeze({ allowedConnectionIds: CONNECTION_IDS, pageSize: 1.5 }),
-      Object.freeze({ allowedConnectionIds: CONNECTION_IDS, pageSize: 101 }),
+      Object.freeze({ allowedConnectionIds: CONNECTION_IDS, inboxId: INBOX_ID, pageSize: 0 }),
+      Object.freeze({ allowedConnectionIds: CONNECTION_IDS, inboxId: INBOX_ID, pageSize: 1.5 }),
+      Object.freeze({ allowedConnectionIds: CONNECTION_IDS, inboxId: INBOX_ID, pageSize: 101 }),
       Object.freeze({
         allowedConnectionIds: CONNECTION_IDS,
+        inboxId: INBOX_ID,
         pageSize: 1,
         cursor: Object.freeze({ beforeSequence: '0009', snapshotMaxSequence: '9' })
       }),
       Object.freeze({
         allowedConnectionIds: CONNECTION_IDS,
+        inboxId: INBOX_ID,
         pageSize: 1,
         cursor: Object.freeze({ beforeSequence: '10', snapshotMaxSequence: '9' })
       }),
@@ -262,6 +278,7 @@ describe('PostgresOutboundReplyCommandHistoryReader', () => {
     await expect(
       new PostgresOutboundReplyCommandHistoryReader(malformedTextPool).list({
         allowedConnectionIds: CONNECTION_IDS,
+        inboxId: INBOX_ID,
         pageSize: 1
       })
     ).rejects.toBeInstanceOf(PostgresStorageError);
@@ -273,6 +290,7 @@ describe('PostgresOutboundReplyCommandHistoryReader', () => {
     await expect(
       new PostgresOutboundReplyCommandHistoryReader(oversizedPagePool).list({
         allowedConnectionIds: CONNECTION_IDS,
+        inboxId: INBOX_ID,
         pageSize: 1
       })
     ).rejects.toBeInstanceOf(PostgresStorageError);
@@ -281,6 +299,7 @@ describe('PostgresOutboundReplyCommandHistoryReader', () => {
     await expect(
       new PostgresOutboundReplyCommandHistoryReader(malformedSnapshotPool).list({
         allowedConnectionIds: CONNECTION_IDS,
+        inboxId: INBOX_ID,
         pageSize: 1
       })
     ).rejects.toBeInstanceOf(PostgresStorageError);
@@ -291,6 +310,7 @@ describe('PostgresOutboundReplyCommandHistoryReader', () => {
     await expect(
       new PostgresOutboundReplyCommandHistoryReader(invalidSnapshotValuePool).list({
         allowedConnectionIds: CONNECTION_IDS,
+        inboxId: INBOX_ID,
         pageSize: 1
       })
     ).rejects.toBeInstanceOf(PostgresStorageError);
@@ -299,6 +319,7 @@ describe('PostgresOutboundReplyCommandHistoryReader', () => {
     await expect(
       new PostgresOutboundReplyCommandHistoryReader(failingPool).list({
         allowedConnectionIds: CONNECTION_IDS,
+        inboxId: INBOX_ID,
         pageSize: 1
       })
     ).rejects.toMatchObject({
@@ -385,13 +406,17 @@ const createPool = (options: PoolOptions = {}): FakePool => {
 
       if (options.commandRows !== undefined) {
         const allowedConnectionIds = values[0];
-        const snapshotMaxSequence = values[1];
-        const isContinuation = sql.includes('outbound_command.command_id < $3::bigint');
-        const beforeSequence = isContinuation ? values[2] : undefined;
-        const limit = values[isContinuation ? 3 : 2];
+        const inboxId = values[1];
+        const scopeFingerprint = values[2];
+        const snapshotMaxSequence = values[3];
+        const isContinuation = sql.includes('outbound_command.command_id < $5::bigint');
+        const beforeSequence = isContinuation ? values[4] : undefined;
+        const limit = values[isContinuation ? 5 : 4];
 
         if (
           !isStringArray(allowedConnectionIds) ||
+          inboxId !== INBOX_ID ||
+          typeof scopeFingerprint !== 'string' ||
           typeof snapshotMaxSequence !== 'string' ||
           (beforeSequence !== undefined && typeof beforeSequence !== 'string') ||
           typeof limit !== 'number'
@@ -419,7 +444,7 @@ const createPool = (options: PoolOptions = {}): FakePool => {
       }
 
       return Object.freeze({
-        rows: sql.includes('outbound_command.command_id < $3::bigint')
+        rows: sql.includes('outbound_command.command_id < $5::bigint')
           ? (options.continuationPageRows ?? [])
           : (options.firstPageRows ?? [])
       });
@@ -439,6 +464,7 @@ const row = (
     message_text: `Synthetic reply ${sequence}`,
     source_provider_event_id: `provider-${sequence}`,
     state: 'queued',
+    telegram_delivery_authorization_eligible: false,
     ...overrides
   });
 
@@ -448,6 +474,7 @@ const command = (sequence: string, connectionId: string, text = `Synthetic reply
   sourceConnectionId: connectionId,
   sourceProviderEventId: `provider-${sequence}`,
   state: 'queued' as const,
+  telegramDeliveryAuthorizationEligible: false,
   text
 });
 

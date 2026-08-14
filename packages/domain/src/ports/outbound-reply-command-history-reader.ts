@@ -19,12 +19,19 @@ export interface OutboundReplyCommandHistoryEntry {
   readonly sourceConnectionId: string;
   readonly sourceProviderEventId: string;
   readonly state: 'queued';
+  /**
+   * Internal dashboard-only indicator. HTTP adapters must explicitly omit it
+   * so an inbox bearer cannot learn delivery-authorization state.
+   */
+  readonly telegramDeliveryAuthorizationEligible: boolean;
   readonly text: string;
 }
 
 /** Input for a reverse-chronological command history across one inbox scope. */
 export interface OutboundReplyCommandHistoryListInput {
   readonly allowedConnectionIds: readonly string[];
+  /** Server-composed inbox ID used to bind Phase 4h provenance checks. */
+  readonly inboxId: string;
   readonly pageSize: number;
   readonly cursor?: OutboundReplyCommandHistoryPageCursor;
 }

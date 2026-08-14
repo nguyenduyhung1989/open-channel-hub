@@ -541,6 +541,35 @@ deployment.
       independent review, run the synthetic Compose proof, and verify GitHub
       CI/CodeQL before calling this source verified.
 
+### 4j — Telegram delivery-authorization evidence
+
+**Status: candidate source; verification is not complete.**
+
+- [x] Optional strict
+      `dashboard.principals[].telegramDeliveryAuthorizationInboxIds` is an
+      independent unique subset of each principal's readable inboxes. Omission
+      stays read-only and does not grant approval authority.
+- [x] A separate server-only dashboard capability can record one immutable
+      Telegram authorization fact only for an already server-eligible queued
+      command. The inbox bearer catalog and browser never receive this
+      capability, a provider credential, or a recipient.
+- [x] Forward migration
+      <code>0013_outbound_telegram_delivery_authorizations</code> stores one
+      row at most per Phase 4i eligible command: configured inbox/principal,
+      SHA-256 scope fingerprint, opaque Bot fingerprint, and recording time.
+      It rejects updates and deletes.
+- [x] The PostgreSQL writer rechecks current private source, Phase 4h
+      provenance, current Bot binding, fixed inbox scope, no delivery attempt,
+      and no existing authorization. Missing, historic, out-of-scope,
+      non-private, drifted, and attempted commands fail closed.
+- [x] No provider request, SDK, worker, dispatcher, retry, attempt/receipt
+      write, command mutation, delivery/read state, or live-provider test is
+      introduced. The one-operator alpha permits self-authorization and is not
+      dual control.
+- [ ] Freeze the exact source, run final local verification, complete
+      independent review, run the synthetic Compose proof, and verify GitHub
+      CI/CodeQL before calling this source verified.
+
 ### Later Phase 4 work
 
 - Full user accounts/organizations, tested RBAC, invitation/password-reset
@@ -550,8 +579,9 @@ deployment.
   assurance.
 - Provider-specific dispatch policy/capabilities, timeout uncertainty,
   delivery/read status, and retries only after official provider review and a
-  separate security boundary. Phase 4g evidence, Phase 4h provenance, and
-  Phase 4i private-reply evidence are not any of those delivery capabilities.
+  separate security boundary. Phase 4g evidence, Phase 4h provenance, Phase
+  4i private-reply evidence, and Phase 4j delivery-authorization evidence are
+  not any of those delivery capabilities.
 
 ## Phase 5 — experimental connectors, only with evidence
 

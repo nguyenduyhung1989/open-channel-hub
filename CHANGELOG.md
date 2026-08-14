@@ -203,6 +203,16 @@ follows [Semantic Versioning](https://semver.org/).
   created. The field/fingerprint stay out of public readers and dashboard HTML;
   this adds no Telegram request, worker, dispatch, retry, attempt/receipt,
   delivery state, or live-provider claim.
+- Phase 4j candidate: optional strict
+  `dashboard.principals[].telegramDeliveryAuthorizationInboxIds` grants a
+  separate immutable-authorization capability only for an already readable
+  inbox. Omission is read-only and does not grant approval authority.
+- Phase 4j candidate: forward migration
+  <code>0013_outbound_telegram_delivery_authorizations</code> records one
+  immutable approval fact at most for a current private Telegram command with
+  matching Phase 4h provenance, current Bot identity, and no delivery attempt.
+  It stores no target, text, credential, provider request, attempt, receipt,
+  retry, or mutable state, and it does not dispatch a provider message.
 
 ### Changed
 
@@ -247,21 +257,19 @@ follows [Semantic Versioning](https://semver.org/).
   rejected with <code>400</code>. The durable ledger now orders by its numeric
   sequence rather than a text alias; callers must restart from page one after
   upgrading so a mixed ordering cannot silently skip events.
-- The supplied loopback-only HTTP Compose smoke remains intentionally dashboard
-  free. The Phase 4h–4i candidates advance it to twelve immutable schema
-  migrations and add structural checks for the authorization-provenance and
-  Telegram private-reply eligibility tables, their foreign keys, primary keys,
-  named constraints, exact columns, and immutable triggers. The fake Telegram
-  path proves that a private source can create an intent while a supergroup
-  source receives only ingress acknowledgement and cannot create one. The
-  existing Phase 4g delivery-evidence structural checks remain. It still verifies
-  source-bound reply-command idempotency/target derivation plus queued-history
-  scope, safe projection, cursor continuation, and cursor rejection. It does
-  not use direct SQL/DML to create authorization evidence or a direct
-  authorization semantic assertion; the existing API command checks may create
-  provenance atomically with their commands. It does not insert an
-  attempt/receipt, attempt a browser login whose `Secure` cookies and exact
-  origin require TLS, or contact a provider.
+- The supplied loopback-only HTTP Compose smoke advances the Phase 4h–4j
+  candidate to thirteen immutable schema migrations. Its disposable synthetic
+  dashboard configuration manually forwards a signed `Secure` cookie to `curl`
+  so the server-rendered authorization route exercises the PostgreSQL writer.
+  It checks the authorization-provenance, Telegram private-reply eligibility,
+  and Telegram delivery-authorization tables, their foreign keys, primary
+  keys, named constraints, exact columns, and immutable triggers. It also
+  proves authorization create, exact replay, different-principal conflict, and
+  unavailable legacy/Bot-drifted/non-private/already-attempted branches on
+  PostgreSQL. Direct fixture SQL creates only disposable synthetic candidates
+  and one existing attempt; the authorization writer never creates an attempt
+  or provider receipt. This is not browser-over-HTTP or external HTTPS-cookie
+  proof, and it does not contact a provider.
 - Exact commit <code>465186e</code> completed Phase 4e local verification:
   formatting, lint, strict type checking, 53 test files / 351 tests, build,
   low-threshold dependency audit, secret scan, diff check, and synthetic

@@ -36,10 +36,29 @@ readonly support_outbound_text='Synthetic durable reply intent'
 readonly support_outbound_conflicting_text='Synthetic conflicting reply intent'
 readonly support_outbound_history_client_operation_id='synthetic-reply-history-support-0001'
 readonly support_outbound_history_text='Synthetic queued history reply'
+readonly dashboard_public_origin='https://dashboard.example.test'
+readonly dashboard_password='synthetic-dashboard-smoke-password'
+readonly dashboard_password_hash='$argon2id$v=19$m=19456,p=1,t=2$21g0IWCLKxGW8Ec2AUnx1Q$CkRBW5f09hcOhIniXR2YG4T0njlXWrLfzdjWhJLKCJA'
+readonly dashboard_principal_a='support-approver-a'
+readonly dashboard_principal_b='support-approver-b'
+readonly dashboard_session_cookie_signing_key='synthetic_dashboard_cookie_signing_key_01234567890123456789'
+readonly dashboard_session_id_pepper='synthetic_dashboard_session_id_pepper_01234567890123456789'
+readonly legacy_authorization_client_operation_id='synthetic-legacy-authorization-0001'
+readonly drifted_authorization_client_operation_id='synthetic-drifted-authorization-0001'
+readonly non_private_authorization_client_operation_id='synthetic-non-private-authorization-0001'
+readonly attempted_authorization_client_operation_id='synthetic-attempted-authorization-0001'
 readonly whatsapp_webhook_payload='{"object":"whatsapp_business_account","entry":[{"id":"900000000000000501","changes":[{"field":"messages","value":{"messaging_product":"whatsapp","metadata":{"phone_number_id":"900000000000000601"},"messages":[{"from":"900000000000000701","id":"wamid.synthetic.901","timestamp":"1786492800","type":"text","text":{"body":"Synthetic WhatsApp Business inbound message"}}]}}]},{"id":"900000000000000501","changes":[{"field":"messages","value":{"messaging_product":"whatsapp","metadata":{"phone_number_id":"900000000000000602"},"messages":[{"from":"900000000000000702","id":"wamid.synthetic.901","timestamp":"1786492800","type":"text","text":{"body":"Synthetic WhatsApp Business inbound message"}}]}}]}]}'
-# This loopback-only HTTP smoke intentionally omits the optional browser dashboard.
-# Secure cookies plus the exact external HTTPS origin are exercised by route tests, not by this Compose run.
+# This loopback-only smoke enables a synthetic dashboard solely to execute the
+# authorization writer through the real HTTP and PostgreSQL composition path.
+# It manually returns Secure cookies to curl and therefore does not prove TLS.
 readonly runtime_connections_configuration='{"version":1,"connections":[{"id":"telegram-bot-support","type":"telegram_bot","botToken":"123456789:synthetic-bot-token-support","operatorApiToken":"synthetic_operator_support_01234567890123456789","webhookSecret":"synthetic_support_webhook_secret_0123456789","webhookUrl":"https://example.test/v1/webhooks/telegram-bot/telegram-bot-support"},{"id":"telegram-bot-sales","type":"telegram_bot","botToken":"987654321:synthetic-bot-token-sales","operatorApiToken":"synthetic_operator_sales_0123456789012345678901","webhookSecret":"synthetic_sales_webhook_secret_01234567890123456789","webhookUrl":"https://example.test/v1/webhooks/telegram-bot/telegram-bot-sales"},{"id":"zalo-oa-support","type":"zalo_oa","appId":"900000000000000001","oaId":"900000000000000101","oaSecretKey":"synthetic-zalo-oa-support-secret-$-key","operatorApiToken":"synthetic_zalo_operator_support_012345678901234567","webhookUrl":"https://example.test/v1/webhooks/zalo-oa"},{"id":"zalo-oa-sales","type":"zalo_oa","appId":"900000000000000002","oaId":"900000000000000102","oaSecretKey":"synthetic-zalo-oa-sales-secret-$-key","operatorApiToken":"synthetic_zalo_operator_sales_0123456789012345678","webhookUrl":"https://example.test/v1/webhooks/zalo-oa"},{"id":"facebook-page-support","type":"facebook_page","appId":"900000000000000003","pageId":"900000000000000301","appSecret":"synthetic-facebook-app-secret-$-value-01234567890","webhookVerifyToken":"synthetic-facebook-verify-token-012345678901234567","operatorApiToken":"synthetic_facebook_operator_support_012345678901234567","webhookUrl":"https://example.test/v1/webhooks/meta"},{"id":"facebook-page-sales","type":"facebook_page","appId":"900000000000000003","pageId":"900000000000000302","appSecret":"synthetic-facebook-app-secret-$-value-01234567890","webhookVerifyToken":"synthetic-facebook-verify-token-012345678901234567","operatorApiToken":"synthetic_facebook_operator_sales_0123456789012345678","webhookUrl":"https://example.test/v1/webhooks/meta"},{"id":"whatsapp-business-support","type":"whatsapp_business","appId":"900000000000000003","wabaId":"900000000000000501","phoneNumberId":"900000000000000601","appSecret":"synthetic-facebook-app-secret-$-value-01234567890","webhookVerifyToken":"synthetic-facebook-verify-token-012345678901234567","operatorApiToken":"synthetic_whatsapp_operator_support_012345678901234567","webhookUrl":"https://example.test/v1/webhooks/meta"},{"id":"whatsapp-business-sales","type":"whatsapp_business","appId":"900000000000000003","wabaId":"900000000000000501","phoneNumberId":"900000000000000602","appSecret":"synthetic-facebook-app-secret-$-value-01234567890","webhookVerifyToken":"synthetic-facebook-verify-token-012345678901234567","operatorApiToken":"synthetic_whatsapp_operator_sales_0123456789012345678","webhookUrl":"https://example.test/v1/webhooks/meta"}],"inboxes":[{"id":"support-inbox","token":"synthetic_inbox_support_token_01234567890123456789","connectionIds":["telegram-bot-support","zalo-oa-support","facebook-page-support","whatsapp-business-support"]},{"id":"sales-inbox","token":"synthetic_inbox_sales_token_01234567890123456789012","connectionIds":["telegram-bot-sales","zalo-oa-sales","facebook-page-sales","whatsapp-business-sales"]}]}'
+readonly runtime_dashboard_configuration_suffix=",\"dashboard\":{\"publicOrigin\":\"${dashboard_public_origin}\",\"sessionCookieSigningKeys\":[\"${dashboard_session_cookie_signing_key}\"],\"sessionIdPepper\":\"${dashboard_session_id_pepper}\",\"principals\":[{\"id\":\"${dashboard_principal_a}\",\"passwordHash\":\"${dashboard_password_hash}\",\"inboxIds\":[\"support-inbox\"],\"telegramDeliveryAuthorizationInboxIds\":[\"support-inbox\"]},{\"id\":\"${dashboard_principal_b}\",\"passwordHash\":\"${dashboard_password_hash}\",\"inboxIds\":[\"support-inbox\"],\"telegramDeliveryAuthorizationInboxIds\":[\"support-inbox\"]}]}}"
+readonly runtime_connections_configuration_with_dashboard="${runtime_connections_configuration%?}${runtime_dashboard_configuration_suffix}"
+
+validate_synthetic_runtime_configuration() {
+  node -e 'try { JSON.parse(process.argv[1]); } catch { process.exitCode = 1; }' \
+    "$runtime_connections_configuration_with_dashboard"
+}
 
 compose=(docker compose --project-name "$project_name" --file compose.yaml)
 
@@ -316,6 +335,136 @@ read_inbox_outbound_command_history_status() {
     "$url"
 }
 
+dashboard_response_body() {
+  local response=$1
+  local normalized_response=${response//$'\r'/}
+
+  printf '%s' "${normalized_response#*$'\n\n'}"
+}
+
+dashboard_response_status() {
+  local response=$1
+
+  printf '%s\n' "$response" \
+    | tr -d '\r' \
+    | sed -n 's/^HTTP\/[^ ]* \([0-9][0-9][0-9]\).*/\1/p'
+}
+
+dashboard_cookie_pair() {
+  local response=$1
+  local cookie_name=$2
+
+  printf '%s\n' "$response" \
+    | tr -d '\r' \
+    | awk -v cookie_name="$cookie_name" '
+      /^[Ss]et-[Cc]ookie:/ {
+        cookie = $2
+        prefix = cookie_name "="
+
+        if (index(cookie, prefix) == 1) {
+          sub(/;.*/, "", cookie)
+          print cookie
+          exit
+        }
+      }
+    '
+}
+
+dashboard_hidden_input_value() {
+  local html=$1
+  local name=$2
+
+  printf '%s\n' "$html" \
+    | sed -n "s/.*name=\"${name}\" value=\"\\([^\"]*\\)\".*/\\1/p" \
+    | head -n 1
+}
+
+dashboard_login_session_cookie() {
+  local principal_id=$1
+  local login_response
+  local login_page
+  local login_cookie
+  local login_csrf
+  local session_response
+  local session_cookie
+
+  login_response="$(
+    curl --include --silent --show-error --connect-timeout 3 --max-time 10 \
+      "http://127.0.0.1:${api_host_port}/operator/login"
+  )"
+  login_page="$(dashboard_response_body "$login_response")"
+  login_cookie="$(dashboard_cookie_pair "$login_response" '__Host-och_dashboard_login_csrf')"
+  login_csrf="$(dashboard_hidden_input_value "$login_page" 'csrf')"
+
+  if [[ "$(dashboard_response_status "$login_response")" != '200' || -z "$login_cookie" || -z "$login_csrf" ]]; then
+    printf 'The synthetic dashboard login page did not issue a usable CSRF boundary.\n' >&2
+    return 1
+  fi
+
+  session_response="$(
+    curl --include --silent --show-error --connect-timeout 3 --max-time 10 \
+      --data-urlencode "csrf=${login_csrf}" \
+      --data-urlencode "principal=${principal_id}" \
+      --data-urlencode "password=${dashboard_password}" \
+      --header "cookie: ${login_cookie}" \
+      --header "origin: ${dashboard_public_origin}" \
+      --request POST \
+      "http://127.0.0.1:${api_host_port}/operator/session"
+  )"
+  session_cookie="$(dashboard_cookie_pair "$session_response" '__Host-och_dashboard_session')"
+
+  if [[ "$(dashboard_response_status "$session_response")" != '303' || -z "$session_cookie" ]]; then
+    printf 'The synthetic dashboard login did not issue a usable session.\n' >&2
+    return 1
+  fi
+
+  printf '%s' "$session_cookie"
+}
+
+read_dashboard_outbound_command_history() {
+  local session_cookie=$1
+
+  curl --fail --silent --show-error --connect-timeout 3 --max-time 10 \
+    --header "cookie: ${session_cookie}" \
+    "http://127.0.0.1:${api_host_port}/operator/outbound-commands?inbox=support-inbox"
+}
+
+post_dashboard_telegram_delivery_authorization() {
+  local session_cookie=$1
+  local csrf=$2
+  local command_id=$3
+
+  curl --silent --show-error --connect-timeout 3 --max-time 10 \
+    --data-urlencode "commandId=${command_id}" \
+    --data-urlencode "csrf=${csrf}" \
+    --data-urlencode 'inbox=support-inbox' \
+    --header "cookie: ${session_cookie}" \
+    --header "origin: ${dashboard_public_origin}" \
+    --output /dev/null \
+    --request POST \
+    --write-out '%{http_code}' \
+    "http://127.0.0.1:${api_host_port}/operator/telegram-delivery-authorizations"
+}
+
+insert_synthetic_outbound_command() {
+  local client_operation_id=$1
+  local provider_event_id=$2
+  local reply_target_id=$3
+  local source_message_id=$4
+  local text=$5
+
+  query_postgres "INSERT INTO open_channel_hub.outbound_commands (connection_id, source_provider_event_id, client_operation_id, reply_target_id, source_message_id, source_channel, message_text, state) VALUES ('telegram-bot-support', '${provider_event_id}', '${client_operation_id}', '${reply_target_id}', '${source_message_id}', 'telegram_bot', '${text}', 'queued');" >/dev/null
+  query_postgres "SELECT command_id::text FROM open_channel_hub.outbound_commands WHERE connection_id = 'telegram-bot-support' AND client_operation_id = '${client_operation_id}';"
+}
+
+insert_synthetic_telegram_command_evidence() {
+  local command_id=$1
+  local scope_fingerprint=$2
+  local bot_identity_fingerprint=$3
+
+  query_postgres "INSERT INTO open_channel_hub.outbound_command_authorizations (command_id, authorization_kind, inbox_id, dashboard_principal_id, scope_fingerprint) VALUES (${command_id}::bigint, 'inbox_bearer', 'support-inbox', NULL, '${scope_fingerprint}'); INSERT INTO open_channel_hub.outbound_telegram_command_eligibility (command_id, bot_identity_fingerprint, source_chat_type) VALUES (${command_id}::bigint, '${bot_identity_fingerprint}', 'private');" >/dev/null
+}
+
 outbound_command_request_body() {
   local client_operation_id=$1
   local source_connection_id=$2
@@ -505,7 +654,11 @@ trap cleanup EXIT
 trap 'on_error "$LINENO"' ERR
 
 export API_HOST_PORT="$api_host_port"
-export CONNECTIONS_CONFIG_BASE64="$(printf '%s' "$runtime_connections_configuration" | base64 | tr '+/' '-_' | tr -d '=\n')"
+if ! validate_synthetic_runtime_configuration; then
+  printf 'The synthetic runtime connection configuration is invalid JSON.\n' >&2
+  exit 1
+fi
+export CONNECTIONS_CONFIG_BASE64="$(printf '%s' "$runtime_connections_configuration_with_dashboard" | base64 | tr '+/' '-_' | tr -d '=\n')"
 export DATABASE_PASSWORD='synthetic_database_password_0123456789'
 export POSTGRES_PASSWORD='synthetic_postgres_password_0123456789'
 export SOURCE_OFFER_URL="$source_offer_url"
@@ -615,7 +768,7 @@ assert_equal \
 migration_count="$(
   query_postgres "SELECT COUNT(*) FROM open_channel_hub.schema_migrations;"
 )"
-assert_equal '12' "$migration_count" 'immutable migration ledger entry count'
+assert_equal '13' "$migration_count" 'immutable migration ledger entry count'
 
 connection_registry_records="$(
   query_postgres "SELECT connection_id || ':' || connector_id || ':' || channel || ':' || tier FROM open_channel_hub.connection_registry ORDER BY connection_id;"
@@ -950,6 +1103,14 @@ assert_equal \
   "$outbound_telegram_command_eligibility_schema_guards" \
   'Telegram private-reply eligibility table, constraints, and immutable trigger'
 
+outbound_telegram_delivery_authorization_schema_guards="$(
+  query_postgres "SELECT CASE WHEN to_regclass('open_channel_hub.outbound_telegram_delivery_authorizations') IS NOT NULL AND (SELECT string_agg(column_name, ',' ORDER BY ordinal_position) FROM information_schema.columns WHERE table_schema = 'open_channel_hub' AND table_name = 'outbound_telegram_delivery_authorizations') = 'command_id,inbox_id,dashboard_principal_id,scope_fingerprint,bot_identity_fingerprint,authorized_at' AND (SELECT string_agg(column_name || ':' || is_nullable, ',' ORDER BY ordinal_position) FROM information_schema.columns WHERE table_schema = 'open_channel_hub' AND table_name = 'outbound_telegram_delivery_authorizations') = 'command_id:NO,inbox_id:NO,dashboard_principal_id:NO,scope_fingerprint:NO,bot_identity_fingerprint:NO,authorized_at:NO' AND (SELECT COUNT(*) FROM pg_constraint WHERE conrelid = 'open_channel_hub.outbound_telegram_delivery_authorizations'::regclass AND conname IN ('outbound_telegram_delivery_authorizations_command_fk', 'outbound_telegram_delivery_authorizations_inbox_id_format', 'outbound_telegram_delivery_authorizations_dashboard_principal_id_format', 'outbound_telegram_delivery_authorizations_scope_fingerprint_format', 'outbound_telegram_delivery_authorizations_bot_identity_fingerprint_format')) = 5 AND (SELECT COUNT(*) FROM pg_constraint WHERE conrelid = 'open_channel_hub.outbound_telegram_delivery_authorizations'::regclass AND contype = 'p' AND conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'open_channel_hub.outbound_telegram_delivery_authorizations'::regclass AND attname = 'command_id' AND NOT attisdropped)]) = 1 AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'open_channel_hub.outbound_telegram_delivery_authorizations'::regclass AND tgname = 'outbound_telegram_delivery_authorizations_immutable' AND NOT tgisinternal) THEN 'present' ELSE 'missing' END;"
+)"
+assert_equal \
+  'present' \
+  "$outbound_telegram_delivery_authorization_schema_guards" \
+  'Telegram delivery-authorization table, constraints, and immutable trigger'
+
 support_outbound_telegram_eligibility="$(
   query_postgres "SELECT CASE WHEN COUNT(*) = 2 AND COUNT(*) FILTER (WHERE eligibility.source_chat_type = 'private' AND eligibility.bot_identity_fingerprint ~ '^[a-f0-9]{64}$') = 2 THEN 'present' ELSE 'missing' END FROM open_channel_hub.outbound_telegram_command_eligibility eligibility JOIN open_channel_hub.outbound_commands command ON command.command_id = eligibility.command_id WHERE command.connection_id = 'telegram-bot-support' AND command.client_operation_id IN ('${support_outbound_client_operation_id}', '${support_outbound_history_client_operation_id}');"
 )"
@@ -1116,6 +1277,141 @@ assert_equal \
   '400' \
   "$(read_whatsapp_business_inbound_events_status "$whatsapp_sales_operator_api_token" "$whatsapp_cross_connection_cursor")" \
   'WhatsApp Business cross-connection cursor rejection'
+
+support_scope_fingerprint="$(
+  query_postgres "SELECT command_authorization.scope_fingerprint FROM open_channel_hub.outbound_command_authorizations AS command_authorization JOIN open_channel_hub.outbound_commands AS command ON command.command_id = command_authorization.command_id WHERE command.connection_id = 'telegram-bot-support' AND command.client_operation_id = '${support_outbound_client_operation_id}';"
+)"
+support_bot_identity_fingerprint="$(
+  query_postgres "SELECT provider_identity_fingerprint FROM open_channel_hub.connection_registry WHERE connection_id = 'telegram-bot-support';"
+)"
+if [[ ! "$support_scope_fingerprint" =~ ^[a-f0-9]{64}$ || ! "$support_bot_identity_fingerprint" =~ ^[a-f0-9]{64}$ ]]; then
+  printf 'Synthetic Telegram authorization evidence was not provisioned by the source-bound command path.\n' >&2
+  exit 1
+fi
+
+dashboard_principal_a_session_cookie="$(dashboard_login_session_cookie "$dashboard_principal_a")"
+dashboard_principal_a_history="$(
+  read_dashboard_outbound_command_history "$dashboard_principal_a_session_cookie"
+)"
+dashboard_authorization_csrf="$(dashboard_hidden_input_value "$dashboard_principal_a_history" 'csrf')"
+dashboard_authorization_inbox="$(dashboard_hidden_input_value "$dashboard_principal_a_history" 'inbox')"
+dashboard_authorization_command_id="$(
+  dashboard_hidden_input_value "$dashboard_principal_a_history" 'commandId'
+)"
+if [[ -z "$dashboard_authorization_csrf" || "$dashboard_authorization_inbox" != 'support-inbox' || ! "$dashboard_authorization_command_id" =~ ^[1-9][0-9]{0,18}$ ]]; then
+  printf 'The synthetic dashboard did not render a server-eligible Telegram authorization form.\n' >&2
+  exit 1
+fi
+assert_equal \
+  '303' \
+  "$(post_dashboard_telegram_delivery_authorization "$dashboard_principal_a_session_cookie" "$dashboard_authorization_csrf" "$dashboard_authorization_command_id")" \
+  'real PostgreSQL Telegram authorization creation'
+assert_equal \
+  '303' \
+  "$(post_dashboard_telegram_delivery_authorization "$dashboard_principal_a_session_cookie" "$dashboard_authorization_csrf" "$dashboard_authorization_command_id")" \
+  'real PostgreSQL exact Telegram authorization replay'
+
+dashboard_principal_b_session_cookie="$(dashboard_login_session_cookie "$dashboard_principal_b")"
+dashboard_principal_b_history="$(
+  read_dashboard_outbound_command_history "$dashboard_principal_b_session_cookie"
+)"
+dashboard_principal_b_csrf="$(dashboard_hidden_input_value "$dashboard_principal_b_history" 'csrf')"
+if [[ -z "$dashboard_principal_b_csrf" ]]; then
+  printf 'The second synthetic dashboard principal did not receive a usable CSRF token.\n' >&2
+  exit 1
+fi
+assert_equal \
+  '409' \
+  "$(post_dashboard_telegram_delivery_authorization "$dashboard_principal_b_session_cookie" "$dashboard_principal_b_csrf" "$dashboard_authorization_command_id")" \
+  'real PostgreSQL Telegram authorization conflict for a different principal'
+
+legacy_authorization_command_id="$(
+  insert_synthetic_outbound_command \
+    "$legacy_authorization_client_operation_id" \
+    '9001' \
+    '42' \
+    '301' \
+    'Synthetic legacy Telegram authorization candidate'
+)"
+drifted_authorization_command_id="$(
+  insert_synthetic_outbound_command \
+    "$drifted_authorization_client_operation_id" \
+    '9001' \
+    '42' \
+    '301' \
+    'Synthetic drifted Telegram authorization candidate'
+)"
+non_private_authorization_command_id="$(
+  insert_synthetic_outbound_command \
+    "$non_private_authorization_client_operation_id" \
+    '9002' \
+    '-1001234567890' \
+    '302' \
+    'Synthetic non-private Telegram authorization candidate'
+)"
+attempted_authorization_command_id="$(
+  insert_synthetic_outbound_command \
+    "$attempted_authorization_client_operation_id" \
+    '9001' \
+    '42' \
+    '301' \
+    'Synthetic attempted Telegram authorization candidate'
+)"
+for command_id in \
+  "$legacy_authorization_command_id" \
+  "$drifted_authorization_command_id" \
+  "$non_private_authorization_command_id" \
+  "$attempted_authorization_command_id"; do
+  if [[ ! "$command_id" =~ ^[1-9][0-9]{0,18}$ ]]; then
+    printf 'The synthetic PostgreSQL authorization candidate command was not created.\n' >&2
+    exit 1
+  fi
+done
+
+readonly drifted_bot_identity_fingerprint='0000000000000000000000000000000000000000000000000000000000000000'
+if [[ "$support_bot_identity_fingerprint" == "$drifted_bot_identity_fingerprint" ]]; then
+  printf 'Synthetic Bot identity fingerprint unexpectedly collided with the drift fixture.\n' >&2
+  exit 1
+fi
+insert_synthetic_telegram_command_evidence \
+  "$drifted_authorization_command_id" \
+  "$support_scope_fingerprint" \
+  "$drifted_bot_identity_fingerprint"
+insert_synthetic_telegram_command_evidence \
+  "$non_private_authorization_command_id" \
+  "$support_scope_fingerprint" \
+  "$support_bot_identity_fingerprint"
+insert_synthetic_telegram_command_evidence \
+  "$attempted_authorization_command_id" \
+  "$support_scope_fingerprint" \
+  "$support_bot_identity_fingerprint"
+query_postgres "INSERT INTO open_channel_hub.outbound_delivery_attempts (command_id) VALUES (${attempted_authorization_command_id}::bigint);" >/dev/null
+
+for unavailable_command_id in \
+  "$legacy_authorization_command_id" \
+  "$drifted_authorization_command_id" \
+  "$non_private_authorization_command_id" \
+  "$attempted_authorization_command_id"; do
+  assert_equal \
+    '404' \
+    "$(post_dashboard_telegram_delivery_authorization "$dashboard_principal_a_session_cookie" "$dashboard_authorization_csrf" "$unavailable_command_id")" \
+    'real PostgreSQL unavailable Telegram authorization branch'
+done
+
+telegram_authorization_real_postgres_evidence="$(
+  query_postgres "SELECT CASE WHEN COUNT(*) = 1 AND COUNT(*) FILTER (WHERE command_id = ${dashboard_authorization_command_id}::bigint AND inbox_id = 'support-inbox' AND dashboard_principal_id = '${dashboard_principal_a}' AND scope_fingerprint = '${support_scope_fingerprint}' AND bot_identity_fingerprint = '${support_bot_identity_fingerprint}') = 1 THEN 'present' ELSE 'missing' END FROM open_channel_hub.outbound_telegram_delivery_authorizations WHERE command_id IN (${dashboard_authorization_command_id}::bigint, ${legacy_authorization_command_id}::bigint, ${drifted_authorization_command_id}::bigint, ${non_private_authorization_command_id}::bigint, ${attempted_authorization_command_id}::bigint);"
+)"
+assert_equal \
+  'present' \
+  "$telegram_authorization_real_postgres_evidence" \
+  'real PostgreSQL created/replay/conflict and unavailable authorization outcomes'
+telegram_authorization_attempt_count="$(
+  query_postgres "SELECT COUNT(*) FROM open_channel_hub.outbound_delivery_attempts WHERE command_id IN (${dashboard_authorization_command_id}::bigint, ${legacy_authorization_command_id}::bigint, ${drifted_authorization_command_id}::bigint, ${non_private_authorization_command_id}::bigint, ${attempted_authorization_command_id}::bigint);"
+)"
+assert_equal \
+  '1' \
+  "$telegram_authorization_attempt_count" \
+  'authorization writer never creates a delivery attempt on real PostgreSQL'
 
 runtime_connection_secret_permissions="$(
   "${compose[@]}" exec -T api stat -c '%u:%g:%a' /run/secrets/runtime_connections_base64

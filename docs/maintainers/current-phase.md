@@ -1,4 +1,4 @@
-# Public checkpoint: Phase 4a–4g verified source; Phases 4h–4i candidate
+# Public checkpoint: Phase 4a–4g verified source; Phases 4h–4j candidate
 
 **Verified scope:** Phase 4a is a configured, read-only aggregate feed across
 an explicit set of existing official connections. It builds on the Telegram
@@ -125,6 +125,35 @@ missing/changed identity, absent source, and out-of-scope source fail closed.
 This adds no provider call, sender, worker, retry, attempt/receipt write,
 delivery result, browser field, or live-provider test.
 
+## Phase 4j candidate source
+
+Phase 4j is not verified yet. Its forward-only migration
+`0013_outbound_telegram_delivery_authorizations` records one immutable human
+authorization fact at most for a command that already has Phase 4i Telegram
+private-chat/Bot-identity evidence. The row records only command ID, configured
+inbox ID, configured dashboard principal ID, a SHA-256 scope fingerprint, an
+opaque Bot fingerprint, and time; it contains no target, text, bearer, session,
+token, provider response, attempt, receipt, retry, or mutable state.
+
+An optional per-principal `telegramDeliveryAuthorizationInboxIds` list is a
+strict subset of readable inboxes and defaults to empty. It yields a separate
+server-held capability; the inbox-bearer catalog and browser never get that
+capability. The dashboard form is rendered only for a currently eligible
+history entry, then the writer rechecks configured scope, Phase 4h provenance,
+private source, current Bot binding, no attempt, and no prior authorization in
+one PostgreSQL transaction. Missing, historic, out-of-scope, non-private,
+drifted, or already-attempted commands fail closed.
+
+The final synthetic Compose proof is designed to enable only a disposable
+dashboard configuration, manually forward its signed `Secure` cookie to
+`curl`, and exercise this route against PostgreSQL. It is not a browser/TLS
+claim and still makes no provider request.
+
+The current self-hosted alpha allows a configured principal to authorize its
+own previously recorded intent. This is not a four-eyes policy. Phase 4j adds
+no provider HTTP, worker, dispatcher, retry, attempt/receipt writer, command
+mutation, delivery/read state, or live-provider test.
+
 ## Exact verified history
 
 - GitHub CI and CodeQL succeeded for the Phase 0 commit <code>8b80c3b</code>,
@@ -162,7 +191,7 @@ delivery result, browser field, or live-provider test.
 - Historical evidence proves only those exact revisions. It does not verify any
   live provider account, provider send, public TLS endpoint, production
   deployment, any Phase 4g provider result beyond its exact verified commit, or
-  the Phase 4h or Phase 4i candidates.
+  the Phase 4h, Phase 4i, or Phase 4j candidates.
 
 ## Verified Phase 4g source
 

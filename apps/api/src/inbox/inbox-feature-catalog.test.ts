@@ -38,6 +38,9 @@ describe('createInboxFeatureCatalog', () => {
       support.readOutboundReplyCommandHistory
     );
     expect(selectedSupport).not.toHaveProperty('createDashboardReplyIntentCapability');
+    expect(selectedSupport).not.toHaveProperty(
+      'createDashboardTelegramDeliveryAuthorizationCapability'
+    );
     expect(selectedSales).toMatchObject({
       connectionIds: ['telegram-bot-sales'],
       id: 'sales',
@@ -84,9 +87,20 @@ describe('createInboxFeatureCatalog', () => {
       [
         Object.freeze({
           connectionIds: Object.freeze(['telegram-bot-support']),
+          createDashboardReplyIntentCapability: vi.fn(),
+          createOutboundReplyCommand: vi.fn(),
           id: 'support',
           readInboundEvents: vi.fn(async (): Promise<InboundEventPage> => ({ events: [] })),
+          readOutboundReplyCommandHistory: vi.fn(
+            async (): Promise<OutboundReplyCommandHistoryPage> => ({ commands: [] })
+          ),
           token: 'short'
+        })
+      ],
+      [
+        Object.freeze({
+          ...createFeature(),
+          createDashboardTelegramDeliveryAuthorizationCapability: undefined
         })
       ]
     ];
@@ -117,5 +131,13 @@ const createFeature = (overrides: Readonly<Partial<InboxFeature>> = {}): InboxFe
       commands: []
     })),
     token: SUPPORT_TOKEN,
-    ...overrides
+    ...overrides,
+    createDashboardTelegramDeliveryAuthorizationCapability:
+      overrides.createDashboardTelegramDeliveryAuthorizationCapability ??
+      vi.fn(() =>
+        Object.freeze({
+          recordTelegramDeliveryAuthorization: async () =>
+            Object.freeze({ kind: 'command_unavailable' } as const)
+        })
+      )
   });

@@ -10,7 +10,9 @@ import type {
   DashboardInbox,
   DashboardPrincipal,
   DashboardReplyIntentInput,
-  DashboardReplyIntentInbox
+  DashboardReplyIntentInbox,
+  DashboardTelegramDeliveryAuthorizationInbox,
+  DashboardTelegramDeliveryAuthorizationInput
 } from './dashboard-feature.js';
 
 /** A non-diagnostic composition failure for an invalid server-only dashboard graph. */
@@ -34,6 +36,8 @@ export const createRuntimeDashboardFeature = (
   const inboxById = toInboxSnapshot(inboxes);
   const principalById = toPrincipalSnapshot(configuration.principals, inboxById);
   const replyIntentInboxesByPrincipal = toReplyIntentInboxesByPrincipal(principalById, inboxes);
+  const telegramDeliveryAuthorizationInboxesByPrincipal =
+    toTelegramDeliveryAuthorizationInboxesByPrincipal(principalById, inboxes);
   const inboxesByPrincipal = new Map<string, readonly DashboardInbox[]>();
 
   for (const principal of principalById.values()) {
@@ -63,6 +67,11 @@ export const createRuntimeDashboardFeature = (
       inboxId: string
     ): DashboardReplyIntentInbox | undefined =>
       replyIntentInboxesByPrincipal.get(principalId)?.get(inboxId),
+    findTelegramDeliveryAuthorizationInbox: (
+      principalId: string,
+      inboxId: string
+    ): DashboardTelegramDeliveryAuthorizationInbox | undefined =>
+      telegramDeliveryAuthorizationInboxesByPrincipal.get(principalId)?.get(inboxId),
     findPrincipal: (principalId: string): DashboardPrincipal | undefined =>
       principalById.get(principalId),
     listInboxes: (principalId: string): readonly DashboardInbox[] =>
@@ -155,6 +164,61 @@ const toReplyIntentInboxesByPrincipal = (
   return replyIntentInboxesByPrincipal;
 };
 
+/**
+ * This stays separate from reply-intent recording. A principal may review and
+ * authorize a queued command without gaining any ability to create new ones.
+ */
+const toTelegramDeliveryAuthorizationInboxesByPrincipal = (
+  principals: ReadonlyMap<string, DashboardPrincipal>,
+  inboxes: readonly InboxFeature[]
+): ReadonlyMap<string, ReadonlyMap<string, DashboardTelegramDeliveryAuthorizationInbox>> => {
+  const inboxById = new Map<string, InboxFeature>();
+
+  for (const inbox of inboxes) {
+    if (inboxById.has(inbox.id)) {
+      throw new RuntimeDashboardFeatureError();
+    }
+
+    inboxById.set(inbox.id, inbox);
+  }
+
+  const authorizationInboxesByPrincipal = new Map<
+    string,
+    ReadonlyMap<string, DashboardTelegramDeliveryAuthorizationInbox>
+  >();
+
+  for (const principal of principals.values()) {
+    const authorizationInboxes = new Map<string, DashboardTelegramDeliveryAuthorizationInbox>();
+
+    for (const inboxId of principal.telegramDeliveryAuthorizationInboxIds) {
+      const inbox = inboxById.get(inboxId);
+
+      if (inbox === undefined) {
+        throw new RuntimeDashboardFeatureError();
+      }
+
+      const capability = inbox.createDashboardTelegramDeliveryAuthorizationCapability(principal.id);
+
+      authorizationInboxes.set(
+        inboxId,
+        Object.freeze({
+          id: inboxId,
+          recordTelegramDeliveryAuthorization: async (
+            input: DashboardTelegramDeliveryAuthorizationInput
+          ) =>
+            capability.recordTelegramDeliveryAuthorization(
+              Object.freeze({ commandId: input.commandId })
+            )
+        })
+      );
+    }
+
+    authorizationInboxesByPrincipal.set(principal.id, authorizationInboxes);
+  }
+
+  return authorizationInboxesByPrincipal;
+};
+
 const toPrincipalSnapshot = (
   principals: readonly RuntimeDashboardPrincipal[],
   inboxById: ReadonlyMap<string, DashboardInbox>
@@ -167,6 +231,9 @@ const toPrincipalSnapshot = (
       principal.inboxIds.some((inboxId) => !inboxById.has(inboxId)) ||
       principal.replyIntentInboxIds.some(
         (inboxId) => !inboxById.has(inboxId) || !principal.inboxIds.includes(inboxId)
+      ) ||
+      principal.telegramDeliveryAuthorizationInboxIds.some(
+        (inboxId) => !inboxById.has(inboxId) || !principal.inboxIds.includes(inboxId)
       )
     ) {
       throw new RuntimeDashboardFeatureError();
@@ -178,7 +245,10 @@ const toPrincipalSnapshot = (
         id: principal.id,
         inboxIds: Object.freeze([...principal.inboxIds]),
         passwordHash: principal.passwordHash,
-        replyIntentInboxIds: Object.freeze([...principal.replyIntentInboxIds])
+        replyIntentInboxIds: Object.freeze([...principal.replyIntentInboxIds]),
+        telegramDeliveryAuthorizationInboxIds: Object.freeze([
+          ...principal.telegramDeliveryAuthorizationInboxIds
+        ])
       })
     );
   }

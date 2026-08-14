@@ -87,14 +87,16 @@ describe('loadRuntimeConnectionConfiguration', () => {
             inboxIds: ['sales-inbox', 'support-inbox'],
             passwordHash:
               '$argon2id$v=19$m=19456,p=1,t=2$c3ludGhldGljLXNhbHQ$c3ludGhldGljLXBhc3N3b3JkLWhhc2gtc3VwcG9ydA',
-            replyIntentInboxIds: []
+            replyIntentInboxIds: [],
+            telegramDeliveryAuthorizationInboxIds: []
           },
           {
             id: 'sales-agent',
             inboxIds: ['sales-inbox'],
             passwordHash:
               '$argon2id$v=19$m=19456,t=2,p=1$c2FsZXMtc3ludGhldGljLXNhbHQ$c2FsZXMtcGFzc3dvcmQtaGFzaC1mb3ItdGVzdGluZw',
-            replyIntentInboxIds: []
+            replyIntentInboxIds: [],
+            telegramDeliveryAuthorizationInboxIds: []
           }
         ],
         publicOrigin: 'https://dashboard.example.test',
@@ -128,6 +130,7 @@ describe('loadRuntimeConnectionConfiguration', () => {
     expect(Object.isFrozen(principal)).toBe(true);
     expect(Object.isFrozen(principal?.inboxIds)).toBe(true);
     expect(Object.isFrozen(principal?.replyIntentInboxIds)).toBe(true);
+    expect(Object.isFrozen(principal?.telegramDeliveryAuthorizationInboxIds)).toBe(true);
     expect(() => {
       (dashboard?.sessionCookieSigningKeys as string[]).push('another-signing-key');
     }).toThrow(TypeError);
@@ -136,6 +139,9 @@ describe('loadRuntimeConnectionConfiguration', () => {
     }).toThrow(TypeError);
     expect(() => {
       (principal?.replyIntentInboxIds as string[]).push('another-inbox');
+    }).toThrow(TypeError);
+    expect(() => {
+      (principal?.telegramDeliveryAuthorizationInboxIds as string[]).push('another-inbox');
     }).toThrow(TypeError);
   });
 
@@ -152,16 +158,35 @@ describe('loadRuntimeConnectionConfiguration', () => {
         inboxIds: ['sales-inbox', 'support-inbox'],
         passwordHash:
           '$argon2id$v=19$m=19456,p=1,t=2$c3ludGhldGljLXNhbHQ$c3ludGhldGljLXBhc3N3b3JkLWhhc2gtc3VwcG9ydA',
-        replyIntentInboxIds: ['sales-inbox', 'support-inbox']
+        replyIntentInboxIds: ['sales-inbox', 'support-inbox'],
+        telegramDeliveryAuthorizationInboxIds: []
       },
       {
         id: 'sales-agent',
         inboxIds: ['sales-inbox'],
         passwordHash:
           '$argon2id$v=19$m=19456,t=2,p=1$c2FsZXMtc3ludGhldGljLXNhbHQ$c2FsZXMtcGFzc3dvcmQtaGFzaC1mb3ItdGVzdGluZw',
-        replyIntentInboxIds: []
+        replyIntentInboxIds: [],
+        telegramDeliveryAuthorizationInboxIds: []
       }
     ]);
+  });
+
+  it('loads a separate canonical Telegram delivery-authorization scope without granting reply-intent recording', async () => {
+    const configuration = validDashboardConfiguration();
+    configuration.dashboard.principals[0]!.telegramDeliveryAuthorizationInboxIds = [
+      'support-inbox',
+      'sales-inbox'
+    ];
+    readFileMock.mockResolvedValue(JSON.stringify(configuration));
+
+    const result = await loadRuntimeConnectionConfiguration(CONFIGURATION_PATH);
+
+    expect(result.dashboard?.principals[0]).toMatchObject({
+      inboxIds: ['sales-inbox', 'support-inbox'],
+      replyIntentInboxIds: [],
+      telegramDeliveryAuthorizationInboxIds: ['sales-inbox', 'support-inbox']
+    });
   });
 
   it('rejects a dashboard without configured inboxes, inexact dashboard records, and non-public origins', async () => {
@@ -335,6 +360,26 @@ describe('loadRuntimeConnectionConfiguration', () => {
     const replyIntentOutsideReadScope = validDashboardConfiguration();
     replyIntentOutsideReadScope.dashboard.principals[1]!.replyIntentInboxIds = ['support-inbox'];
 
+    const malformedTelegramDeliveryAuthorizationInboxScope = validDashboardConfiguration();
+    malformedTelegramDeliveryAuthorizationInboxScope.dashboard.principals[0]!.telegramDeliveryAuthorizationInboxIds =
+      ['..'];
+
+    const nonArrayTelegramDeliveryAuthorizationInboxScope = validDashboardConfiguration();
+    nonArrayTelegramDeliveryAuthorizationInboxScope.dashboard.principals[0]!.telegramDeliveryAuthorizationInboxIds =
+      'sales-inbox' as unknown as string[];
+
+    const duplicateTelegramDeliveryAuthorizationInboxScope = validDashboardConfiguration();
+    duplicateTelegramDeliveryAuthorizationInboxScope.dashboard.principals[0]!.telegramDeliveryAuthorizationInboxIds =
+      ['sales-inbox', 'sales-inbox'];
+
+    const unknownTelegramDeliveryAuthorizationInboxScope = validDashboardConfiguration();
+    unknownTelegramDeliveryAuthorizationInboxScope.dashboard.principals[0]!.telegramDeliveryAuthorizationInboxIds =
+      ['not-configured'];
+
+    const telegramDeliveryAuthorizationOutsideReadScope = validDashboardConfiguration();
+    telegramDeliveryAuthorizationOutsideReadScope.dashboard.principals[1]!.telegramDeliveryAuthorizationInboxIds =
+      ['support-inbox'];
+
     for (const configuration of [
       noPrincipals,
       duplicatePrincipalId,
@@ -354,7 +399,12 @@ describe('loadRuntimeConnectionConfiguration', () => {
       nonArrayReplyIntentInboxScope,
       duplicateReplyIntentInboxScope,
       unknownReplyIntentInboxScope,
-      replyIntentOutsideReadScope
+      replyIntentOutsideReadScope,
+      malformedTelegramDeliveryAuthorizationInboxScope,
+      nonArrayTelegramDeliveryAuthorizationInboxScope,
+      duplicateTelegramDeliveryAuthorizationInboxScope,
+      unknownTelegramDeliveryAuthorizationInboxScope,
+      telegramDeliveryAuthorizationOutsideReadScope
     ]) {
       readFileMock.mockResolvedValueOnce(JSON.stringify(configuration));
       await expectGenericFailure(loadRuntimeConnectionConfiguration(CONFIGURATION_PATH));
@@ -918,6 +968,7 @@ interface MutableRuntimeDashboardPrincipal {
   inboxIds: string[];
   passwordHash: string;
   replyIntentInboxIds?: string[];
+  telegramDeliveryAuthorizationInboxIds?: string[];
 }
 
 interface MutableRuntimeInbox {

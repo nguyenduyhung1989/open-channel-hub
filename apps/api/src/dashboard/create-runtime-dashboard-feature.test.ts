@@ -53,7 +53,8 @@ describe('runtime dashboard feature', () => {
       inboxIds: ['sales-inbox', 'support-inbox'],
       passwordHash:
         '$argon2id$v=19$m=19456,p=1,t=2$c3ludGhldGljLXNhbHQ$W+RmllYNYY+qahTKzQkGOeAD0Lv1oPXOFLTM1cAY150',
-      replyIntentInboxIds: ['support-inbox']
+      replyIntentInboxIds: ['support-inbox'],
+      telegramDeliveryAuthorizationInboxIds: []
     });
     expect(supportInbox).toEqual({
       connectionIds: ['telegram-bot-support'],
@@ -125,6 +126,61 @@ describe('runtime dashboard feature', () => {
     expect(readOnlyCapabilityFactory).not.toHaveBeenCalled();
   });
 
+  it('creates a separate Telegram delivery-authorization capability only for its configured principal inbox scope', async () => {
+    const recordTelegramDeliveryAuthorization = vi.fn(async () =>
+      Object.freeze({ kind: 'command_unavailable' } as const)
+    );
+    const telegramDeliveryAuthorizationCapabilityFactory = vi.fn(() =>
+      Object.freeze({ recordTelegramDeliveryAuthorization })
+    );
+    const dashboard = createRuntimeDashboardFeature(
+      runtimeDashboard({ supportTelegramDeliveryAuthorizationInboxIds: ['support-inbox'] }),
+      [
+        inbox(
+          'support-inbox',
+          SUPPORT_TOKEN,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          telegramDeliveryAuthorizationCapabilityFactory
+        ),
+        inbox('sales-inbox', SALES_TOKEN)
+      ],
+      sessionStore()
+    );
+
+    const authorizationInbox = dashboard.findTelegramDeliveryAuthorizationInbox(
+      'support-agent',
+      'support-inbox'
+    );
+
+    expect(dashboard.findReplyIntentInbox('support-agent', 'support-inbox')).toBeUndefined();
+    expect(authorizationInbox).toEqual({
+      id: 'support-inbox',
+      recordTelegramDeliveryAuthorization: expect.any(Function)
+    });
+    expect(authorizationInbox).not.toHaveProperty('connectionIds');
+    expect(authorizationInbox).not.toHaveProperty('readInboundEvents');
+    expect(authorizationInbox).not.toHaveProperty('createOutboundReplyCommand');
+    expect(authorizationInbox).not.toHaveProperty(
+      'createDashboardTelegramDeliveryAuthorizationCapability'
+    );
+    expect(JSON.stringify(authorizationInbox)).not.toContain(SUPPORT_TOKEN);
+    expect(
+      dashboard.findTelegramDeliveryAuthorizationInbox('support-agent', 'sales-inbox')
+    ).toBeUndefined();
+    expect(
+      dashboard.findTelegramDeliveryAuthorizationInbox('sales-agent', 'support-inbox')
+    ).toBeUndefined();
+
+    await authorizationInbox?.recordTelegramDeliveryAuthorization({ commandId: '44' });
+
+    expect(telegramDeliveryAuthorizationCapabilityFactory).toHaveBeenCalledOnce();
+    expect(telegramDeliveryAuthorizationCapabilityFactory).toHaveBeenCalledWith('support-agent');
+    expect(recordTelegramDeliveryAuthorization).toHaveBeenCalledWith({ commandId: '44' });
+  });
+
   it('refuses a direct composition graph with duplicated or unavailable inboxes', () => {
     expect(() =>
       createRuntimeDashboardFeature(
@@ -154,7 +210,10 @@ describe('runtime dashboard feature', () => {
 });
 
 const runtimeDashboard = (
-  options: Readonly<{ supportReplyIntentInboxIds?: readonly string[] }> = {}
+  options: Readonly<{
+    supportReplyIntentInboxIds?: readonly string[];
+    supportTelegramDeliveryAuthorizationInboxIds?: readonly string[];
+  }> = {}
 ): RuntimeDashboard => ({
   principals: [
     {
@@ -162,14 +221,17 @@ const runtimeDashboard = (
       inboxIds: ['sales-inbox', 'support-inbox'],
       passwordHash:
         '$argon2id$v=19$m=19456,p=1,t=2$c3ludGhldGljLXNhbHQ$W+RmllYNYY+qahTKzQkGOeAD0Lv1oPXOFLTM1cAY150',
-      replyIntentInboxIds: options.supportReplyIntentInboxIds ?? []
+      replyIntentInboxIds: options.supportReplyIntentInboxIds ?? [],
+      telegramDeliveryAuthorizationInboxIds:
+        options.supportTelegramDeliveryAuthorizationInboxIds ?? []
     },
     {
       id: 'sales-agent',
       inboxIds: ['sales-inbox'],
       passwordHash:
         '$argon2id$v=19$m=19456,p=1,t=2$c2FsZXMtc2FsdA$W+RmllYNYY+qahTKzQkGOeAD0Lv1oPXOFLTM1cAY150',
-      replyIntentInboxIds: []
+      replyIntentInboxIds: [],
+      telegramDeliveryAuthorizationInboxIds: []
     }
   ],
   publicOrigin: 'https://dashboard.example.test',
@@ -189,11 +251,17 @@ const inbox = (
   createOutboundReplyCommand: InboxFeature['createOutboundReplyCommand'] = async (): Promise<CreateOutboundReplyCommandResult> =>
     Object.freeze({ kind: 'source_unavailable' }),
   createDashboardReplyIntentCapability: InboxFeature['createDashboardReplyIntentCapability'] = () =>
-    Object.freeze({ recordReplyIntent: createOutboundReplyCommand })
+    Object.freeze({ recordReplyIntent: createOutboundReplyCommand }),
+  createDashboardTelegramDeliveryAuthorizationCapability: InboxFeature['createDashboardTelegramDeliveryAuthorizationCapability'] = () =>
+    Object.freeze({
+      recordTelegramDeliveryAuthorization: async () =>
+        Object.freeze({ kind: 'command_unavailable' } as const)
+    })
 ): InboxFeature =>
   Object.freeze({
     connectionIds: Object.freeze(['telegram-bot-support']),
     createDashboardReplyIntentCapability,
+    createDashboardTelegramDeliveryAuthorizationCapability,
     createOutboundReplyCommand,
     id,
     readInboundEvents,

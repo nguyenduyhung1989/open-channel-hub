@@ -91,6 +91,11 @@ export interface RuntimeDashboardPrincipal {
    * existing dashboard principal remains read-only by default.
    */
   readonly replyIntentInboxIds: readonly string[];
+  /**
+   * The independent subset allowed to record Telegram delivery authorization
+   * evidence. Omission is a frozen empty allow-list; it never enables a send.
+   */
+  readonly telegramDeliveryAuthorizationInboxIds: readonly string[];
 }
 
 /**
@@ -176,7 +181,10 @@ const DASHBOARD_REQUIRED_KEYS = Object.freeze([
   'principals'
 ]);
 const DASHBOARD_PRINCIPAL_REQUIRED_KEYS = Object.freeze(['id', 'passwordHash', 'inboxIds']);
-const DASHBOARD_PRINCIPAL_OPTIONAL_KEYS = Object.freeze(['replyIntentInboxIds']);
+const DASHBOARD_PRINCIPAL_OPTIONAL_KEYS = Object.freeze([
+  'replyIntentInboxIds',
+  'telegramDeliveryAuthorizationInboxIds'
+]);
 const CONNECTION_ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
 const PRINTABLE_TOKEN_PATTERN = /^[!-~]+$/;
 const WEBHOOK_SECRET_PATTERN = /^[A-Za-z0-9_-]{32,256}$/;
@@ -668,12 +676,18 @@ const parseDashboardPrincipal = (
     configuredInboxIds,
     readableInboxIds: inboxIds
   });
+  const telegramDeliveryAuthorizationInboxIds = parseTelegramDeliveryAuthorizationInboxIds({
+    candidate: value.telegramDeliveryAuthorizationInboxIds,
+    configuredInboxIds,
+    readableInboxIds: inboxIds
+  });
 
   return Object.freeze({
     id: value.id,
     inboxIds: Object.freeze([...inboxIds].sort()),
     passwordHash: value.passwordHash,
-    replyIntentInboxIds
+    replyIntentInboxIds,
+    telegramDeliveryAuthorizationInboxIds
   });
 };
 
@@ -712,6 +726,43 @@ const parseReplyIntentInboxIds = ({
   }
 
   return Object.freeze([...replyIntentInboxIds].sort());
+};
+
+interface ParseTelegramDeliveryAuthorizationInboxIdsInput {
+  readonly candidate: unknown;
+  readonly configuredInboxIds: ReadonlySet<string>;
+  readonly readableInboxIds: ReadonlySet<string>;
+}
+
+const parseTelegramDeliveryAuthorizationInboxIds = ({
+  candidate,
+  configuredInboxIds,
+  readableInboxIds
+}: ParseTelegramDeliveryAuthorizationInboxIdsInput): readonly string[] => {
+  if (candidate === undefined) {
+    return Object.freeze([]);
+  }
+
+  if (!Array.isArray(candidate) || candidate.length > MAXIMUM_INBOXES) {
+    throw new RuntimeConnectionConfigurationError();
+  }
+
+  const telegramDeliveryAuthorizationInboxIds = new Set<string>();
+
+  for (const inboxId of candidate) {
+    if (
+      !isInboxId(inboxId) ||
+      !configuredInboxIds.has(inboxId) ||
+      !readableInboxIds.has(inboxId) ||
+      telegramDeliveryAuthorizationInboxIds.has(inboxId)
+    ) {
+      throw new RuntimeConnectionConfigurationError();
+    }
+
+    telegramDeliveryAuthorizationInboxIds.add(inboxId);
+  }
+
+  return Object.freeze([...telegramDeliveryAuthorizationInboxIds].sort());
 };
 
 const parseConnection = (value: unknown): RuntimeConnection => {

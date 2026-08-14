@@ -8,7 +8,8 @@ import type {
   InboundEventReader,
   InboundEventStore,
   OutboundReplyCommandHistoryReader,
-  OutboundReplyCommandStore
+  OutboundReplyCommandStore,
+  OutboundTelegramDeliveryAuthorizationStore
 } from '@open-channel-hub/domain';
 
 import { PostgresConnectionRegistry } from './postgres-connection-registry.js';
@@ -20,6 +21,7 @@ import { PostgresInboundEventReader } from './postgres-inbound-event-reader.js';
 import { assertPostgresSchemaCurrent, migratePostgresSchema } from './postgres-migrations.js';
 import { PostgresOutboundReplyCommandStore } from './postgres-outbound-reply-command-store.js';
 import { PostgresOutboundReplyCommandHistoryReader } from './postgres-outbound-reply-command-history-reader.js';
+import { PostgresOutboundTelegramDeliveryAuthorizationStore } from './postgres-outbound-telegram-delivery-authorization-store.js';
 import type { SqlClient, SqlPool, SqlQueryResult } from './sql.js';
 
 export interface PostgresDatabaseOptions {
@@ -38,6 +40,7 @@ export interface PostgresDatabase {
   readonly inboundEventStore: InboundEventStore;
   readonly outboundReplyCommandHistoryReader: OutboundReplyCommandHistoryReader;
   readonly outboundReplyCommandStore: OutboundReplyCommandStore;
+  readonly outboundTelegramDeliveryAuthorizationStore: OutboundTelegramDeliveryAuthorizationStore;
   checkReadiness(): Promise<void>;
   close(): Promise<void>;
   migrate(): Promise<void>;
@@ -77,6 +80,8 @@ export const createPostgresDatabase = async (
   const inboundEventStore = new PostgresInboundEventStore(sqlPool);
   const outboundReplyCommandStore = new PostgresOutboundReplyCommandStore(sqlPool);
   const outboundReplyCommandHistoryReader = new PostgresOutboundReplyCommandHistoryReader(sqlPool);
+  const outboundTelegramDeliveryAuthorizationStore =
+    new PostgresOutboundTelegramDeliveryAuthorizationStore(sqlPool);
 
   return Object.freeze({
     connectionRegistry,
@@ -86,6 +91,7 @@ export const createPostgresDatabase = async (
     inboundEventStore,
     outboundReplyCommandHistoryReader,
     outboundReplyCommandStore,
+    outboundTelegramDeliveryAuthorizationStore,
     checkReadiness: async (): Promise<void> => {
       try {
         if (idleClientError) {
