@@ -602,6 +602,39 @@ CREATE TRIGGER outbound_telegram_delivery_authorizations_immutable
 BEFORE UPDATE OR DELETE ON ${POSTGRES_SCHEMA}.outbound_telegram_delivery_authorizations
 FOR EACH ROW
 EXECUTE FUNCTION ${POSTGRES_SCHEMA}.reject_outbound_telegram_delivery_authorization_mutation()
+  `
+]);
+
+/**
+ * Experimental Zalo User events retain only their provider-reported thread
+ * kind. A future group-only reply policy must never infer this from a mutable
+ * conversation identifier. The same migration binds a Zalo User connection
+ * to an opaque account fingerprint before new ledger rows may be written.
+ */
+const ZALO_USER_THREAD_TYPE_AND_PROVIDER_IDENTITY_ID =
+  '0014_zalo_user_thread_type_and_provider_identity';
+
+const ZALO_USER_THREAD_TYPE_AND_PROVIDER_IDENTITY_STATEMENTS = Object.freeze([
+  `
+ALTER TABLE ${POSTGRES_SCHEMA}.inbound_events
+  ADD COLUMN zalo_user_thread_type text
+`,
+  `
+ALTER TABLE ${POSTGRES_SCHEMA}.inbound_events
+  ADD CONSTRAINT inbound_events_zalo_user_thread_type_channel_match CHECK (
+    (
+      channel = 'zalo_user'
+      AND zalo_user_thread_type IS NOT NULL
+      AND zalo_user_thread_type IN ('user', 'group')
+    )
+    OR (channel <> 'zalo_user' AND zalo_user_thread_type IS NULL)
+  ) NOT VALID
+`,
+  `
+ALTER TABLE ${POSTGRES_SCHEMA}.connection_registry
+  ADD CONSTRAINT connection_registry_zalo_user_provider_identity_required CHECK (
+    channel <> 'zalo_user' OR provider_identity_fingerprint IS NOT NULL
+  ) NOT VALID
 `
 ]);
 
@@ -697,6 +730,14 @@ const MIGRATIONS = Object.freeze([
       OUTBOUND_TELEGRAM_DELIVERY_AUTHORIZATIONS_STATEMENTS
     ),
     statements: OUTBOUND_TELEGRAM_DELIVERY_AUTHORIZATIONS_STATEMENTS
+  }),
+  Object.freeze({
+    id: ZALO_USER_THREAD_TYPE_AND_PROVIDER_IDENTITY_ID,
+    checksum: checksumFor(
+      ZALO_USER_THREAD_TYPE_AND_PROVIDER_IDENTITY_ID,
+      ZALO_USER_THREAD_TYPE_AND_PROVIDER_IDENTITY_STATEMENTS
+    ),
+    statements: ZALO_USER_THREAD_TYPE_AND_PROVIDER_IDENTITY_STATEMENTS
   })
 ]);
 

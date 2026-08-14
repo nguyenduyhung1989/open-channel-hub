@@ -31,6 +31,10 @@ import type { ZaloOaFeature } from './zalo-oa/zalo-oa-feature.js';
 import { createZaloOaFeatureCatalog } from './zalo-oa/zalo-oa-feature-catalog.js';
 import { registerZaloOaInboundEventsRoute } from './zalo-oa/zalo-oa-inbound-events-route.js';
 import { registerZaloOaWebhookRoute } from './zalo-oa/zalo-oa-webhook-route.js';
+import type { ZaloUserFeature } from './zalo-user/zalo-user-feature.js';
+import { createZaloUserFeatureCatalog } from './zalo-user/zalo-user-feature-catalog.js';
+import { registerZaloUserBridgeEventsRoute } from './zalo-user/zalo-user-bridge-events-route.js';
+import { registerZaloUserInboundEventsRoute } from './zalo-user/zalo-user-inbound-events-route.js';
 import type { WhatsAppBusinessFeature } from './whatsapp-business/whatsapp-business-feature.js';
 import { createWhatsAppBusinessFeatureCatalog } from './whatsapp-business/whatsapp-business-feature-catalog.js';
 import { registerWhatsAppBusinessInboundEventsRoute } from './whatsapp-business/whatsapp-business-inbound-events-route.js';
@@ -46,6 +50,7 @@ export interface BuildAppOptions {
   readonly telegramBots?: readonly TelegramBotFeature[];
   readonly whatsappBusinesses?: readonly WhatsAppBusinessFeature[];
   readonly zaloOas?: readonly ZaloOaFeature[];
+  readonly zaloUsers?: readonly ZaloUserFeature[];
 }
 
 export const buildApp = async (options: BuildAppOptions = {}): Promise<FastifyInstance> => {
@@ -149,6 +154,13 @@ export const buildApp = async (options: BuildAppOptions = {}): Promise<FastifyIn
 
     await registerZaloOaInboundEventsRoute(app, catalog);
     await registerZaloOaWebhookRoute(app, catalog);
+  }
+
+  if (options.zaloUsers !== undefined) {
+    const catalog = createZaloUserFeatureCatalog(options.zaloUsers);
+
+    await registerZaloUserInboundEventsRoute(app, catalog);
+    await registerZaloUserBridgeEventsRoute(app, catalog);
   }
 
   if (options.facebookPages !== undefined) {

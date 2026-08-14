@@ -29,6 +29,14 @@ const ZALO_OA_REGISTRATION: ConnectionRegistration = Object.freeze({
   tier: 'OFFICIAL'
 });
 
+const ZALO_USER_REGISTRATION: ConnectionRegistration = Object.freeze({
+  channel: 'zalo_user',
+  connectorId: 'zalo-user',
+  id: 'zalo-user-support',
+  providerIdentityFingerprint: '3d9c0bdb0a878c974c947a36fc38e51ad46dc6a7ba9b55bc854046218fcc83e1',
+  tier: 'EXPERIMENTAL'
+});
+
 const FACEBOOK_PAGE_REGISTRATION: ConnectionRegistration = Object.freeze({
   channel: 'facebook_page',
   connectorId: 'facebook-page',
@@ -125,6 +133,39 @@ describe('PostgresConnectionRegistry', () => {
     await expect(registry.ensureRegistered([ZALO_OA_REGISTRATION])).rejects.toBeInstanceOf(
       PostgresStorageError
     );
+    expect(pool.records).toEqual([]);
+    expect(pool.client.queries.map((query) => query.sql)).toContain('ROLLBACK');
+  });
+
+  it('requires, preserves, and protects an opaque Zalo User provider identity', async () => {
+    const invalid = Object.freeze({
+      channel: 'zalo_user' as const,
+      connectorId: 'zalo-user',
+      id: 'zalo-user-without-identity',
+      tier: 'EXPERIMENTAL' as const
+    } satisfies ConnectionRegistration);
+    const rebound = Object.freeze({
+      ...ZALO_USER_REGISTRATION,
+      providerIdentityFingerprint:
+        '6fb4d468bae3102075d0ad82e4b6b7e115b2332a4ff8d0d0c826d90d2a5b55f0'
+    });
+
+    await expect(
+      new PostgresConnectionRegistry(createRegistryPool()).ensureRegistered([invalid])
+    ).rejects.toBeInstanceOf(PostgresStorageError);
+    await expect(
+      new PostgresConnectionRegistry(createRegistryPool([ZALO_USER_REGISTRATION])).ensureRegistered(
+        [rebound]
+      )
+    ).rejects.toBeInstanceOf(PostgresStorageError);
+  });
+
+  it('rejects first binding a Zalo User id that has pre-registry inbound history', async () => {
+    const pool = createRegistryPool({ historicalConnectionIds: [ZALO_USER_REGISTRATION.id] });
+
+    await expect(
+      new PostgresConnectionRegistry(pool).ensureRegistered([ZALO_USER_REGISTRATION])
+    ).rejects.toBeInstanceOf(PostgresStorageError);
     expect(pool.records).toEqual([]);
     expect(pool.client.queries.map((query) => query.sql)).toContain('ROLLBACK');
   });

@@ -1,0 +1,11 @@
+{
+  "name": "@open-channel-hub/zalo-user-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "dependencies": {
+    "@open-channel-hub/connector-zalo-user": "file:../../packages/connector-zalo-user",
+    "zca-js": "2.1.2"
+  }
+}

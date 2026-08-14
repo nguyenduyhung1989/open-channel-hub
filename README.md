@@ -2,7 +2,8 @@
 
 > A self-hosted, official-first multichannel messaging hub.
 
-**Status: Phase 4j alpha source verified.** The repository contains a durable
+**Status: Phase 4j alpha source verified; Phase 5a is an experimental source
+candidate.** The repository contains a durable
 PostgreSQL inbound-event ledger, account-scoped operator read APIs, a
 configured multi-connection inbox API, an optional server-rendered read-only
 operator dashboard, a durable source-bound reply-command ledger, a scoped
@@ -116,6 +117,15 @@ bearer exposes only that OA's canonical events at
 <code>GET /v1/zalo-oa/inbound-events</code>. There is no OAuth, access-token
 storage, outbound Zalo message, attachment, Zalo User, live provider call, or
 automatic webhook registration.
+
+An experimental Zalo User group bridge is present in the working source but is
+not an official connector or a production claim. It runs separately from
+Compose with a fresh local QR session, accepts only non-self group text, and
+offers a loopback-only, separately authenticated text/image control endpoint
+only for a group successfully observed in that running session. It deliberately
+does not persist session material, enumerate groups, accept direct-message
+targets, send in bulk, or retry provider sends automatically. See the
+[experimental Zalo User group bridge guide](docs/operations/zalo-user-group-bridge-experimental.md).
 
 For Zalo OA, Facebook Page, and WhatsApp Business, the registry also stores a domain-separated SHA-256
 fingerprint of the configured <code>(appId, oaId)</code> pair. It is not the

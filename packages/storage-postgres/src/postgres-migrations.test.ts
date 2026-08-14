@@ -212,6 +212,11 @@ describe('PostgreSQL migrations', () => {
     expect(sql).toContain('telegram_chat_type IS NOT NULL');
     expect(sql).toContain("telegram_chat_type IN ('private', 'group', 'supergroup', 'channel')");
     expect(sql).toContain('connection_registry_telegram_bot_provider_identity_required');
+    expect(sql).toContain('ADD COLUMN zalo_user_thread_type text');
+    expect(sql).toContain('inbound_events_zalo_user_thread_type_channel_match');
+    expect(sql).toContain('zalo_user_thread_type IS NOT NULL');
+    expect(sql).toContain("zalo_user_thread_type IN ('user', 'group')");
+    expect(sql).toContain('connection_registry_zalo_user_provider_identity_required');
     expect(telegramEligibilitySql).toContain(
       'CREATE TABLE open_channel_hub.outbound_telegram_command_eligibility'
     );
@@ -305,7 +310,7 @@ describe('PostgreSQL migrations', () => {
       .filter((query) => query.sql.includes('INSERT INTO open_channel_hub.schema_migrations'))
       .map((query) => query.values[0]);
 
-    expect(recordedMigrationIds).toHaveLength(13);
+    expect(recordedMigrationIds).toHaveLength(14);
     expect(recordedMigrationIds).toEqual([
       '0001_inbound_event_ledger',
       '0002_inbound_event_ledger_sequence',
@@ -319,7 +324,8 @@ describe('PostgreSQL migrations', () => {
       '0010_outbound_delivery_attempt_receipts',
       '0011_outbound_command_authorizations',
       '0012_telegram_private_reply_eligibility',
-      '0013_outbound_telegram_delivery_authorizations'
+      '0013_outbound_telegram_delivery_authorizations',
+      '0014_zalo_user_thread_type_and_provider_identity'
     ]);
     expect(pool.releaseCount).toBe(1);
   });
@@ -387,6 +393,10 @@ describe('PostgreSQL migrations', () => {
     );
     expect(secondRunSql).not.toContain(
       'CREATE TRIGGER outbound_telegram_delivery_authorizations_immutable'
+    );
+    expect(secondRunSql).not.toContain('ADD COLUMN zalo_user_thread_type text');
+    expect(secondRunSql).not.toContain(
+      'ADD CONSTRAINT connection_registry_zalo_user_provider_identity_required'
     );
     expect(secondRunSql).not.toContain('INSERT INTO open_channel_hub.schema_migrations');
     expect(pool.releaseCount).toBe(2);

@@ -49,10 +49,11 @@ describe('PostgresInboundEventStore', () => {
         '301',
         '42',
         "Synthetic text with quote ' and SQL-looking punctuation; --",
-        'private'
+        'private',
+        null
       ]
     });
-    expect(pool.client.queries[2]?.sql).toContain('$11');
+    expect(pool.client.queries[2]?.sql).toContain('$12');
     expect(pool.client.queries[2]?.sql).toContain(
       'ON CONFLICT (connection_id, provider_event_id) DO NOTHING'
     );
@@ -78,12 +79,17 @@ describe('PostgresInboundEventStore', () => {
     expect(pool.client.released).toBe(true);
   });
 
-  it('rejects Telegram chat evidence that would violate the durable channel boundary before opening a transaction', async () => {
+  it('rejects channel-specific thread evidence that would violate the durable boundary before opening a transaction', async () => {
     const withoutTelegramChatType = eventWithoutTelegramChatType();
     const invalidEvents: readonly CanonicalEvent[] = [
       Object.freeze(withoutTelegramChatType),
       Object.freeze({ ...EVENT, telegramChatType: 'unsupported' as never }),
-      Object.freeze({ ...EVENT, channel: 'zalo_oa' as const })
+      Object.freeze({ ...EVENT, channel: 'zalo_oa' as const }),
+      Object.freeze({
+        ...withoutTelegramChatType,
+        channel: 'zalo_user' as const,
+        zaloUserThreadType: 'unsupported' as never
+      })
     ];
 
     for (const event of invalidEvents) {
@@ -104,7 +110,21 @@ describe('PostgresInboundEventStore', () => {
 
     await new PostgresInboundEventStore(pool).append([nonTelegram]);
 
-    expect(pool.client.queries[2]?.values.at(-1)).toBeNull();
+    expect(pool.client.queries[2]?.values.slice(-2)).toEqual([null, null]);
+  });
+
+  it('stores the Zalo User group marker only for a Zalo User canonical event', async () => {
+    const pool = createSqlPool();
+    const withoutTelegramChatType = eventWithoutTelegramChatType();
+    const zaloUserGroupEvent: CanonicalEvent = Object.freeze({
+      ...withoutTelegramChatType,
+      channel: 'zalo_user',
+      zaloUserThreadType: 'group'
+    });
+
+    await new PostgresInboundEventStore(pool).append([zaloUserGroupEvent]);
+
+    expect(pool.client.queries[2]?.values.slice(-2)).toEqual([null, 'group']);
   });
 });
 

@@ -25,6 +25,7 @@ it does not mean a feature is complete.
 | [0017](0017-immutable-outbound-command-authorization-provenance.md) | accepted | Immutable command authorization provenance before provider dispatch |
 | [0018](0018-telegram-private-reply-eligibility.md)                  | accepted | Telegram private-chat and Bot-identity evidence before dispatch     |
 | [0019](0019-telegram-delivery-authorization-evidence.md)            | accepted | Immutable Telegram delivery authorization before dispatch           |
+| [0020](0020-experimental-zalo-user-group-bridge.md)                 | accepted | Isolated experimental Zalo User group bridge                        |
 
 Template for a new ADR:
 

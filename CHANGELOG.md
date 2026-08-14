@@ -8,6 +8,19 @@ follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Phase 5a: an opt-in experimental Zalo User group bridge outside the API
+  container and Compose stack. It retains only canonical non-self group text,
+  binds one opaque connection ID to an account fingerprint, and keeps QR
+  session material out of Hub runtime configuration and persistence.
+- Phase 5a: a loopback-only separately authenticated local control service for
+  one explicit group text or JPEG/PNG/WebP send after that group was durably
+  observed in the running bridge. It has no direct-message target, group list,
+  bulk recipient surface, provider retry, or session persistence.
+- Phase 5a: forward migration
+  <code>0014_zalo_user_thread_type_and_provider_identity</code> to retain the
+  internal Zalo User group/thread marker and require an opaque provider identity
+  fingerprint for new Zalo User registry bindings.
+
 - The public Phase 0 foundation for Open Channel Hub.
 - The original mocked Telegram Bot vertical slice, connector contracts, and
   health-check API.

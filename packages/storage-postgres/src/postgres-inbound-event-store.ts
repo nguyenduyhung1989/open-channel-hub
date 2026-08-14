@@ -1,7 +1,9 @@
 import {
   TELEGRAM_CHAT_TYPES,
+  ZALO_USER_THREAD_TYPES,
   type CanonicalEvent,
-  type TelegramChatType
+  type TelegramChatType,
+  type ZaloUserThreadType
 } from '@open-channel-hub/contracts';
 import type { InboundEventStore } from '@open-channel-hub/domain';
 
@@ -28,9 +30,10 @@ INSERT INTO ${POSTGRES_SCHEMA}.inbound_events (
   message_id,
   sender_id,
   message_text,
-  telegram_chat_type
+  telegram_chat_type,
+  zalo_user_thread_type
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 ON CONFLICT (connection_id, provider_event_id) DO NOTHING
 `;
 
@@ -47,7 +50,7 @@ export class PostgresInboundEventStore implements InboundEventStore {
       return;
     }
 
-    if (!events.every(hasValidTelegramChatType)) {
+    if (!events.every(hasValidTelegramChatType) || !events.every(hasValidZaloUserThreadType)) {
       throw new PostgresStorageError();
     }
 
@@ -94,15 +97,24 @@ const valuesFor = (event: CanonicalEvent): readonly unknown[] =>
     event.message.id,
     event.message.senderId,
     event.message.text,
-    event.telegramChatType ?? null
+    event.telegramChatType ?? null,
+    event.zaloUserThreadType ?? null
   ]);
 
 const hasValidTelegramChatType = (event: CanonicalEvent): boolean =>
   event.channel === 'telegram_bot'
-    ? isTelegramChatType(event.telegramChatType)
+    ? isTelegramChatType(event.telegramChatType) && event.zaloUserThreadType === undefined
     : event.telegramChatType === undefined;
+
+const hasValidZaloUserThreadType = (event: CanonicalEvent): boolean =>
+  event.channel === 'zalo_user'
+    ? isZaloUserThreadType(event.zaloUserThreadType) && event.telegramChatType === undefined
+    : event.zaloUserThreadType === undefined;
 
 const isTelegramChatType = (value: unknown): value is TelegramChatType =>
   typeof value === 'string' && (TELEGRAM_CHAT_TYPES as readonly string[]).includes(value);
+
+const isZaloUserThreadType = (value: unknown): value is ZaloUserThreadType =>
+  typeof value === 'string' && (ZALO_USER_THREAD_TYPES as readonly string[]).includes(value);
 
 export type { SqlClient, SqlPool } from './sql.js';

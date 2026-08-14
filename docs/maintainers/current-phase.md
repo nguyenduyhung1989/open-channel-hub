@@ -1,4 +1,13 @@
-# Public checkpoint: Phase 4a–4j verified source
+# Public checkpoint: Phase 4a–4j verified source; Phase 5a candidate
+
+**Current candidate:** Phase 5a is an opt-in, host-local experimental Zalo User
+group bridge. It admits only non-self group text through a separately
+authenticated bridge boundary, and a different loopback-only control bearer can
+explicitly send text or one checked JPEG/PNG/WebP image only to a group observed
+by that running bridge. It has no official Zalo status, live-account proof,
+bulk recipient list, direct-message path, automatic reply, session persistence,
+provider retry, delivery claim, or production claim. Its source and synthetic
+checks are still pending final frozen verification.
 
 **Verified scope:** Phase 4a is a configured, read-only aggregate feed across
 an explicit set of existing official connections. It builds on the Telegram

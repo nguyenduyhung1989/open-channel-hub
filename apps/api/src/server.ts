@@ -14,6 +14,8 @@ import {
 } from './telegram-bot/telegram-bot-connection-configurations.js';
 import { createZaloOaFeature } from './zalo-oa/create-zalo-oa-feature.js';
 import { toZaloOaConnectionConfigurations } from './zalo-oa/zalo-oa-connection-configurations.js';
+import { createZaloUserFeature } from './zalo-user/create-zalo-user-feature.js';
+import { toZaloUserConnectionConfigurations } from './zalo-user/zalo-user-connection-configurations.js';
 import { createWhatsAppBusinessFeature } from './whatsapp-business/create-whatsapp-business-feature.js';
 import { toWhatsAppBusinessConnectionConfigurations } from './whatsapp-business/whatsapp-business-connection-configurations.js';
 import { createPostgresDatabase } from '@open-channel-hub/storage-postgres';
@@ -32,6 +34,7 @@ try {
   let telegramBot: Awaited<ReturnType<typeof createTelegramBotFeature>> | undefined;
   let telegramBots: readonly Awaited<ReturnType<typeof createTelegramBotFeature>>[] | undefined;
   let zaloOas: readonly Awaited<ReturnType<typeof createZaloOaFeature>>[] | undefined;
+  let zaloUsers: readonly Awaited<ReturnType<typeof createZaloUserFeature>>[] | undefined;
   let facebookPages: readonly Awaited<ReturnType<typeof createFacebookPageFeature>>[] | undefined;
   let whatsappBusinesses:
     readonly Awaited<ReturnType<typeof createWhatsAppBusinessFeature>>[] | undefined;
@@ -68,57 +71,77 @@ try {
       configuredConnections === undefined
         ? Object.freeze([])
         : toFacebookPageConnectionConfigurations(configuredConnections);
+    const zaloUserConnections =
+      configuredConnections === undefined
+        ? Object.freeze([])
+        : toZaloUserConnectionConfigurations(configuredConnections);
     const whatsappBusinessConnections =
       configuredConnections === undefined
         ? Object.freeze([])
         : toWhatsAppBusinessConnectionConfigurations(configuredConnections);
-    const [telegramFeatures, zaloOaFeatures, facebookPageFeatures, whatsappBusinessFeatures] =
-      await Promise.all([
-        Promise.all(
-          telegramConnections.map(async (connection) =>
-            createTelegramBotFeature(connection, {
-              readInboundEvents: async (input) => inboundEventReader.list(input),
-              receiveEvents: async (events) => {
-                await inboundEventStore.append(events);
-              }
-            })
-          )
-        ),
-        Promise.all(
-          zaloOaConnections.map(async (connection) =>
-            createZaloOaFeature(connection, {
-              readInboundEvents: async (input) => inboundEventReader.list(input),
-              receiveEvents: async (events) => {
-                await inboundEventStore.append(events);
-              }
-            })
-          )
-        ),
-        Promise.all(
-          facebookPageConnections.map(async (connection) =>
-            createFacebookPageFeature(connection, {
-              readInboundEvents: async (input) => inboundEventReader.list(input),
-              receiveEvents: async (events) => {
-                await inboundEventStore.append(events);
-              }
-            })
-          )
-        ),
-        Promise.all(
-          whatsappBusinessConnections.map(async (connection) =>
-            createWhatsAppBusinessFeature(connection, {
-              readInboundEvents: async (input) => inboundEventReader.list(input),
-              receiveEvents: async (events) => {
-                await inboundEventStore.append(events);
-              }
-            })
-          )
+    const [
+      telegramFeatures,
+      zaloOaFeatures,
+      zaloUserFeatures,
+      facebookPageFeatures,
+      whatsappBusinessFeatures
+    ] = await Promise.all([
+      Promise.all(
+        telegramConnections.map(async (connection) =>
+          createTelegramBotFeature(connection, {
+            readInboundEvents: async (input) => inboundEventReader.list(input),
+            receiveEvents: async (events) => {
+              await inboundEventStore.append(events);
+            }
+          })
         )
-      ]);
+      ),
+      Promise.all(
+        zaloOaConnections.map(async (connection) =>
+          createZaloOaFeature(connection, {
+            readInboundEvents: async (input) => inboundEventReader.list(input),
+            receiveEvents: async (events) => {
+              await inboundEventStore.append(events);
+            }
+          })
+        )
+      ),
+      Promise.all(
+        zaloUserConnections.map(async (connection) =>
+          createZaloUserFeature(connection, {
+            readInboundEvents: async (input) => inboundEventReader.list(input),
+            receiveEvents: async (events) => {
+              await inboundEventStore.append(events);
+            }
+          })
+        )
+      ),
+      Promise.all(
+        facebookPageConnections.map(async (connection) =>
+          createFacebookPageFeature(connection, {
+            readInboundEvents: async (input) => inboundEventReader.list(input),
+            receiveEvents: async (events) => {
+              await inboundEventStore.append(events);
+            }
+          })
+        )
+      ),
+      Promise.all(
+        whatsappBusinessConnections.map(async (connection) =>
+          createWhatsAppBusinessFeature(connection, {
+            readInboundEvents: async (input) => inboundEventReader.list(input),
+            receiveEvents: async (events) => {
+              await inboundEventStore.append(events);
+            }
+          })
+        )
+      )
+    ]);
 
     await connectionRegistry.ensureRegistered([
       ...telegramFeatures.map((feature) => feature.registration),
       ...zaloOaFeatures.map((feature) => feature.registration),
+      ...zaloUserFeatures.map((feature) => feature.registration),
       ...facebookPageFeatures.map((feature) => feature.registration),
       ...whatsappBusinessFeatures.map((feature) => feature.registration)
     ]);
@@ -130,6 +153,10 @@ try {
 
       if (zaloOaFeatures.length > 0) {
         zaloOas = Object.freeze(zaloOaFeatures);
+      }
+
+      if (zaloUserFeatures.length > 0) {
+        zaloUsers = Object.freeze(zaloUserFeatures);
       }
 
       if (facebookPageFeatures.length > 0) {
@@ -202,6 +229,7 @@ try {
     ...(telegramBot === undefined ? {} : { telegramBot }),
     ...(telegramBots === undefined ? {} : { telegramBots }),
     ...(zaloOas === undefined ? {} : { zaloOas }),
+    ...(zaloUsers === undefined ? {} : { zaloUsers }),
     ...(facebookPages === undefined ? {} : { facebookPages }),
     ...(inboxes === undefined ? {} : { inboxes }),
     ...(dashboard === undefined ? {} : { dashboard }),

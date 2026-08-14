@@ -1,4 +1,4 @@
-# Phase 0–4j threat model
+# Phase 0–5a threat model
 
 **Review date:** 2026-08-14
 
@@ -36,6 +36,15 @@ after final local checks, an independent audit, a synthetic Compose/PostgreSQL
 proof, GitHub Continuous Integration, and CodeQL. Phase 4i adds only internal
 Telegram private-chat and Bot-identity evidence; Phase 4j adds only immutable
 dashboard-principal Telegram authorization evidence. None adds a sender.
+
+Phase 5a is an unverified experimental source candidate for one Zalo User
+group bridge. It is isolated from Compose and provider webhook routes: a fresh
+QR session runs on an owner-controlled host, forwards only canonical non-self
+group text to a strict Hub ingress, and exposes a different bearer on
+`127.0.0.1` for explicit bounded group text/image sends. It has no official
+provider status, real-account proof, bulk list, direct-message path, automatic
+reply, persistence of QR/session material, provider retry, delivery claim, or
+production claim.
 
 ## Facts before plans
 
@@ -187,12 +196,36 @@ production claim.
 - No provider HTTP request, worker, dispatcher, attempt/receipt writer, retry,
   command mutation, delivery/read state, or live-provider test is in scope.
 
+## Phase 5a candidate Zalo User group-bridge boundary
+
+- The Hub accepts a bridge event only after the connection ID resolves to a
+  configured `zalo_user` entry and its dedicated bridge bearer matches. The
+  route authenticates before JSON parsing, accepts only a strict canonical
+  non-self `group` text envelope, and returns `204` only after durable append.
+- The separately run bridge binds its local control server to `127.0.0.1`, uses
+  a different bearer, admits a group to its in-memory send set only after the
+  Hub accepted that group event, and accepts no group enumeration endpoint.
+- A direct explicit text/image request is limited to 20 sends per rolling
+  minute. Images must be one checked JPEG/PNG/WebP buffer with matching magic
+  bytes and extension and a 1 byte–10 MiB decoded size. An ambiguous or failed Zalo
+  call is reported once; it is never automatically sent again.
+- `0014_zalo_user_thread_type_and_provider_identity` stores only an internal
+  `user`/`group` classification and an opaque account-binding fingerprint. It
+  stores no QR cookie, device identifier, bridge bearer, local control bearer,
+  raw Zalo object, provider response, or second group-target copy. The canonical
+  inbound event retains its group conversation identifier in `conversation_id`;
+  it is exposed only through an operator-bearer reader.
+- The `zca-js` dependency is unofficial and therefore account-compatible
+  operation is unproven. No control path is exposed through Compose, a public
+  reverse proxy, browser, inbox bearer, or dashboard.
+
 ## Trust zones and data flow
 
 ### Zone A — external and untrusted
 
-Every HTTP request, including Telegram, Zalo OA, Facebook Page, and WhatsApp
-Business webhook payloads, message text, authentication headers, issue/PR
+Every HTTP request, including Telegram, Zalo OA, Facebook Page, WhatsApp
+Business, and experimental Zalo User bridge/control payloads, message text,
+authentication headers, issue/PR
 content, and user-provided data is untrusted. It must be validated at the
 boundary and must not become SQL, a shell command, an outbound URL, or HTML
 without appropriate controls.
@@ -202,7 +235,8 @@ without appropriate controls.
 This zone contains reviewed code, API/migration containers, runtime connection
 configuration, connector ports, inbox principals, dashboard principals, and
 provider credentials. The JSON document is a secret because it contains inline
-Bot, OA, Meta App, account-operator, inbox-bearer, password-hash, session-key,
+Bot, OA, Meta App, experimental local-bridge, account-operator, inbox-bearer,
+password-hash, session-key,
 pepper, and webhook values. It is trusted only to the extent that the operator
 controls the host and secret source. Provider data and inbox-command text remain
 untrusted after they cross the boundary. Possession of an inbox bearer grants
@@ -227,7 +261,8 @@ connection registry, dashboard session table, source-bound reply-command table,
 verified authorization-provenance and Telegram-eligibility tables, and
 canonical inbound events. The registry contains opaque internal connection ID,
 connector metadata, and domain-separated SHA-256 account-binding fingerprints
-for Zalo OA, Facebook Page, WhatsApp Business, and verified Telegram
+for Zalo OA, Facebook Page, WhatsApp Business, verified Telegram, and candidate
+Zalo User
 registrations. The dashboard-session table contains only
 domain-separated HMACs of random browser token values, local principal ID, and
 lifecycle timestamps. Neither table contains raw provider identifiers,
@@ -309,6 +344,7 @@ not cross the storage boundary.
 - Availability and integrity of the API, migration path, connection registry,
   and future connector actions.
 - Telegram Bot tokens, Zalo OA secret keys, Meta App secrets and verify tokens,
+  Zalo User bridge/local-control bearers and temporary QR/session material,
   per-connection operator tokens, configured inbox bearer tokens, dashboard
   password hashes, cookie signing keys, session pepper, webhook signatures,
   PostgreSQL bootstrap password, application database password, and runtime
@@ -323,7 +359,8 @@ not cross the storage boundary.
   text, authenticated dashboard HTML that renders a smaller queued-text
   projection, the Phase 4f form's hidden source transport values, and the
   PostgreSQL volume that holds them.
-- Candidate Telegram chat-type evidence and opaque Bot-identity fingerprints.
+- Candidate Telegram/Zalo User chat-type evidence and opaque account-identity
+  fingerprints.
   They are sensitive operational linkage data even though they are not tokens,
   raw Bot IDs, or authorization to send.
 - The Docker host and any backup destination added later.
@@ -343,6 +380,7 @@ not cross the storage boundary.
 | Migration race, mismatch, unsafe manual schema change, or overstated delivery evidence | Migration, registry, reply-command creation, and the verified Phase 4g migration use transaction-scoped advisory locks; immutable checksums record applied IDs; Compose starts API only after migration; `/ready` checks known migrations. The command row has a source-event foreign key, unique operation key, and update/delete-rejection trigger. At Phase 4d's verified revision, `0009_outbound_reply_commands` was the ninth entry. Verified Phase 4g `0010_outbound_delivery_attempt_receipts` adds source-bound attempt/receipt foreign keys and separate immutable triggers, without changing command state. The absence of an attempt row supports only the derived `not_attempted` in this ledger label, never proof an external call did not happen; a stored attempt with no receipt remains unknown.                                                                                                           | Production-sized migration test, expand/contract design for later large tables, recovery plan, foreign-key validation procedure, provider-specific attempt ordering, and independently reviewed receipt mapping. |
 | Container privilege or network exposure                                                | API/migration are non-root, drop capabilities, use `no-new-privileges`, and use an internal data network. API host access is loopback-only. Normal local Compose configuration omits the dashboard, whose browser cookies require an external HTTPS origin. The Phase 4j disposable smoke configuration enables it only to manually return a signed `Secure` cookie to `curl` for server/PostgreSQL coverage; this does not prove browser HTTPS behavior.                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | TLS proxy, resource limits, monitoring, host hardening, and a secret-delivery design that permits read-only roots.                                                                                               |
 | Provider URL or SDK abuse for SSRF/unintended egress                                   | Telegram gateway fixes its destination, rejects redirects, bounds timeout, and validates responses. Telegram, Zalo, Facebook Page, and WhatsApp Business webhook URL validation excludes credentials, query, fragment, private hostnames, and non-HTTPS values. Zalo and Meta inbound code make no provider request; Phases 4c–4g create no provider client, dispatch worker, or provider request.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Authorized live-provider check, bounded retry policy, and private-network/DNS controls if configurable destinations appear.                                                                                      |
+| Experimental Zalo User account/session misuse or uncontrolled group send               | The Phase 5a bridge is opt-in and host-local, does not store QR/session material, has no bulk recipient list/direct-message route/scheduler, binds control to `127.0.0.1` with a separate bearer, allows only groups observed by the live bridge, checks image bytes/size, rate-limits explicit sends, and never retries a provider error. The Hub sees canonical group text only and has no provider-session material.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Owner-operated real-account acceptance, provider-policy/legal review, host-process hardening, local token rotation, log-redaction review, and a separate design before any broader capability.                   |
 | Source offer does not match network service                                            | `GET /source` and response `Link` expose the configured URL; production validates its HTTPS shape.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Operator must publish exact unauthenticated corresponding source for the version running. This is an AGPL implementation aid, not legal advice.                                                                  |
 | Dependency, CI, or repository-history compromise                                       | `npm ci`, CodeQL, Dependabot, secret scanning, Private Vulnerability Reporting, and main-branch force-push/deletion protection are configured.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Fresh checks for each candidate, alert review, SBOM/provenance work, and reassessment of PR/status requirements before collaboration expands.                                                                    |
 
@@ -412,11 +450,15 @@ not cross the storage boundary.
   Meta App secret, OAuth/access token, webhook registration, or customer test
   flow has occurred. Historical reachability and synthetic tests do not
   establish provider compatibility.
+- No real Zalo User QR login, group message, image send, reconnect, account
+  restriction outcome, or local-control deployment has occurred. The
+  experimental source uses an unofficial dependency and must not be interpreted
+  as permission or compatibility evidence.
 
 ## Review trigger
 
-Update this model before a real Telegram, Zalo OA, Facebook Page, or WhatsApp
-Business test, public webhook/TLS exposure, dashboard public deployment,
+Update this model before a real Telegram, Zalo OA, Facebook Page, WhatsApp
+Business, or Zalo User test, public webhook/TLS exposure, dashboard public deployment,
 Phase 4e history-projection or scope-boundary change, any Phase 4f
 reply-intent authorization, form, source-binding, rate-limit, or projection
 change, any Phase 4h authorization-provenance or Phase 4i Telegram
@@ -425,4 +467,7 @@ or projection change,
 inbox-scope/password/session-key rotation change, backup or retention work,
 foreign-key validation, new database access path or history projection,
 dispatch/attempt/retry work, full login/RBAC, AI feature, production deployment,
-or a branch-protection change.
+or a branch-protection change. Update it before changing the Zalo User bridge's
+QR/session lifecycle, loopback bind, token boundary, group-admission rule,
+image validation, rate limit, reconnect policy, provider call, public exposure,
+or stored event/identity fields.

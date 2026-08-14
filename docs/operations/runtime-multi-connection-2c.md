@@ -1,7 +1,8 @@
 # Runtime multi-connection configuration
 
 This guide configures the current alpha's official Telegram Bot, Zalo Official
-Account (OA), Facebook Page, WhatsApp Business, optional inbox entries, and
+Account (OA), Facebook Page, WhatsApp Business, an opt-in experimental Zalo
+User bridge entry, optional inbox entries, and
 optional Phase 4b operator dashboard. The dashboard is a small
 server-rendered local-principal surface, not a full user, organization,
 public-connection, or permission model. The verified Phase 4f source adds an
@@ -11,7 +12,8 @@ been verified with a real provider account or public TLS endpoint.
 ## What is configured
 
 One secret JSON document can configure one to one hundred Telegram Bot, Zalo
-OA, Facebook Page, and WhatsApp Business connections, plus up to one hundred
+OA, Facebook Page, WhatsApp Business, and experimental Zalo User connections,
+plus up to one hundred
 optional configured inboxes and up to one hundred optional dashboard
 principals. It contains credentials and password verifiers, so treat the
 entire document as a secret even though its IDs are opaque internal labels.
@@ -68,6 +70,28 @@ the same or different OA secrets; the configuration deliberately makes no
 undocumented secret-sharing claim. See the
 [Phase 3a Zalo OA guide](zalo-oa-3a.md) for the raw-signature and live-test
 boundary.
+
+The same version-1 document also accepts one experimental Zalo User bridge
+entry:
+
+```json
+{
+  "id": "zalo-user-support",
+  "type": "zalo_user",
+  "accountId": "123456789",
+  "bridgeToken": "<unique 32-512 character bridge token>",
+  "operatorApiToken": "<unique 32-512 character operator token>"
+}
+```
+
+`accountId` is a numeric account binding, not a phone number. `bridgeToken`
+authenticates only the separately run local bridge to the Hub; it is not its
+local control token. A Zalo User entry has no public `webhookUrl`, QR cookie,
+IMEI, or user-agent field. The bridge is not a Compose service and supports
+only non-self group text ingress plus explicit bounded text/image sends to
+groups observed in that running session. See the
+[experimental Zalo User group bridge guide](zalo-user-group-bridge-experimental.md)
+for its account-risk and local-host boundary.
 
 The same version-1 document also accepts a Facebook Page entry:
 
@@ -295,6 +319,8 @@ token, webhook secret, or webhook URL. The temporary
 | Read canonical events                    | <code>GET /v1/telegram-bot/inbound-events</code>                                   | The same bearer token maps to exactly one configured connection. Cursor continuation is bound to that connection.                                                                                                                                                       |
 | Zalo OA webhook ingress                  | <code>POST /v1/webhooks/zalo-oa</code>                                             | The exact signed JSON identifies the configured <code>(appId, oaId)</code>; the route then checks that entry's OA secret. Unknown identity and invalid signature both return <code>401</code>.                                                                          |
 | Read Zalo OA events                      | <code>GET /v1/zalo-oa/inbound-events</code>                                        | The unique <code>Authorization: Bearer</code> value maps to exactly one configured OA. Cursor continuation is bound to that connection.                                                                                                                                 |
+| Experimental Zalo User bridge ingress    | <code>POST /v1/experimental/zalo-user/:connectionId/events</code>                  | The path resolves one configured Zalo User connection; its distinct bridge bearer must match before JSON is parsed. Only canonical non-self group text is accepted.                                                                                                     |
+| Read Zalo User group events              | <code>GET /v1/zalo-user/inbound-events</code>                                      | The unique operator bearer maps to exactly one configured Zalo User account. Cursor continuation is bound to that connection.                                                                                                                                           |
 | Facebook verification                    | <code>GET /v1/webhooks/facebook-page</code> or <code>/v1/webhooks/meta</code>      | The product-specific route is for an App used only by Facebook Page. A shared Facebook/WhatsApp App uses `/meta`; its `hub.verify_token` must match one configured App before the exact `hub.challenge` is returned.                                                    |
 | Facebook Page ingress                    | <code>POST /v1/webhooks/facebook-page</code> or <code>/v1/webhooks/meta</code>     | Every untrusted batch Page ID must resolve to one configured App before raw-byte `X-Hub-Signature-256` HMAC is checked. A shared App selects the product from the signed envelope at `/meta`; unknown/cross-App identity and invalid signature return <code>401</code>. |
 | Read Facebook Page events                | <code>GET /v1/facebook-page/inbound-events</code>                                  | The unique <code>Authorization: Bearer</code> value maps to exactly one configured Page. Cursor continuation is bound to that connection.                                                                                                                               |
@@ -344,6 +370,16 @@ derives only from the configured token's numeric Bot-ID prefix, never stores the
 prefix or token, and refuses to add a first fingerprint to a Telegram connection
 ID that already has durable inbound history. Use a new connection ID for that
 Bot rather than manually editing or backfilling PostgreSQL.
+
+The Phase 5a candidate migration
+<code>0014_zalo_user_thread_type_and_provider_identity</code> stores an
+internal `user`/`group` thread classification only for `zalo_user` inbound
+rows and requires the same opaque SHA-256 account-binding fingerprint in every
+new Zalo User registry registration. The experimental ingress route accepts
+only `group`; no QR cookie, device identifier, bridge/local-control bearer, or
+second group-target copy is stored in PostgreSQL. The canonical inbound event
+does retain its group conversation identifier in `inbound_events.conversation_id`,
+which is available only through an operator-bearer event reader.
 
 Verified Phase 4j adds an optional
 `dashboard.principals[].telegramDeliveryAuthorizationInboxIds` array. It is a

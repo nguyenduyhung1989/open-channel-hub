@@ -37,6 +37,43 @@ describe('loadRuntimeConnectionConfiguration', () => {
     await expectGenericFailure(loadRuntimeConnectionConfiguration(CONFIGURATION_PATH));
   });
 
+  it('loads an experimental Zalo User bridge and rejects account or bearer ambiguity', async () => {
+    const configuration = validZaloUserConfiguration();
+    readFileMock.mockResolvedValueOnce(JSON.stringify(configuration));
+
+    await expect(loadRuntimeConnectionConfiguration(CONFIGURATION_PATH)).resolves.toEqual({
+      connections: [
+        {
+          accountId: '1234567890123456789',
+          bridgeToken: 'synthetic_zalo_user_bridge_token_0123456789012345678',
+          id: 'zalo-user-support',
+          operatorApiToken: 'synthetic_zalo_user_operator_token_0123456789012345',
+          type: 'zalo_user'
+        }
+      ]
+    });
+
+    const duplicateAccount = validZaloUserConfiguration();
+    duplicateAccount.connections.push(
+      validZaloUserConnection({
+        bridgeToken: 'synthetic_zalo_user_second_bridge_token_012345678901234',
+        id: 'zalo-user-sales',
+        operatorApiToken: 'synthetic_zalo_user_second_operator_token_012345678901'
+      })
+    );
+    const collidingBearer = validZaloUserConfiguration();
+    collidingBearer.connections[0]!.bridgeToken = collidingBearer.connections[0]!.operatorApiToken;
+    const inexactConnection = validZaloUserConfiguration();
+    Object.assign(inexactConnection.connections[0]!, {
+      webhookUrl: 'https://example.test/ignored'
+    });
+
+    for (const invalid of [duplicateAccount, collidingBearer, inexactConnection]) {
+      readFileMock.mockResolvedValueOnce(JSON.stringify(invalid));
+      await expectGenericFailure(loadRuntimeConnectionConfiguration(CONFIGURATION_PATH));
+    }
+  });
+
   it('loads an optional immutable inbox scope while keeping old v1 documents inbox-free', async () => {
     const legacyConfiguration = validConfiguration();
     readFileMock.mockResolvedValueOnce(JSON.stringify(legacyConfiguration));
@@ -1024,6 +1061,35 @@ interface MutableRuntimeZaloOaConnection {
   operatorApiToken: string;
   type: string;
   webhookUrl?: string;
+}
+
+const validZaloUserConfiguration = (): MutableRuntimeZaloUserConfiguration => ({
+  version: 1,
+  connections: [validZaloUserConnection()]
+});
+
+const validZaloUserConnection = (
+  overrides: Readonly<Partial<MutableRuntimeZaloUserConnection>> = {}
+): MutableRuntimeZaloUserConnection => ({
+  accountId: '1234567890123456789',
+  bridgeToken: 'synthetic_zalo_user_bridge_token_0123456789012345678',
+  id: 'zalo-user-support',
+  operatorApiToken: 'synthetic_zalo_user_operator_token_0123456789012345',
+  type: 'zalo_user',
+  ...overrides
+});
+
+interface MutableRuntimeZaloUserConfiguration {
+  version: number;
+  connections: MutableRuntimeZaloUserConnection[];
+}
+
+interface MutableRuntimeZaloUserConnection {
+  accountId: string;
+  bridgeToken: string;
+  id: string;
+  operatorApiToken: string;
+  type: string;
 }
 
 const validFacebookPageConfiguration = (): MutableRuntimeFacebookPageConfiguration => ({

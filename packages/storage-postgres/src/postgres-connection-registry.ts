@@ -170,6 +170,7 @@ const isConnectorTier = (value: unknown): value is ConnectorTier =>
 const requiresProviderIdentityFingerprint = (channel: Channel): boolean =>
   channel === 'telegram_bot' ||
   channel === 'zalo_oa' ||
+  channel === 'zalo_user' ||
   channel === 'facebook_page' ||
   channel === 'whatsapp_business';
 

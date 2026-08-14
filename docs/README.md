@@ -12,6 +12,9 @@
   compatibility boundary.
 - [Phase 3a Zalo OA inbound text](operations/zalo-oa-3a.md): official signed
   raw-JSON ingress, account isolation, and intentionally excluded Zalo surface.
+- [Experimental Zalo User group bridge](operations/zalo-user-group-bridge-experimental.md):
+  isolated local QR session, group-only text/image control, bounded reconnect,
+  and explicit account-risk boundary.
 - [Phase 3b Facebook Page inbound text](operations/facebook-page-3b.md):
   official GET verification, raw-byte HMAC ingress, Page isolation, and the
   intentionally excluded Meta surface.
@@ -44,9 +47,9 @@
   verified private-chat and Bot-identity evidence with no provider dispatch.
 - [Phase 4j Telegram delivery authorization](operations/telegram-delivery-authorization-4j.md):
   verified immutable human authorization evidence with no provider dispatch.
-- [Phase 0–4j threat model](security/threat-model.md): assets, trust
+- [Phase 0–5a threat model](security/threat-model.md): assets, trust
   boundaries, current controls, and planned work.
 - [Open-source readiness](maintainers/oss-readiness.md): an honest operating
   checklist for maintainers.
-- [Phase 4a–4j checkpoint](maintainers/current-phase.md): verified milestones,
+- [Phase 4a–5a checkpoint](maintainers/current-phase.md): verified milestones,
   the Phase 4h–4j no-dispatch boundaries, risks, and next design work.

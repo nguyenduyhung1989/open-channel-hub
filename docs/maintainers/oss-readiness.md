@@ -78,6 +78,17 @@ organization has accepted the project.
   provider message, retain a Telegram token/Bot
   ID, backfills historic rows, or establishes production eligibility.
 
+## Candidate work
+
+- Phase 5a is an opt-in, local experimental Zalo User group bridge. It keeps QR
+  session material out of Compose and the API runtime document, admits only
+  non-self group text through a separately authenticated Hub route, and exposes
+  a distinct `127.0.0.1`-only control bearer for explicit bounded group text or
+  checked image sends. It is deliberately not an official Zalo connector, bulk
+  sender, direct-message tool, session-persistence system, automatic-retry
+  system, delivery claim, or production claim. Final frozen-source verification
+  and a real owner-operated account test remain separate work.
+
 ## Verified Phase 4e source
 
 - Phase 4e is a server-rendered dashboard-history source. An authenticated

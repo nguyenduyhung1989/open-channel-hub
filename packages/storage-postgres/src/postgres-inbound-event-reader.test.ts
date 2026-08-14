@@ -37,6 +37,7 @@ describe('PostgresInboundEventReader', () => {
     expect(pool.queries[1]?.sql).toContain('inbound_event.ledger_id <= $2::bigint');
     expect(pool.queries[1]?.sql).toContain('ORDER BY inbound_event.ledger_id DESC');
     expect(pool.queries[1]?.sql).toContain('telegram_chat_type');
+    expect(pool.queries[1]?.sql).toContain('zalo_user_thread_type');
     expect(pool.queries[1]?.sql).not.toContain(CONNECTION_ID);
     expect(result.events[0]).not.toHaveProperty('ledgerId');
   });
@@ -55,6 +56,37 @@ describe('PostgresInboundEventReader', () => {
 
     const malformedPool = createPool({
       pageRows: [row('9', { channel: 'zalo_oa', telegram_chat_type: 'private' })],
+      snapshotRows: [Object.freeze({ snapshot_max_sequence: '9' })]
+    });
+
+    await expect(
+      new PostgresInboundEventReader(malformedPool).list({
+        connectionId: CONNECTION_ID,
+        pageSize: 1
+      })
+    ).rejects.toBeInstanceOf(PostgresStorageError);
+  });
+
+  it('preserves the Zalo User group marker internally and rejects malformed channel coupling', async () => {
+    const groupPool = createPool({
+      pageRows: [
+        row('9', {
+          channel: 'zalo_user',
+          telegram_chat_type: null,
+          zalo_user_thread_type: 'group'
+        })
+      ],
+      snapshotRows: [Object.freeze({ snapshot_max_sequence: '9' })]
+    });
+
+    await expect(
+      new PostgresInboundEventReader(groupPool).list({ connectionId: CONNECTION_ID, pageSize: 1 })
+    ).resolves.toEqual({
+      events: [Object.freeze({ ...event('9'), channel: 'zalo_user', zaloUserThreadType: 'group' })]
+    });
+
+    const malformedPool = createPool({
+      pageRows: [row('9', { channel: 'telegram_bot', zalo_user_thread_type: 'group' })],
       snapshotRows: [Object.freeze({ snapshot_max_sequence: '9' })]
     });
 
@@ -225,6 +257,7 @@ const row = (
     sender_id: 'sender-1',
     message_text: `Synthetic message ${sequence}`,
     telegram_chat_type: null,
+    zalo_user_thread_type: null,
     ...overrides
   });
 

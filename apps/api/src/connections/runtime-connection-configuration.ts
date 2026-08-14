@@ -28,6 +28,19 @@ export interface RuntimeZaloOaConnection {
 }
 
 /**
+ * The experimental Zalo User bridge holds the short-lived QR session outside
+ * the API process. This runtime entry contains only its opaque account binding
+ * and the bridge-to-hub bearer, never cookies, an IMEI, or a user agent.
+ */
+export interface RuntimeZaloUserConnection {
+  readonly accountId: string;
+  readonly bridgeToken: string;
+  readonly id: string;
+  readonly operatorApiToken: string;
+  readonly type: 'zalo_user';
+}
+
+/**
  * Facebook Page inbound credentials stay deliberately separate from Graph API
  * access tokens. Phase 3b validates signed webhooks only; it does not call
  * Meta, subscribe a Page, send messages, or store OAuth credentials.
@@ -63,6 +76,7 @@ export interface RuntimeWhatsAppBusinessConnection {
 export type RuntimeConnection =
   | RuntimeTelegramBotConnection
   | RuntimeZaloOaConnection
+  | RuntimeZaloUserConnection
   | RuntimeFacebookPageConnection
   | RuntimeWhatsAppBusinessConnection;
 
@@ -152,6 +166,13 @@ const ZALO_OA_CONNECTION_REQUIRED_KEYS = Object.freeze([
   'operatorApiToken'
 ]);
 const ZALO_OA_CONNECTION_OPTIONAL_KEYS = Object.freeze(['webhookUrl']);
+const ZALO_USER_CONNECTION_REQUIRED_KEYS = Object.freeze([
+  'id',
+  'type',
+  'accountId',
+  'bridgeToken',
+  'operatorApiToken'
+]);
 const FACEBOOK_PAGE_CONNECTION_REQUIRED_KEYS = Object.freeze([
   'id',
   'type',
@@ -297,6 +318,7 @@ const parseRuntimeConnectionConfiguration = (value: unknown): RuntimeConnectionC
   const exclusiveCredentials = new Set<string>();
   const zaloOaSecrets = new Set<string>();
   const zaloOaPairs = new Set<string>();
+  const zaloUserAccountIds = new Set<string>();
   const metaCredentials = new Set<string>();
   const metaApps = new Map<string, Readonly<{ appSecret: string; webhookVerifyToken: string }>>();
   const facebookPageIds = new Set<string>();
@@ -350,6 +372,18 @@ const parseRuntimeConnectionConfiguration = (value: unknown): RuntimeConnectionC
 
       zaloOaSecrets.add(connection.oaSecretKey);
       zaloOaPairs.add(pairKey);
+    } else if (connection.type === 'zalo_user') {
+      if (
+        exclusiveCredentials.has(connection.bridgeToken) ||
+        zaloOaSecrets.has(connection.bridgeToken) ||
+        metaCredentials.has(connection.bridgeToken) ||
+        zaloUserAccountIds.has(connection.accountId)
+      ) {
+        throw new RuntimeConnectionConfigurationError();
+      }
+
+      exclusiveCredentials.add(connection.bridgeToken);
+      zaloUserAccountIds.add(connection.accountId);
     } else if (connection.type === 'facebook_page') {
       registerMetaAppCredentials({
         appId: connection.appId,
@@ -778,6 +812,10 @@ const parseConnection = (value: unknown): RuntimeConnection => {
     return parseZaloOaConnection(value);
   }
 
+  if (value.type === 'zalo_user') {
+    return parseZaloUserConnection(value);
+  }
+
   if (value.type === 'facebook_page') {
     return parseFacebookPageConnection(value);
   }
@@ -856,6 +894,27 @@ const parseZaloOaConnection = (value: unknown): RuntimeZaloOaConnection => {
     operatorApiToken: value.operatorApiToken,
     type: 'zalo_oa',
     ...(webhookUrl === undefined ? {} : { webhookUrl })
+  });
+};
+
+const parseZaloUserConnection = (value: unknown): RuntimeZaloUserConnection => {
+  if (
+    !hasExactKeys(value, ZALO_USER_CONNECTION_REQUIRED_KEYS, []) ||
+    !isConnectionId(value.id) ||
+    value.type !== 'zalo_user' ||
+    !isZaloIdentifier(value.accountId) ||
+    !isPrintableToken(value.bridgeToken, 32) ||
+    !isPrintableToken(value.operatorApiToken, 32)
+  ) {
+    throw new RuntimeConnectionConfigurationError();
+  }
+
+  return Object.freeze({
+    accountId: value.accountId,
+    bridgeToken: value.bridgeToken,
+    id: value.id,
+    operatorApiToken: value.operatorApiToken,
+    type: 'zalo_user'
   });
 };
 

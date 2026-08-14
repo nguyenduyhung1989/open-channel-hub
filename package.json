@@ -20,6 +20,7 @@
     "dashboard:password:hash:dev": "node --import tsx apps/api/src/dashboard/password-hash-cli.ts",
     "dev": "node --env-file-if-exists=.env --import tsx apps/api/src/server.ts",
     "start": "node --env-file-if-exists=.env apps/api/dist/server.js",
+    "zalo-user:bridge:dev": "node --env-file-if-exists=.env --import tsx apps/zalo-user-bridge/src/main.ts",
     "telegram:webhook:set": "node --env-file-if-exists=.env apps/api/dist/telegram-bot/set-webhook.js",
     "telegram:webhook:set:dev": "node --env-file-if-exists=.env --import tsx apps/api/src/telegram-bot/set-webhook.ts",
     "typecheck": "tsc --noEmit --project tsconfig.json",

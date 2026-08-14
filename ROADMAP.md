@@ -596,6 +596,27 @@ be separate, opt-in packages with constrained capabilities and clear
 policy/legal risk. They must not bypass automation controls, spoof
 fingerprints, evade CAPTCHA, or send bulk spam.
 
+### 5a — experimental Zalo User group bridge
+
+**Status: source candidate.** This is an opt-in local bridge, not an official
+Zalo integration or a live-account claim.
+
+- [x] Keep QR/session material outside API/Compose/runtime JSON; validate an
+      opaque account binding and register only its SHA-256 fingerprint.
+- [x] Admit only non-self group text after a separately authenticated bridge
+      posts a strict canonical envelope and PostgreSQL makes it durable.
+- [x] Expose a `127.0.0.1`-only control service with a different bearer token,
+      allowing one explicit bounded text or JPEG/PNG/WebP buffer send only to a
+      group observed in the same running bridge session.
+- [x] Reconnect only abnormal listener close `1006` at 1 s, 5 s, and 30 s;
+      duplicate/kick/other closure requires manual restart and new QR.
+- [ ] Run final frozen local checks, a disposable PostgreSQL migration/Compose
+      proof, dependency audit, secret scan, local commit, push, and GitHub
+      verification. A real account test remains owner-operated and separate.
+- [ ] Do not add direct messages, bulk sending, group enumeration, automatic
+      reply, endpoint rotation, CAPTCHA/fingerprint evasion, retry worker,
+      session persistence, delivery/read claim, or public control endpoint.
+
 ## Explicitly out of scope
 
 - Bulk-sending bots, unlawful collection, or provider-limit evasion.

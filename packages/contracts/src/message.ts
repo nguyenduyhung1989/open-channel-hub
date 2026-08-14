@@ -14,6 +14,15 @@ export const TELEGRAM_CHAT_TYPES = Object.freeze([
 
 export type TelegramChatType = (typeof TELEGRAM_CHAT_TYPES)[number];
 
+/**
+ * The only thread kinds emitted by the experimental Zalo User bridge. This is
+ * durable source evidence for the narrowly scoped group-message path; it is
+ * deliberately absent from public event projections.
+ */
+export const ZALO_USER_THREAD_TYPES = Object.freeze(['user', 'group'] as const);
+
+export type ZaloUserThreadType = (typeof ZALO_USER_THREAD_TYPES)[number];
+
 /** The only provider command supported by the Phase 0 core. */
 export interface SendTextProviderCommand {
   readonly type: 'message.send.text';
@@ -48,6 +57,12 @@ export interface CanonicalEvent {
    * is intentionally absent from public event projections.
    */
   readonly telegramChatType?: TelegramChatType;
+  /**
+   * Present only for an event admitted by the experimental Zalo User bridge.
+   * It records whether the source was a direct thread or a group and is kept
+   * as server-side evidence for a later, separately authorized reply path.
+   */
+  readonly zaloUserThreadType?: ZaloUserThreadType;
   readonly message: Readonly<{
     id: string;
     senderId: string;

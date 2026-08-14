@@ -19,6 +19,7 @@ export type {
   ProviderCommand,
   ProviderReceipt,
   SendTextProviderCommand,
-  TelegramChatType
+  TelegramChatType,
+  ZaloUserThreadType
 } from './message.js';
-export { TELEGRAM_CHAT_TYPES } from './message.js';
+export { TELEGRAM_CHAT_TYPES, ZALO_USER_THREAD_TYPES } from './message.js';

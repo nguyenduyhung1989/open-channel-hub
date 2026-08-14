@@ -39,6 +39,7 @@ describe('PostgresInboundEventFeedReader', () => {
     expect(pool.queries[1]?.sql).toContain('inbound_event.ledger_id <= $2::bigint');
     expect(pool.queries[1]?.sql).toContain('ORDER BY inbound_event.ledger_id DESC');
     expect(pool.queries[1]?.sql).toContain('telegram_chat_type');
+    expect(pool.queries[1]?.sql).toContain('zalo_user_thread_type');
     expect(pool.queries[1]?.sql).not.toContain(CONNECTION_A);
     expect(result.events[0]).not.toHaveProperty('ledgerId');
   });
@@ -60,6 +61,46 @@ describe('PostgresInboundEventFeedReader', () => {
 
     const malformedPool = createPool({
       pageRows: [row('12', CONNECTION_A, { channel: 'zalo_oa', telegram_chat_type: 'private' })],
+      snapshotRows: [Object.freeze({ snapshot_max_sequence: '12' })]
+    });
+
+    await expect(
+      new PostgresInboundEventFeedReader(malformedPool).list({
+        connectionIds: [CONNECTION_A],
+        pageSize: 1
+      })
+    ).rejects.toBeInstanceOf(PostgresStorageError);
+  });
+
+  it('preserves the Zalo User group marker internally and rejects malformed channel coupling', async () => {
+    const groupPool = createPool({
+      pageRows: [
+        row('12', CONNECTION_A, {
+          channel: 'zalo_user',
+          telegram_chat_type: null,
+          zalo_user_thread_type: 'group'
+        })
+      ],
+      snapshotRows: [Object.freeze({ snapshot_max_sequence: '12' })]
+    });
+
+    await expect(
+      new PostgresInboundEventFeedReader(groupPool).list({
+        connectionIds: [CONNECTION_A],
+        pageSize: 1
+      })
+    ).resolves.toEqual({
+      events: [
+        Object.freeze({
+          ...event('12', CONNECTION_A),
+          channel: 'zalo_user',
+          zaloUserThreadType: 'group'
+        })
+      ]
+    });
+
+    const malformedPool = createPool({
+      pageRows: [row('12', CONNECTION_A, { zalo_user_thread_type: 'group' })],
       snapshotRows: [Object.freeze({ snapshot_max_sequence: '12' })]
     });
 
@@ -297,6 +338,7 @@ const row = (
     sender_id: 'sender-1',
     message_text: `Synthetic message ${sequence}`,
     telegram_chat_type: null,
+    zalo_user_thread_type: null,
     ...overrides
   });
 

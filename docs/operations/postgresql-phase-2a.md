@@ -12,6 +12,11 @@ verified Telegram delivery-authorization evidence. The combined source passed
 final local checks, independent audit, synthetic Compose/PostgreSQL proof,
 GitHub CI, and CodeQL at exact commit <code>52608e0</code>; it remains no
 provider-dispatch claim.
+The Phase 5a experimental Zalo User bridge is a source candidate. Its additive
+fourteenth migration stores only an internal group/user classification and an
+opaque account-binding fingerprint; it stores no QR/session material, group
+target, bridge bearer, local-control bearer, or provider result. It has no
+real-account, provider-send, or production verification claim.
 Phase 4e's final local
 verification includes a synthetic Compose proof, but that loopback HTTP proof
 does not establish external HTTPS cookie behavior. Phase 4f source verification
@@ -36,8 +41,8 @@ application schema contains:
 | Object                                                 | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | <code>schema_migrations</code>                         | Immutable record of forward schema migrations applied by this binary.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| <code>connection_registry</code>                       | Opaque connection ID, immutable connector metadata, registration timestamp, and a non-secret provider-identity fingerprint when Zalo OA, Facebook Page, WhatsApp Business, or verified Telegram private-reply eligibility is configured.                                                                                                                                                                                                                                                                                                                                                                  |
-| <code>inbound_events</code>                            | Canonical inbound text-event ledger. Its primary key is <code>(connection_id, provider_event_id)</code>. Verified Phase 4i adds an internal Telegram chat-type field for new Telegram rows only.                                                                                                                                                                                                                                                                                                                                                                                                          |
+| <code>connection_registry</code>                       | Opaque connection ID, immutable connector metadata, registration timestamp, and a non-secret provider-identity fingerprint when Zalo OA, Facebook Page, WhatsApp Business, verified Telegram private-reply eligibility, or candidate Zalo User is configured.                                                                                                                                                                                                                                                                                                                                             |
+| <code>inbound_events</code>                            | Canonical inbound text-event ledger. Its primary key is <code>(connection_id, provider_event_id)</code>. Verified Phase 4i adds an internal Telegram chat-type field for new Telegram rows only; candidate Phase 5a adds an internal Zalo User `user`/`group` field.                                                                                                                                                                                                                                                                                                                                      |
 | <code>dashboard_sessions</code>                        | Optional Phase 4b browser-session metadata: only HMACs of random session/anti-forgery values, principal ID, timestamps, and revocation state. It contains no raw token, password, credential, or inbox membership.                                                                                                                                                                                                                                                                                                                                                                                        |
 | <code>outbound_commands</code>                         | Phase 4c immutable source-bound reply intents. It retains a private target derived from canonical inbound `conversation_id`, source message/channel, message text, client operation ID, `queued` state, and timestamps. Phase 4d reads a safe scoped projection of queued rows without changing this table; the Phase 4e source reuses that reader for a smaller server-rendered dashboard projection. The verified Phase 4f source reuses the existing source-bound store through an explicitly granted dashboard form. It has no provider credential, raw payload, attempt, receipt, or delivery state. |
 | <code>outbound_delivery_attempts</code>                | Verified Phase 4g append-only evidence that one command has a durable local attempt fact. One command can have at most one such row. It contains no target, message text, credential, provider response, HTTP detail, retry field, or mutable delivery state.                                                                                                                                                                                                                                                                                                                                             |
@@ -166,6 +171,17 @@ principal's approval fact after current source/provenance/Bot/no-attempt
 rechecks. It is append-only, never backfills historic commands, and does not
 authorize provider I/O. See the verified
 [Phase 4j delivery-authorization guide](telegram-delivery-authorization-4j.md).
+
+The Phase 5a candidate adds forward migration
+<code>0014_zalo_user_thread_type_and_provider_identity</code>. It appends
+`zalo_user_thread_type` to `inbound_events` with a channel-matching constraint:
+only `zalo_user` rows may contain `user` or `group`; all other channels remain
+null. It also requires an opaque provider-identity fingerprint for every new
+`zalo_user` registry row. No bridge token, local-control token, QR/session
+material, image, raw provider object, or provider result is stored. The
+canonical inbound event still retains the group conversation identifier in
+`inbound_events.conversation_id`; migration `0014` does not add a second
+group-target copy, and only an operator-bearer event reader can return it.
 
 ## Configure without exposing passwords
 
@@ -311,6 +327,12 @@ browser-over-HTTP or external HTTPS-cookie proof and makes no provider call.
 The combined Phase 4h–4j source is verified at exact commit <code>52608e0</code>
 after final local checks, independent audit, the synthetic Compose/PostgreSQL
 proof, GitHub CI, and CodeQL.
+
+The Phase 5a candidate advances the expected migration count to fourteen. Its
+disposable Compose extension checks the exact new inbound column and the two
+named `NOT VALID` constraints structurally. The bridge itself is deliberately
+not started by Compose, so this is not a QR login, Zalo User send, reconnect,
+or real-account proof.
 
 ## Container and network boundary
 

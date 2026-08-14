@@ -768,7 +768,7 @@ assert_equal \
 migration_count="$(
   query_postgres "SELECT COUNT(*) FROM open_channel_hub.schema_migrations;"
 )"
-assert_equal '13' "$migration_count" 'immutable migration ledger entry count'
+assert_equal '14' "$migration_count" 'immutable migration ledger entry count'
 
 connection_registry_records="$(
   query_postgres "SELECT connection_id || ':' || connector_id || ':' || channel || ':' || tier FROM open_channel_hub.connection_registry ORDER BY connection_id;"
@@ -817,6 +817,14 @@ assert_equal \
   $'telegram-bot-sales:private\ntelegram-bot-support:private' \
   "$telegram_chat_types" \
   'durable Telegram private-chat evidence'
+
+zalo_user_schema_guards="$(
+  query_postgres "SELECT 'column:' || CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'open_channel_hub' AND table_name = 'inbound_events' AND column_name = 'zalo_user_thread_type' AND data_type = 'text') THEN 'present' ELSE 'missing' END UNION ALL SELECT conname || ':' || CASE WHEN convalidated THEN 'validated' ELSE 'not_valid' END FROM pg_constraint WHERE connamespace = 'open_channel_hub'::regnamespace AND conname IN ('inbound_events_zalo_user_thread_type_channel_match', 'connection_registry_zalo_user_provider_identity_required') ORDER BY 1;"
+)"
+assert_equal \
+  $'column:present\nconnection_registry_zalo_user_provider_identity_required:not_valid\ninbound_events_zalo_user_thread_type_channel_match:not_valid' \
+  "$zalo_user_schema_guards" \
+  'candidate Zalo User thread-type and identity schema guards'
 
 support_inbound_events_response="$(read_inbound_events "$support_operator_api_token")"
 sales_inbound_events_response="$(read_inbound_events "$sales_operator_api_token")"

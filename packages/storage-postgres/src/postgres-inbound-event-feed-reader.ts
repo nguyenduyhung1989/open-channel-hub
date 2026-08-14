@@ -1,9 +1,11 @@
 import {
   CHANNELS,
   TELEGRAM_CHAT_TYPES,
+  ZALO_USER_THREAD_TYPES,
   type CanonicalEvent,
   type Channel,
-  type TelegramChatType
+  type TelegramChatType,
+  type ZaloUserThreadType
 } from '@open-channel-hub/contracts';
 import type {
   InboundEventFeedListInput,
@@ -39,7 +41,8 @@ SELECT
   message_id,
   sender_id,
   message_text,
-  telegram_chat_type
+  telegram_chat_type,
+  zalo_user_thread_type
 FROM ${POSTGRES_SCHEMA}.inbound_events AS inbound_event
 WHERE inbound_event.connection_id = ANY($1::text[])
   AND inbound_event.ledger_id <= $2::bigint
@@ -60,7 +63,8 @@ SELECT
   message_id,
   sender_id,
   message_text,
-  telegram_chat_type
+  telegram_chat_type,
+  zalo_user_thread_type
 FROM ${POSTGRES_SCHEMA}.inbound_events AS inbound_event
 WHERE inbound_event.connection_id = ANY($1::text[])
   AND inbound_event.ledger_id <= $2::bigint
@@ -261,6 +265,7 @@ const parseLedgerRow = (
   }
 
   const telegramChatType = parseTelegramChatType(channel, row.telegram_chat_type);
+  const zaloUserThreadType = parseZaloUserThreadType(channel, row.zalo_user_thread_type);
 
   return Object.freeze({
     sequence,
@@ -272,6 +277,7 @@ const parseLedgerRow = (
       channel,
       occurredAt,
       ...(telegramChatType === undefined ? {} : { telegramChatType }),
+      ...(zaloUserThreadType === undefined ? {} : { zaloUserThreadType }),
       message: Object.freeze({
         id: messageId,
         senderId,
@@ -333,6 +339,29 @@ const parseTelegramChatType = (channel: Channel, value: unknown): TelegramChatTy
 
   if (typeof value === 'string' && (TELEGRAM_CHAT_TYPES as readonly string[]).includes(value)) {
     return value as TelegramChatType;
+  }
+
+  throw new PostgresStorageError();
+};
+
+const parseZaloUserThreadType = (
+  channel: Channel,
+  value: unknown
+): ZaloUserThreadType | undefined => {
+  if (channel !== 'zalo_user') {
+    if (value !== null) {
+      throw new PostgresStorageError();
+    }
+
+    return undefined;
+  }
+
+  if (value === null) {
+    return undefined;
+  }
+
+  if (typeof value === 'string' && (ZALO_USER_THREAD_TYPES as readonly string[]).includes(value)) {
+    return value as ZaloUserThreadType;
   }
 
   throw new PostgresStorageError();
