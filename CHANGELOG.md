@@ -192,6 +192,17 @@ follows [Semantic Versioning](https://semver.org/).
   command, and treats a mismatched authority provenance on replay as a
   conflict. It adds no provider I/O, provider credential, worker, dispatch,
   retry, browser send control, or delivery/read claim.
+- Phase 4i candidate: forward migration
+  <code>0012_telegram_private_reply_eligibility</code> retains a recognized
+  Telegram chat type only for newly stored Telegram inbound rows, requires an
+  opaque Bot fingerprint from the numeric prefix of a configured token, and
+  writes immutable `private` eligibility evidence with each new Telegram reply
+  command. Historic Telegram rows/commands are not backfilled or adopted.
+- Phase 4i candidate: group, supergroup, channel, unknown historic chat type,
+  and missing/changed Bot identity fail closed before a Telegram intent can be
+  created. The field/fingerprint stay out of public readers and dashboard HTML;
+  this adds no Telegram request, worker, dispatch, retry, attempt/receipt,
+  delivery state, or live-provider claim.
 
 ### Changed
 
@@ -237,10 +248,13 @@ follows [Semantic Versioning](https://semver.org/).
   sequence rather than a text alias; callers must restart from page one after
   upgrading so a mixed ordering cannot silently skip events.
 - The supplied loopback-only HTTP Compose smoke remains intentionally dashboard
-  free. The Phase 4h candidate advances it to eleven immutable schema migrations
-  and adds structural checks for the authorization-provenance table, foreign
-  key, primary key, named constraints, exact columns, and immutable trigger.
-  The existing Phase 4g delivery-evidence structural checks remain. It still verifies
+  free. The Phase 4h–4i candidates advance it to twelve immutable schema
+  migrations and add structural checks for the authorization-provenance and
+  Telegram private-reply eligibility tables, their foreign keys, primary keys,
+  named constraints, exact columns, and immutable triggers. The fake Telegram
+  path proves that a private source can create an intent while a supergroup
+  source receives only ingress acknowledgement and cannot create one. The
+  existing Phase 4g delivery-evidence structural checks remain. It still verifies
   source-bound reply-command idempotency/target derivation plus queued-history
   scope, safe projection, cursor continuation, and cursor rejection. It does
   not use direct SQL/DML to create authorization evidence or a direct

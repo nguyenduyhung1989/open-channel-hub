@@ -68,6 +68,12 @@ organization has accepted the project.
   delivery/read state. An absent attempt row supports only a derived
   `not_attempted`-in-this-ledger label; it never proves no external call
   happened. A stored attempt without a receipt remains unknown.
+- Phase 4h–4i are candidate-only source changes. Phase 4h records immutable
+  authority provenance with a new command; Phase 4i records internal Telegram
+  private-chat/Bot-identity evidence with a new Telegram command. Neither
+  feature is verified source evidence, dispatches a provider message, retains
+  a Telegram token/Bot ID, backfills historic rows, or establishes production
+  eligibility.
 
 ## Verified Phase 4e source
 

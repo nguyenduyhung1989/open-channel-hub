@@ -132,3 +132,7 @@ send attempt, delivery, or read status.
 The legacy Phase 1a `POST /v1/telegram-bot/messages` endpoint remains separate
 compatibility behavior. It is not a source for this history and does not turn a
 Phase 4d row into a provider send.
+
+Candidate Phase 4i keeps its Telegram chat type and Bot-identity evidence out
+of this history projection. A `queued` history row remains intent only, whether
+or not a future private-reply eligibility record exists.

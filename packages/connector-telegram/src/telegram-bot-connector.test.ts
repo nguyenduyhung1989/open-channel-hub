@@ -168,9 +168,40 @@ describe('TelegramBotConnectorAdapter', () => {
         },
         occurredAt: '2026-08-12T00:00:00.000Z',
         providerEventId: '9001',
+        telegramChatType: 'supergroup',
         type: 'message.received'
       }
     ]);
+  });
+
+  it('normalizes each supported Telegram chat type and rejects an unknown chat type', () => {
+    const adapter = createAdapter();
+
+    for (const chatType of ['private', 'group', 'supergroup', 'channel'] as const) {
+      expect(
+        adapter.normalize({
+          message: {
+            chat: { id: 42, type: chatType },
+            date: 1_786_492_800,
+            message_id: 301,
+            text: 'Synthetic inbound message'
+          },
+          update_id: 9001
+        })
+      ).toEqual([expect.objectContaining({ telegramChatType: chatType })]);
+    }
+
+    expect(
+      adapter.normalize({
+        message: {
+          chat: { id: 42, type: 'unknown_chat_kind' },
+          date: 1_786_492_800,
+          message_id: 301,
+          text: 'Synthetic inbound message'
+        },
+        update_id: 9001
+      })
+    ).toEqual([]);
   });
 
   it('ignores a non-text Telegram update without throwing', () => {

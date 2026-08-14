@@ -16,13 +16,17 @@ const EXPECTED_SCOPE_FINGERPRINT =
   '3d58dc520e577fc8205c5baa6c1fa853232cb7e40fab9a73b0e44a36c95e321e';
 const EXPECTED_SUPPORT_ONLY_SCOPE_FINGERPRINT =
   '7893b2565513a5b5cd5cacee0dd46ab3485505434c2a5e3c63effe2cea85ba68';
+const TELEGRAM_BOT_IDENTITY_FINGERPRINT =
+  '2d9cb6d8a36fb0a2b3c774d9ed50bbd7ebd6954d11c0f87f3282bb17480304f2';
 const SOURCE: SourceEvent = Object.freeze({
   channel: 'telegram_bot',
   connectionId: CONNECTION_SUPPORT,
   conversationId: '-1001234567890',
   messageId: '301',
+  providerIdentityFingerprint: TELEGRAM_BOT_IDENTITY_FINGERPRINT,
   providerEventId: "9001';DROP--",
-  senderId: '42'
+  senderId: '42',
+  telegramChatType: 'private'
 });
 const CREATED_AT = '2026-08-13T12:00:00.000Z';
 
@@ -74,6 +78,8 @@ describe('PostgresOutboundReplyCommandStore', () => {
     expect(insert?.sql).toContain('source.message_id');
     expect(insert?.sql).toContain('source.channel');
     expect(insert?.sql).toContain('source.connection_id = ANY($5::text[])');
+    expect(insert?.sql).toContain("source.telegram_chat_type = 'private'");
+    expect(insert?.sql).toContain('source_registry.provider_identity_fingerprint');
     expect(insert?.sql).not.toContain(SOURCE.conversationId);
     expect(insert?.sql).not.toContain(input.text);
     expect(insert?.sql).not.toContain(input.authorization.inboxId);
@@ -109,6 +115,127 @@ describe('PostgresOutboundReplyCommandStore', () => {
         scopeFingerprint: EXPECTED_SCOPE_FINGERPRINT
       })
     ]);
+    expect(pool.telegramEligibilities).toEqual([
+      Object.freeze({
+        botIdentityFingerprint: TELEGRAM_BOT_IDENTITY_FINGERPRINT,
+        commandId: '1',
+        sourceChatType: 'private'
+      })
+    ]);
+
+    const telegramEligibilityInsert = pool.queries.find((query) =>
+      query.sql.includes('INSERT INTO open_channel_hub.outbound_telegram_command_eligibility')
+    );
+
+    expect(telegramEligibilityInsert).toMatchObject({
+      values: ['1', TELEGRAM_BOT_IDENTITY_FINGERPRINT, 'private']
+    });
+    expect(telegramEligibilityInsert?.sql).not.toContain(SOURCE.conversationId);
+    expect(telegramEligibilityInsert?.sql).not.toContain(input.text);
+    expect(telegramEligibilityInsert?.sql).not.toContain('reply_target_id');
+  });
+
+  it('does not create a Telegram reply intent for non-private, legacy, or identity-unbound sources', async () => {
+    const unsafeSources: readonly SourceEvent[] = [
+      Object.freeze({ ...SOURCE, telegramChatType: 'group' }),
+      Object.freeze({ ...SOURCE, telegramChatType: 'supergroup' }),
+      Object.freeze({ ...SOURCE, telegramChatType: 'channel' }),
+      Object.freeze({
+        channel: SOURCE.channel,
+        connectionId: SOURCE.connectionId,
+        conversationId: SOURCE.conversationId,
+        messageId: SOURCE.messageId,
+        providerEventId: SOURCE.providerEventId,
+        senderId: SOURCE.senderId
+      }),
+      Object.freeze({ ...SOURCE, providerIdentityFingerprint: undefined })
+    ];
+
+    for (const source of unsafeSources) {
+      const pool = createPool({ sources: [source] });
+
+      await expect(
+        new PostgresOutboundReplyCommandStore(pool).create(createInput())
+      ).resolves.toEqual({
+        kind: 'source_unavailable'
+      });
+      expect(pool.records).toEqual([]);
+      expect(pool.authorizations).toEqual([]);
+      expect(pool.telegramEligibilities).toEqual([]);
+    }
+  });
+
+  it('keeps non-Telegram source-bound commands unchanged and does not create Telegram eligibility evidence', async () => {
+    const zaloSource: SourceEvent = Object.freeze({
+      channel: 'zalo_oa',
+      connectionId: 'zalo-oa-support',
+      conversationId: 'zalo-conversation-1',
+      messageId: 'zalo-message-1',
+      providerEventId: 'zalo-event-1',
+      senderId: 'zalo-sender-1'
+    });
+    const input = createInput({
+      allowedConnectionIds: Object.freeze(['zalo-oa-support']),
+      clientOperationId: 'zalo-operation-1',
+      sourceConnectionId: zaloSource.connectionId,
+      sourceProviderEventId: zaloSource.providerEventId
+    });
+    const pool = createPool({ sources: [zaloSource] });
+    const store = new PostgresOutboundReplyCommandStore(pool);
+
+    await expect(store.create(input)).resolves.toMatchObject({ kind: 'created' });
+    await expect(store.create(input)).resolves.toMatchObject({ kind: 'idempotent_replay' });
+    expect(pool.telegramEligibilities).toEqual([]);
+  });
+
+  it('does not adopt a legacy Telegram command that lacks immutable private-reply eligibility evidence', async () => {
+    const input = createInput();
+    const authorization: StoredCommandAuthorization = Object.freeze({
+      authorizationKind: 'inbox_bearer',
+      commandId: '1',
+      inboxId: SUPPORT_INBOX,
+      scopeFingerprint: EXPECTED_SCOPE_FINGERPRINT
+    });
+    const pool = createPool({
+      initialAuthorizations: [authorization],
+      initialCommands: [storedCommand(input)],
+      sources: [SOURCE]
+    });
+
+    await expect(new PostgresOutboundReplyCommandStore(pool).create(input)).resolves.toEqual({
+      kind: 'idempotency_conflict'
+    });
+    expect(pool.telegramEligibilities).toEqual([]);
+  });
+
+  it('rejects a Telegram idempotent replay when durable eligibility no longer matches the registry Bot identity', async () => {
+    const input = createInput();
+    const authorization: StoredCommandAuthorization = Object.freeze({
+      authorizationKind: 'inbox_bearer',
+      commandId: '1',
+      inboxId: SUPPORT_INBOX,
+      scopeFingerprint: EXPECTED_SCOPE_FINGERPRINT
+    });
+    const eligibility: StoredTelegramCommandEligibility = Object.freeze({
+      botIdentityFingerprint: TELEGRAM_BOT_IDENTITY_FINGERPRINT,
+      commandId: '1',
+      sourceChatType: 'private'
+    });
+    const reboundSource = Object.freeze({
+      ...SOURCE,
+      providerIdentityFingerprint:
+        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+    });
+    const pool = createPool({
+      initialAuthorizations: [authorization],
+      initialCommands: [storedCommand(input)],
+      initialTelegramEligibilities: [eligibility],
+      sources: [reboundSource]
+    });
+
+    await expect(new PostgresOutboundReplyCommandStore(pool).create(input)).resolves.toEqual({
+      kind: 'idempotency_conflict'
+    });
   });
 
   it('persists dashboard-principal provenance with its bound inbox and no bearer material', async () => {
@@ -426,6 +553,21 @@ describe('PostgresOutboundReplyCommandStore', () => {
     expect(pool.authorizations).toEqual([]);
     expect(pool.clients.every((client) => client.released)).toBe(true);
   });
+
+  it('rolls back the command and authorization when immutable Telegram eligibility evidence cannot be inserted', async () => {
+    const pool = createPool({
+      failOnQuery: 'INSERT INTO open_channel_hub.outbound_telegram_command_eligibility',
+      sources: [SOURCE]
+    });
+
+    await expect(new PostgresOutboundReplyCommandStore(pool).create(createInput())).rejects.toEqual(
+      new PostgresStorageError()
+    );
+    expect(pool.records).toEqual([]);
+    expect(pool.authorizations).toEqual([]);
+    expect(pool.telegramEligibilities).toEqual([]);
+    expect(pool.queries.map((query) => query.sql)).toContain('ROLLBACK');
+  });
 });
 
 interface SourceEvent {
@@ -433,8 +575,10 @@ interface SourceEvent {
   readonly connectionId: string;
   readonly conversationId: string;
   readonly messageId: string;
+  readonly providerIdentityFingerprint?: string;
   readonly providerEventId: string;
   readonly senderId: string;
+  readonly telegramChatType?: 'private' | 'group' | 'supergroup' | 'channel';
 }
 
 interface StoredCommand {
@@ -458,6 +602,12 @@ interface StoredCommandAuthorization {
   readonly scopeFingerprint: string;
 }
 
+interface StoredTelegramCommandEligibility {
+  readonly botIdentityFingerprint: string;
+  readonly commandId: string;
+  readonly sourceChatType: 'private';
+}
+
 interface RecordedQuery {
   readonly sql: string;
   readonly values: readonly unknown[];
@@ -475,6 +625,7 @@ interface FakePool extends SqlPool {
   readonly outboundLockAcquisitions: number;
   readonly queries: readonly RecordedQuery[];
   readonly records: readonly StoredCommand[];
+  readonly telegramEligibilities: readonly StoredTelegramCommandEligibility[];
 }
 
 interface PoolOptions {
@@ -482,6 +633,7 @@ interface PoolOptions {
   readonly failOnQuery?: string;
   readonly initialAuthorizations?: readonly StoredCommandAuthorization[];
   readonly initialCommands?: readonly StoredCommand[];
+  readonly initialTelegramEligibilities?: readonly StoredTelegramCommandEligibility[];
   readonly sources?: readonly SourceEvent[];
 }
 
@@ -516,6 +668,7 @@ const createPool = (options: PoolOptions = {}): FakePool => {
   const authorizations = new Map<string, StoredCommandAuthorization>();
   const commands = new Map<string, StoredCommand>();
   const sources = new Map<string, SourceEvent>();
+  const telegramEligibilities = new Map<string, StoredTelegramCommandEligibility>();
   const queries: RecordedQuery[] = [];
   const clients: FakeSqlClient[] = [];
   const lock = new AsyncTransactionLock();
@@ -535,15 +688,24 @@ const createPool = (options: PoolOptions = {}): FakePool => {
     authorizations.set(authorization.commandId, authorization);
   }
 
+  for (const eligibility of options.initialTelegramEligibilities ?? []) {
+    telegramEligibilities.set(eligibility.commandId, eligibility);
+  }
+
   const createClient = (): FakeSqlClient => {
     const clientQueries: RecordedQuery[] = [];
     const createdAuthorizationIds = new Set<string>();
     const createdCommandKeys = new Set<string>();
+    const createdTelegramEligibilityIds = new Set<string>();
     let releaseLock: (() => void) | undefined;
     let released = false;
     let transactionCommitted = false;
 
     const rollbackCreatedRecords = (): void => {
+      for (const eligibilityId of createdTelegramEligibilityIds) {
+        telegramEligibilities.delete(eligibilityId);
+      }
+
       for (const authorizationId of createdAuthorizationIds) {
         authorizations.delete(authorizationId);
       }
@@ -553,6 +715,7 @@ const createPool = (options: PoolOptions = {}): FakePool => {
 
         if (command !== undefined) {
           authorizations.delete(command.commandId);
+          telegramEligibilities.delete(command.commandId);
         }
 
         commands.delete(commandKeyToRemove);
@@ -560,6 +723,7 @@ const createPool = (options: PoolOptions = {}): FakePool => {
 
       createdAuthorizationIds.clear();
       createdCommandKeys.clear();
+      createdTelegramEligibilityIds.clear();
     };
 
     const client: FakeSqlClient = {
@@ -606,14 +770,21 @@ const createPool = (options: PoolOptions = {}): FakePool => {
               ? commands.get(commandKey(connectionId, clientOperationId))
               : undefined;
 
+          const source =
+            command === undefined
+              ? undefined
+              : sources.get(sourceKey(command.connectionId, command.sourceProviderEventId));
+
           return Object.freeze({
             rows:
-              command === undefined
+              command === undefined || source === undefined
                 ? []
                 : [
                     existingRow(
                       command,
                       authorizations.get(command.commandId),
+                      source,
+                      telegramEligibilities.get(command.commandId),
                       options.corruptExistingRow
                     )
                   ]
@@ -644,7 +815,10 @@ const createPool = (options: PoolOptions = {}): FakePool => {
           if (
             source === undefined ||
             !allowedConnectionIds.includes(connectionId) ||
-            commands.has(key)
+            commands.has(key) ||
+            (source.channel === 'telegram_bot' &&
+              (source.telegramChatType !== 'private' ||
+                source.providerIdentityFingerprint === undefined))
           ) {
             return Object.freeze({ rows: [] });
           }
@@ -665,7 +839,16 @@ const createPool = (options: PoolOptions = {}): FakePool => {
           commands.set(key, command);
           createdCommandKeys.add(key);
 
-          return Object.freeze({ rows: [publicRow(command)] });
+          return Object.freeze({
+            rows: [
+              Object.freeze({
+                ...publicRow(command),
+                provider_identity_fingerprint: source.providerIdentityFingerprint ?? null,
+                source_channel: source.channel,
+                telegram_chat_type: source.telegramChatType ?? null
+              })
+            ]
+          });
         }
 
         if (sql.includes('INSERT INTO open_channel_hub.outbound_command_authorizations')) {
@@ -724,6 +907,57 @@ const createPool = (options: PoolOptions = {}): FakePool => {
           return Object.freeze({ rows: [authorizationRow(authorization)] });
         }
 
+        if (sql.includes('INSERT INTO open_channel_hub.outbound_telegram_command_eligibility')) {
+          const [commandId, botIdentityFingerprint, sourceChatType] = values;
+
+          if (
+            typeof commandId !== 'string' ||
+            typeof botIdentityFingerprint !== 'string' ||
+            sourceChatType !== 'private'
+          ) {
+            throw new Error('The synthetic Telegram eligibility query has invalid values.');
+          }
+
+          const command = [...commands.values()].find(
+            (candidate) => candidate.commandId === commandId
+          );
+          const source =
+            command === undefined
+              ? undefined
+              : sources.get(sourceKey(command.connectionId, command.sourceProviderEventId));
+
+          if (
+            command === undefined ||
+            source === undefined ||
+            source.channel !== 'telegram_bot' ||
+            source.telegramChatType !== 'private' ||
+            source.providerIdentityFingerprint !== botIdentityFingerprint ||
+            telegramEligibilities.has(commandId)
+          ) {
+            throw new Error(
+              'The synthetic Telegram eligibility does not match its source command.'
+            );
+          }
+
+          const eligibility: StoredTelegramCommandEligibility = Object.freeze({
+            botIdentityFingerprint,
+            commandId,
+            sourceChatType
+          });
+          telegramEligibilities.set(commandId, eligibility);
+          createdTelegramEligibilityIds.add(commandId);
+
+          return Object.freeze({
+            rows: [
+              Object.freeze({
+                bot_identity_fingerprint: eligibility.botIdentityFingerprint,
+                command_id: eligibility.commandId,
+                source_chat_type: eligibility.sourceChatType
+              })
+            ]
+          });
+        }
+
         return Object.freeze({ rows: [] });
       },
       release: () => {
@@ -760,6 +994,9 @@ const createPool = (options: PoolOptions = {}): FakePool => {
     get records(): readonly StoredCommand[] {
       return Object.freeze([...commands.values()]);
     },
+    get telegramEligibilities(): readonly StoredTelegramCommandEligibility[] {
+      return Object.freeze([...telegramEligibilities.values()]);
+    },
     connect: async (): Promise<SqlClient> => createClient(),
     query: async (): Promise<SqlQueryResult> => {
       throw new Error('Outbound reply commands must use a transaction-scoped client.');
@@ -770,15 +1007,23 @@ const createPool = (options: PoolOptions = {}): FakePool => {
 const existingRow = (
   command: StoredCommand,
   authorization: StoredCommandAuthorization | undefined,
+  source: SourceEvent,
+  telegramEligibility: StoredTelegramCommandEligibility | undefined,
   overrides: Readonly<Record<string, unknown>> | undefined
 ): Readonly<Record<string, unknown>> =>
   Object.freeze({
     ...publicRow(command),
     message_text: command.messageText,
+    command_source_channel: command.sourceChannel,
     authorization_kind: authorization?.authorizationKind ?? null,
     inbox_id: authorization?.inboxId ?? null,
     dashboard_principal_id: authorization?.dashboardPrincipalId ?? null,
     scope_fingerprint: authorization?.scopeFingerprint ?? null,
+    source_channel: source.channel,
+    telegram_chat_type: source.telegramChatType ?? null,
+    current_provider_identity_fingerprint: source.providerIdentityFingerprint ?? null,
+    bot_identity_fingerprint: telegramEligibility?.botIdentityFingerprint ?? null,
+    eligibility_source_chat_type: telegramEligibility?.sourceChatType ?? null,
     ...overrides
   });
 

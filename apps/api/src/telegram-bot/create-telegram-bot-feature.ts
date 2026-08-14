@@ -17,6 +17,7 @@ import {
 } from '@open-channel-hub/domain';
 
 import type { TelegramBotFeature } from './telegram-bot-feature.js';
+import { fingerprintTelegramBotProviderIdentity } from './telegram-bot-provider-identity.js';
 
 export interface TelegramBotConnectionConfiguration {
   readonly botToken: string;
@@ -42,6 +43,12 @@ export const createTelegramBotFeature = async (
   environment: TelegramBotConnectionConfiguration,
   options: CreateTelegramBotFeatureOptions
 ): Promise<TelegramBotFeature> => {
+  const providerIdentityFingerprint = fingerprintTelegramBotProviderIdentity(environment.botToken);
+
+  if (providerIdentityFingerprint === undefined) {
+    throw new Error('Telegram Bot token does not have a stable Bot identity prefix.');
+  }
+
   const gateway = new TelegramHttpBotGateway({
     botToken: environment.botToken,
     connectionId: environment.connectionId,
@@ -58,10 +65,12 @@ export const createTelegramBotFeature = async (
   });
   const sendMessage = new SendMessage(outboundPort);
   const manifest = connector.manifest();
+
   const registration: ConnectionRegistration = Object.freeze({
     channel: manifest.channel,
     connectorId: manifest.id,
     id: environment.connectionId,
+    providerIdentityFingerprint,
     tier: manifest.tier
   });
 

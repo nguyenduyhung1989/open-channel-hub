@@ -107,16 +107,18 @@ pair nor a secret. A restart with the same pair is safe; a changed fingerprint
 for an existing Zalo connection ID fails registration. The first Zalo binding is
 also refused when older pre-registry inbound history already uses that ID, so
 the new source never silently claims that old rows belonged to a newly chosen
-OA. Telegram remains without an equivalent provider-identity fingerprint because
-this configuration does not contain a comparable non-secret Bot account ID.
+OA. Candidate Phase 4i later adds a Telegram-specific identity fingerprint from
+the numeric prefix of the configured Bot token. That later decision is
+deliberately not retroactive: it cannot bind a Telegram connection that already
+has inbound history but no stored identity evidence.
 
 Migration
 <code>0006_connection_registry_facebook_page_provider_identity</code> requires
 the same opaque fingerprint field for every <code>facebook_page</code> row. Its
 domain-separated digest derives from `(appId, pageId)`, never stores those raw
 identifiers or a credential, rejects rebinding an existing Page connection ID,
-and uses the same pre-registry-history guard. It does not add an equivalent
-Telegram binding.
+and uses the same pre-registry-history guard. Telegram identity is addressed by
+the later dedicated Phase 4i decision rather than by this Page migration.
 
 Migration
 <code>0007_connection_registry_whatsapp_business_provider_identity</code>

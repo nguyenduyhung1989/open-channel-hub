@@ -1,4 +1,8 @@
-import type { ProviderReceipt } from '@open-channel-hub/contracts';
+import {
+  TELEGRAM_CHAT_TYPES,
+  type ProviderReceipt,
+  type TelegramChatType
+} from '@open-channel-hub/contracts';
 
 /**
  * The only provider port this first vertical slice needs. Implementations own
@@ -15,7 +19,7 @@ export interface TelegramSendTextMessage {
 
 interface TelegramChat {
   readonly id: number;
-  readonly type: string;
+  readonly type: TelegramChatType;
 }
 
 interface TelegramUser {
@@ -61,7 +65,7 @@ export const toTelegramTextUpdate = (value: unknown): TelegramUpdate | undefined
     typeof message.text !== 'string' ||
     !isRecord(message.chat) ||
     !isSafeInteger(message.chat.id) ||
-    typeof message.chat.type !== 'string'
+    !isTelegramChatType(message.chat.type)
   ) {
     return undefined;
   }
@@ -107,3 +111,6 @@ const isSafeInteger = (value: unknown): value is number =>
 
 const isUnixTimestampSeconds = (value: unknown): value is number =>
   isSafeInteger(value) && value >= 0 && value <= MAX_JAVASCRIPT_DATE_SECONDS;
+
+const isTelegramChatType = (value: unknown): value is TelegramChatType =>
+  typeof value === 'string' && (TELEGRAM_CHAT_TYPES as readonly string[]).includes(value);

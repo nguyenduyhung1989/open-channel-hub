@@ -148,4 +148,6 @@ Before a dispatcher can exist, define and independently review provider
 capabilities, authorization, credential handling, attempt-write ordering,
 delivery receipts, timeout uncertainty, retry safety, audit/retention behavior,
 and a provider-specific dispatch model. The Phase 4g verified-source evidence schema
-does not remove any of those requirements.
+does not remove any of those requirements. Candidate Phase 4i only adds
+Telegram private-chat/Bot-identity evidence for newly created Telegram commands;
+it is not a sender, current authorization, or delivery capability.

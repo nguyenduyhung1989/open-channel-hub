@@ -114,6 +114,31 @@ describe('Inbox inbound-events route', () => {
     });
   });
 
+  it('does not project internal Telegram chat evidence through the aggregate inbox API', async () => {
+    const telegramEvent = Object.freeze({
+      ...canonicalEvent(SUPPORT_CONNECTION_IDS[1]),
+      telegramChatType: 'private' as const
+    });
+    const { feature } = createFeature({
+      readInboundEvents: vi.fn(async (): Promise<InboundEventPage> => ({ events: [telegramEvent] }))
+    });
+    const app = await buildApp({ inboxes: [feature] });
+    applications.push(app);
+
+    const response = await app.inject({
+      headers: { authorization: `Bearer ${SUPPORT_TOKEN}` },
+      method: 'GET',
+      url: '/v1/inbox/inbound-events'
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      success: true,
+      data: { events: [canonicalEvent(SUPPORT_CONNECTION_IDS[1])] }
+    });
+    expect(response.body).not.toContain('telegramChatType');
+  });
+
   it('rejects a cursor issued to another inbox, a changed scope, and an unversioned shape', async () => {
     const support = createFeature({
       readInboundEvents: vi.fn(async (): Promise<InboundEventPage> => ({

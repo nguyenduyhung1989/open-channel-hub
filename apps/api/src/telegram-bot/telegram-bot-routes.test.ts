@@ -142,7 +142,8 @@ describe('Telegram Bot routes', () => {
     const rawProviderPayload = 'Synthetic raw provider payload must never leave the server.';
     const eventWithUnexpectedField = Object.freeze({
       ...EVENT,
-      rawProviderPayload
+      rawProviderPayload,
+      telegramChatType: 'private' as const
     }) as CanonicalEvent;
     const { feature, readInboundEvents } = createFeature({
       readInboundEvents: vi.fn(async (): Promise<InboundEventPage> => ({
@@ -173,6 +174,7 @@ describe('Telegram Bot routes', () => {
       pageSize: 2
     });
     expect(response.body).not.toContain(rawProviderPayload);
+    expect(response.body).not.toContain('telegramChatType');
   });
 
   it('invalidates unversioned connection-bound and Phase 2b cursors even in legacy one-Bot mode', async () => {

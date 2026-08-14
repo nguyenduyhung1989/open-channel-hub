@@ -87,12 +87,14 @@ call.
 ## What remains before provider dispatch
 
 - A current authorization recheck and an explicit policy for legacy commands.
-- Provider-specific account identity and private-recipient eligibility,
-  including a Telegram private-chat/account-identity design.
+- Provider-specific account identity and private-recipient eligibility. Candidate
+  Phase 4i records the narrow Telegram private-chat/Bot-identity evidence, but
+  it is not a current policy or dispatch capability.
 - Credential isolation, capability policy, attempt-write ordering, timeout
   uncertainty, receipt mapping, retry prohibition or policy, redaction, and
   production verification.
 
 See [ADR-0017](../adr/0017-immutable-outbound-command-authorization-provenance.md)
 for the rationale, and [the Phase 4g evidence guide](outbound-delivery-evidence-4g.md)
-for the separate no-dispatch attempt/receipt storage foundation.
+for the separate no-dispatch attempt/receipt storage foundation. See also the
+[Phase 4i Telegram private-reply guide](telegram-private-reply-eligibility-4i.md).

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { DEFAULT_SOURCE_OFFER_URL } from '../source/source-offer.js';
+import { isTelegramBotToken } from '../telegram-bot/telegram-bot-provider-identity.js';
 
 const environmentSchema = z.object({
   DATABASE_HOST: z.string().optional(),
@@ -151,6 +152,7 @@ export const parseEnvironment = (environment: NodeJS.ProcessEnv): AppEnvironment
 
   if (
     botToken === undefined ||
+    !isTelegramBotToken(botToken) ||
     operatorApiToken === undefined ||
     webhookSecret === undefined ||
     operatorApiToken === webhookSecret ||

@@ -1,4 +1,8 @@
-import type { CanonicalEvent } from '@open-channel-hub/contracts';
+import {
+  TELEGRAM_CHAT_TYPES,
+  type CanonicalEvent,
+  type TelegramChatType
+} from '@open-channel-hub/contracts';
 import type { InboundEventStore } from '@open-channel-hub/domain';
 
 import { PostgresStorageError } from './postgres-error.js';
@@ -23,9 +27,10 @@ INSERT INTO ${POSTGRES_SCHEMA}.inbound_events (
   conversation_id,
   message_id,
   sender_id,
-  message_text
+  message_text,
+  telegram_chat_type
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 ON CONFLICT (connection_id, provider_event_id) DO NOTHING
 `;
 
@@ -40,6 +45,10 @@ export class PostgresInboundEventStore implements InboundEventStore {
   public async append(events: readonly CanonicalEvent[]): Promise<void> {
     if (events.length === 0) {
       return;
+    }
+
+    if (!events.every(hasValidTelegramChatType)) {
+      throw new PostgresStorageError();
     }
 
     let client: SqlClient | undefined;
@@ -84,7 +93,16 @@ const valuesFor = (event: CanonicalEvent): readonly unknown[] =>
     event.message.conversationId,
     event.message.id,
     event.message.senderId,
-    event.message.text
+    event.message.text,
+    event.telegramChatType ?? null
   ]);
+
+const hasValidTelegramChatType = (event: CanonicalEvent): boolean =>
+  event.channel === 'telegram_bot'
+    ? isTelegramChatType(event.telegramChatType)
+    : event.telegramChatType === undefined;
+
+const isTelegramChatType = (value: unknown): value is TelegramChatType =>
+  typeof value === 'string' && (TELEGRAM_CHAT_TYPES as readonly string[]).includes(value);
 
 export type { SqlClient, SqlPool } from './sql.js';

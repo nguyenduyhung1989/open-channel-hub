@@ -23,6 +23,7 @@ it does not mean a feature is complete.
 | [0015](0015-opt-in-dashboard-reply-intents.md)                      | accepted | Opt-in source-bound dashboard reply-intent recording                |
 | [0016](0016-append-only-outbound-delivery-evidence.md)              | accepted | Append-only outbound delivery evidence before provider dispatch     |
 | [0017](0017-immutable-outbound-command-authorization-provenance.md) | accepted | Immutable command authorization provenance before provider dispatch |
+| [0018](0018-telegram-private-reply-eligibility.md)                  | accepted | Telegram private-chat and Bot-identity evidence before dispatch     |
 
 Template for a new ADR:
 

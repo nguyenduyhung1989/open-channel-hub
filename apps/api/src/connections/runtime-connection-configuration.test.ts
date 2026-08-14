@@ -29,6 +29,14 @@ describe('loadRuntimeConnectionConfiguration', () => {
     expect(readFileMock).toHaveBeenCalledWith(CONFIGURATION_PATH, 'utf8');
   });
 
+  it('rejects a Telegram token without the stable numeric Bot identity prefix', async () => {
+    const configuration = validConfiguration();
+    configuration.connections[0]!.botToken = 'synthetic-bot-token-without-prefix';
+    readFileMock.mockResolvedValue(JSON.stringify(configuration));
+
+    await expectGenericFailure(loadRuntimeConnectionConfiguration(CONFIGURATION_PATH));
+  });
+
   it('loads an optional immutable inbox scope while keeping old v1 documents inbox-free', async () => {
     const legacyConfiguration = validConfiguration();
     readFileMock.mockResolvedValueOnce(JSON.stringify(legacyConfiguration));
@@ -441,7 +449,7 @@ describe('loadRuntimeConnectionConfiguration', () => {
 
   it('loads a canonical base64url JSON document without interpreting credential characters', async () => {
     const configuration = validConfiguration();
-    configuration.connections[0]!.botToken = 'synthetic-bot-$credential';
+    configuration.connections[0]!.botToken = '123456789:synthetic-bot-$credential';
     const encoded = Buffer.from(JSON.stringify(configuration), 'utf8').toString('base64url');
     readFileMock.mockResolvedValue(encoded);
 
@@ -823,7 +831,7 @@ const validConfiguration = (): MutableRuntimeConnectionConfiguration => ({
     {
       id: 'telegram-bot-primary',
       type: 'telegram_bot',
-      botToken: 'synthetic-bot-token-primary',
+      botToken: '123456789:synthetic-bot-token-primary',
       operatorApiToken: 'synthetic_operator_api_token_primary_0123456789',
       webhookSecret: 'synthetic_webhook_secret_primary_0123456789',
       webhookUrl: 'https://example.test/v1/webhooks/telegram-bot/telegram-bot-primary'
@@ -831,7 +839,7 @@ const validConfiguration = (): MutableRuntimeConnectionConfiguration => ({
     {
       id: 'telegram-bot-secondary',
       type: 'telegram_bot',
-      botToken: 'synthetic-bot-token-secondary',
+      botToken: '987654321:synthetic-bot-token-secondary',
       operatorApiToken: 'synthetic_operator_api_token_secondary_0123456789',
       webhookSecret: 'synthetic_webhook_secret_secondary_0123456789',
       webhookUrl: 'https://example.test/v1/webhooks/telegram-bot/telegram-bot-secondary'

@@ -18,5 +18,7 @@ export type {
   CanonicalEvent,
   ProviderCommand,
   ProviderReceipt,
-  SendTextProviderCommand
+  SendTextProviderCommand,
+  TelegramChatType
 } from './message.js';
+export { TELEGRAM_CHAT_TYPES } from './message.js';

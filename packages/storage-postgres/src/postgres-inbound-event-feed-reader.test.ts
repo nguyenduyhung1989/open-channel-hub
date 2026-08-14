@@ -38,8 +38,37 @@ describe('PostgresInboundEventFeedReader', () => {
     });
     expect(pool.queries[1]?.sql).toContain('inbound_event.ledger_id <= $2::bigint');
     expect(pool.queries[1]?.sql).toContain('ORDER BY inbound_event.ledger_id DESC');
+    expect(pool.queries[1]?.sql).toContain('telegram_chat_type');
     expect(pool.queries[1]?.sql).not.toContain(CONNECTION_A);
     expect(result.events[0]).not.toHaveProperty('ledgerId');
+  });
+
+  it('preserves recognized Telegram chat evidence internally and rejects malformed channel coupling', async () => {
+    const privatePool = createPool({
+      pageRows: [row('12', CONNECTION_A, { telegram_chat_type: 'private' })],
+      snapshotRows: [Object.freeze({ snapshot_max_sequence: '12' })]
+    });
+
+    await expect(
+      new PostgresInboundEventFeedReader(privatePool).list({
+        connectionIds: [CONNECTION_A],
+        pageSize: 1
+      })
+    ).resolves.toEqual({
+      events: [Object.freeze({ ...event('12', CONNECTION_A), telegramChatType: 'private' })]
+    });
+
+    const malformedPool = createPool({
+      pageRows: [row('12', CONNECTION_A, { channel: 'zalo_oa', telegram_chat_type: 'private' })],
+      snapshotRows: [Object.freeze({ snapshot_max_sequence: '12' })]
+    });
+
+    await expect(
+      new PostgresInboundEventFeedReader(malformedPool).list({
+        connectionIds: [CONNECTION_A],
+        pageSize: 1
+      })
+    ).rejects.toBeInstanceOf(PostgresStorageError);
   });
 
   it('orders the underlying bigint ledger column numerically rather than the projected text alias', async () => {
@@ -267,6 +296,7 @@ const row = (
     message_id: `message-${sequence}`,
     sender_id: 'sender-1',
     message_text: `Synthetic message ${sequence}`,
+    telegram_chat_type: null,
     ...overrides
   });
 

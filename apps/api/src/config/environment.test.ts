@@ -9,6 +9,7 @@ const POSTGRES_ENVIRONMENT = Object.freeze({
   DATABASE_PORT: '5432',
   DATABASE_USER: 'open_channel_hub'
 });
+const TELEGRAM_BOT_TOKEN = '123456789:synthetic-bot-token';
 
 describe('parseEnvironment', () => {
   it('returns only the documented runtime settings with safe defaults', () => {
@@ -26,7 +27,7 @@ describe('parseEnvironment', () => {
       parseEnvironment({
         OPERATOR_API_TOKEN: 'a'.repeat(32),
         PORT: '3010',
-        TELEGRAM_BOT_TOKEN: 'synthetic-bot-token',
+        TELEGRAM_BOT_TOKEN,
         TELEGRAM_WEBHOOK_SECRET: 'synthetic_webhook_secret_0123456789'
       })
     ).toEqual({
@@ -48,13 +49,25 @@ describe('parseEnvironment', () => {
     );
   });
 
+  it('rejects an enabled legacy Telegram token without its stable numeric Bot identity prefix', () => {
+    expect(() =>
+      parseEnvironment({
+        ...POSTGRES_ENVIRONMENT,
+        OPERATOR_API_TOKEN: 'operator-token-with-at-least-thirty-two-characters',
+        TELEGRAM_BOT_ENABLED: 'true',
+        TELEGRAM_BOT_TOKEN: 'synthetic-bot-token-without-prefix',
+        TELEGRAM_WEBHOOK_SECRET: 'synthetic_webhook_secret_0123456789'
+      })
+    ).toThrow(EnvironmentConfigurationError);
+  });
+
   it('returns an enabled Telegram configuration only after validating secrets and HTTPS webhook URL', () => {
     expect(
       parseEnvironment({
         ...POSTGRES_ENVIRONMENT,
         OPERATOR_API_TOKEN: 'operator-token-with-at-least-thirty-two-characters',
         TELEGRAM_BOT_ENABLED: 'true',
-        TELEGRAM_BOT_TOKEN: 'synthetic-bot-token',
+        TELEGRAM_BOT_TOKEN,
         TELEGRAM_CONNECTION_ID: 'telegram.bot:primary',
         TELEGRAM_WEBHOOK_SECRET: 'synthetic_webhook_secret_0123456789',
         TELEGRAM_WEBHOOK_URL: 'https://example.test/v1/webhooks/telegram-bot'
@@ -72,7 +85,7 @@ describe('parseEnvironment', () => {
       },
       sourceOfferUrl: 'https://github.com/nguyenduyhung1989/open-channel-hub',
       connectorRuntime: {
-        botToken: 'synthetic-bot-token',
+        botToken: TELEGRAM_BOT_TOKEN,
         connectionId: 'telegram.bot:primary',
         enabled: true,
         operatorApiToken: 'operator-token-with-at-least-thirty-two-characters',
@@ -89,7 +102,7 @@ describe('parseEnvironment', () => {
           ...POSTGRES_ENVIRONMENT,
           OPERATOR_API_TOKEN: 'operator-token-with-at-least-thirty-two-characters',
           TELEGRAM_BOT_ENABLED: 'true',
-          TELEGRAM_BOT_TOKEN: 'synthetic-bot-token',
+          TELEGRAM_BOT_TOKEN,
           TELEGRAM_CONNECTION_ID: connectionId,
           TELEGRAM_WEBHOOK_SECRET: 'synthetic_webhook_secret_0123456789'
         }).connectorRuntime
@@ -126,7 +139,7 @@ describe('parseEnvironment', () => {
       parseEnvironment({
         TELEGRAM_BOT_ENABLED: 'true',
         OPERATOR_API_TOKEN: 'operator-token-with-at-least-thirty-two-characters',
-        TELEGRAM_BOT_TOKEN: 'synthetic-bot-token',
+        TELEGRAM_BOT_TOKEN,
         TELEGRAM_WEBHOOK_SECRET: 'synthetic_webhook_secret_0123456789'
       })
     ).toThrow(EnvironmentConfigurationError);
@@ -218,7 +231,7 @@ describe('parseEnvironment', () => {
       ...POSTGRES_ENVIRONMENT,
       OPERATOR_API_TOKEN: 'operator-token-with-at-least-thirty-two-characters',
       TELEGRAM_BOT_ENABLED: 'true',
-      TELEGRAM_BOT_TOKEN: 'synthetic-bot-token',
+      TELEGRAM_BOT_TOKEN,
       TELEGRAM_WEBHOOK_SECRET: 'synthetic_webhook_secret_0123456789'
     };
 
@@ -239,7 +252,7 @@ describe('parseEnvironment', () => {
         ...POSTGRES_ENVIRONMENT,
         OPERATOR_API_TOKEN: sharedSecret,
         TELEGRAM_BOT_ENABLED: 'true',
-        TELEGRAM_BOT_TOKEN: 'synthetic-bot-token',
+        TELEGRAM_BOT_TOKEN,
         TELEGRAM_WEBHOOK_SECRET: sharedSecret
       })
     ).toThrow(EnvironmentConfigurationError);
@@ -250,7 +263,7 @@ describe('parseEnvironment', () => {
       ...POSTGRES_ENVIRONMENT,
       OPERATOR_API_TOKEN: 'operator-token-with-at-least-thirty-two-characters',
       TELEGRAM_BOT_ENABLED: 'true',
-      TELEGRAM_BOT_TOKEN: 'synthetic-bot-token',
+      TELEGRAM_BOT_TOKEN,
       TELEGRAM_WEBHOOK_SECRET: 'short-secret'
     };
 

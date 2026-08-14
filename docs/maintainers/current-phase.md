@@ -1,4 +1,4 @@
-# Public checkpoint: Phase 4a–4g verified source; Phase 4h candidate
+# Public checkpoint: Phase 4a–4g verified source; Phases 4h–4i candidate
 
 **Verified scope:** Phase 4a is a configured, read-only aggregate feed across
 an explicit set of existing official connections. It builds on the Telegram
@@ -102,6 +102,29 @@ provenance row also is not current authorization and never authorizes provider
 I/O. Phase 4h adds no provider request, worker, queue, dispatcher, retry,
 browser send control, delivery/read state, or live-provider test.
 
+## Phase 4i candidate source
+
+Phase 4i is not verified yet. Its forward-only migration
+`0012_telegram_private_reply_eligibility` preserves Telegram's documented chat
+type as internal canonical evidence for new inbound rows, requires an opaque
+non-secret Bot fingerprint in new Telegram registry registrations, and captures
+one immutable private-chat/Bot-identity eligibility record with a new Telegram
+reply command.
+
+The fingerprint is a domain-separated SHA-256 digest of the numeric prefix of
+the configured `<bot-id>:<secret>` token. Neither prefix nor secret is stored,
+returned, or rendered. The registry refuses to attach this binding to a legacy
+Telegram connection that already has durable inbound history but no existing
+fingerprint; the safe cutover is a new connection ID. Historic inbound rows and
+commands are never backfilled or adopted.
+
+A new Telegram reply intent requires a private source, a current registry
+fingerprint, Phase 4h provenance, and the new eligibility record to persist in
+the same transaction. Group, supergroup, channel, historic unknown chat type,
+missing/changed identity, absent source, and out-of-scope source fail closed.
+This adds no provider call, sender, worker, retry, attempt/receipt write,
+delivery result, browser field, or live-provider test.
+
 ## Exact verified history
 
 - GitHub CI and CodeQL succeeded for the Phase 0 commit <code>8b80c3b</code>,
@@ -139,7 +162,7 @@ browser send control, delivery/read state, or live-provider test.
 - Historical evidence proves only those exact revisions. It does not verify any
   live provider account, provider send, public TLS endpoint, production
   deployment, any Phase 4g provider result beyond its exact verified commit, or
-  the Phase 4h candidate.
+  the Phase 4h or Phase 4i candidates.
 
 ## Verified Phase 4g source
 

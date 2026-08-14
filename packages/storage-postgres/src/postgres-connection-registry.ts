@@ -40,10 +40,23 @@ WHERE $4::text IS NULL
       )
   )
 ON CONFLICT (connection_id) DO UPDATE
-SET connection_id = EXCLUDED.connection_id
+SET
+  connection_id = EXCLUDED.connection_id,
+  provider_identity_fingerprint = EXCLUDED.provider_identity_fingerprint
 WHERE existing.connector_id = EXCLUDED.connector_id
   AND existing.channel = EXCLUDED.channel
-  AND existing.provider_identity_fingerprint IS NOT DISTINCT FROM EXCLUDED.provider_identity_fingerprint
+  AND (
+    existing.provider_identity_fingerprint IS NOT DISTINCT FROM EXCLUDED.provider_identity_fingerprint
+    OR (
+      existing.provider_identity_fingerprint IS NULL
+      AND EXCLUDED.provider_identity_fingerprint IS NOT NULL
+      AND NOT EXISTS (
+        SELECT 1
+        FROM ${POSTGRES_SCHEMA}.inbound_events AS history
+        WHERE history.connection_id = existing.connection_id
+      )
+    )
+  )
   AND existing.tier = EXCLUDED.tier
 RETURNING connection_id, connector_id, channel, provider_identity_fingerprint, tier
 `;
@@ -155,7 +168,10 @@ const isConnectorTier = (value: unknown): value is ConnectorTier =>
   typeof value === 'string' && (CONNECTOR_TIERS as readonly string[]).includes(value);
 
 const requiresProviderIdentityFingerprint = (channel: Channel): boolean =>
-  channel === 'zalo_oa' || channel === 'facebook_page' || channel === 'whatsapp_business';
+  channel === 'telegram_bot' ||
+  channel === 'zalo_oa' ||
+  channel === 'facebook_page' ||
+  channel === 'whatsapp_business';
 
 const isProviderIdentityFingerprint = (value: unknown): value is string =>
   typeof value === 'string' && PROVIDER_IDENTITY_FINGERPRINT_PATTERN.test(value);

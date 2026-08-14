@@ -4,9 +4,10 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { buildApp } from '../app.js';
 import { createTelegramBotFeature } from './create-telegram-bot-feature.js';
+import { fingerprintTelegramBotProviderIdentity } from './telegram-bot-provider-identity.js';
 
 const ENVIRONMENT: EnabledTelegramBotEnvironment = Object.freeze({
-  botToken: 'synthetic-bot-token',
+  botToken: '123456789:synthetic-bot-token',
   connectionId: 'telegram-bot-default',
   enabled: true,
   operatorApiToken: 'operator-token-with-at-least-thirty-two-characters',
@@ -27,6 +28,14 @@ describe('createTelegramBotFeature', () => {
       now: () => new Date('2026-08-12T00:00:00.000Z'),
       readInboundEvents,
       receiveEvents
+    });
+
+    expect(feature.registration).toEqual({
+      channel: 'telegram_bot',
+      connectorId: 'telegram-bot',
+      id: ENVIRONMENT.connectionId,
+      providerIdentityFingerprint: fingerprintTelegramBotProviderIdentity(ENVIRONMENT.botToken),
+      tier: 'OFFICIAL'
     });
 
     await expect(
@@ -100,7 +109,7 @@ describe('createTelegramBotFeature', () => {
         }
       });
       expect(fetchImpl).toHaveBeenCalledWith(
-        'https://api.telegram.org/botsynthetic-bot-token/sendMessage',
+        'https://api.telegram.org/bot123456789:synthetic-bot-token/sendMessage',
         expect.objectContaining({
           body: JSON.stringify({ chat_id: '42', text: 'Synthetic end-to-end message' }),
           method: 'POST',
@@ -139,5 +148,15 @@ describe('createTelegramBotFeature', () => {
       ])
     ).rejects.toThrow('Telegram inbound events do not match their configured connection.');
     expect(receiveEvents).not.toHaveBeenCalled();
+  });
+
+  it('rejects a direct feature configuration without a token-bound Bot identity', async () => {
+    await expect(
+      createTelegramBotFeature(Object.freeze({ ...ENVIRONMENT, botToken: 'synthetic-bot-token' }), {
+        fetchImpl: vi.fn<typeof fetch>(),
+        readInboundEvents: async (): Promise<InboundEventPage> => ({ events: [] }),
+        receiveEvents: async (): Promise<void> => undefined
+      })
+    ).rejects.toThrow('Telegram Bot token does not have a stable Bot identity prefix.');
   });
 });

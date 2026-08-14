@@ -161,3 +161,6 @@ required external HTTPS cookie/origin behavior.
 - No real Telegram, Zalo OA, Facebook Page, WhatsApp Business, public TLS, or
   production authorization proof. The Phase 1a Telegram direct-send endpoint
   remains unrelated legacy compatibility behavior.
+- Candidate Phase 4i may record internal Telegram private-chat/Bot-identity
+  evidence alongside a new command, but it does not change this form's fields,
+  render those values, or turn this source-bound intent into a provider send.

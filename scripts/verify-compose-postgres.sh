@@ -10,7 +10,8 @@ readonly support_operator_api_token='synthetic_operator_support_0123456789012345
 readonly support_webhook_secret='synthetic_support_webhook_secret_0123456789'
 readonly sales_operator_api_token='synthetic_operator_sales_0123456789012345678901'
 readonly sales_webhook_secret='synthetic_sales_webhook_secret_01234567890123456789'
-readonly webhook_payload='{"update_id":9001,"message":{"chat":{"id":-1001234567890,"type":"supergroup"},"date":1786492800,"from":{"first_name":"Synthetic","id":42,"is_bot":false},"message_id":301,"text":"Synthetic inbound message"}}'
+readonly webhook_payload='{"update_id":9001,"message":{"chat":{"id":42,"type":"private"},"date":1786492800,"from":{"first_name":"Synthetic","id":42,"is_bot":false},"message_id":301,"text":"Synthetic inbound message"}}'
+readonly non_private_telegram_webhook_payload='{"update_id":9002,"message":{"chat":{"id":-1001234567890,"type":"supergroup"},"date":1786492800,"from":{"first_name":"Synthetic","id":42,"is_bot":false},"message_id":302,"text":"Synthetic non-private inbound message"}}'
 readonly zalo_support_app_id='900000000000000001'
 readonly zalo_sales_app_id='900000000000000002'
 readonly zalo_support_oa_secret_key='synthetic-zalo-oa-support-secret-$-key'
@@ -38,7 +39,7 @@ readonly support_outbound_history_text='Synthetic queued history reply'
 readonly whatsapp_webhook_payload='{"object":"whatsapp_business_account","entry":[{"id":"900000000000000501","changes":[{"field":"messages","value":{"messaging_product":"whatsapp","metadata":{"phone_number_id":"900000000000000601"},"messages":[{"from":"900000000000000701","id":"wamid.synthetic.901","timestamp":"1786492800","type":"text","text":{"body":"Synthetic WhatsApp Business inbound message"}}]}}]},{"id":"900000000000000501","changes":[{"field":"messages","value":{"messaging_product":"whatsapp","metadata":{"phone_number_id":"900000000000000602"},"messages":[{"from":"900000000000000702","id":"wamid.synthetic.901","timestamp":"1786492800","type":"text","text":{"body":"Synthetic WhatsApp Business inbound message"}}]}}]}]}'
 # This loopback-only HTTP smoke intentionally omits the optional browser dashboard.
 # Secure cookies plus the exact external HTTPS origin are exercised by route tests, not by this Compose run.
-readonly runtime_connections_configuration='{"version":1,"connections":[{"id":"telegram-bot-support","type":"telegram_bot","botToken":"synthetic-bot-token-support","operatorApiToken":"synthetic_operator_support_01234567890123456789","webhookSecret":"synthetic_support_webhook_secret_0123456789","webhookUrl":"https://example.test/v1/webhooks/telegram-bot/telegram-bot-support"},{"id":"telegram-bot-sales","type":"telegram_bot","botToken":"synthetic-bot-token-sales","operatorApiToken":"synthetic_operator_sales_0123456789012345678901","webhookSecret":"synthetic_sales_webhook_secret_01234567890123456789","webhookUrl":"https://example.test/v1/webhooks/telegram-bot/telegram-bot-sales"},{"id":"zalo-oa-support","type":"zalo_oa","appId":"900000000000000001","oaId":"900000000000000101","oaSecretKey":"synthetic-zalo-oa-support-secret-$-key","operatorApiToken":"synthetic_zalo_operator_support_012345678901234567","webhookUrl":"https://example.test/v1/webhooks/zalo-oa"},{"id":"zalo-oa-sales","type":"zalo_oa","appId":"900000000000000002","oaId":"900000000000000102","oaSecretKey":"synthetic-zalo-oa-sales-secret-$-key","operatorApiToken":"synthetic_zalo_operator_sales_0123456789012345678","webhookUrl":"https://example.test/v1/webhooks/zalo-oa"},{"id":"facebook-page-support","type":"facebook_page","appId":"900000000000000003","pageId":"900000000000000301","appSecret":"synthetic-facebook-app-secret-$-value-01234567890","webhookVerifyToken":"synthetic-facebook-verify-token-012345678901234567","operatorApiToken":"synthetic_facebook_operator_support_012345678901234567","webhookUrl":"https://example.test/v1/webhooks/meta"},{"id":"facebook-page-sales","type":"facebook_page","appId":"900000000000000003","pageId":"900000000000000302","appSecret":"synthetic-facebook-app-secret-$-value-01234567890","webhookVerifyToken":"synthetic-facebook-verify-token-012345678901234567","operatorApiToken":"synthetic_facebook_operator_sales_0123456789012345678","webhookUrl":"https://example.test/v1/webhooks/meta"},{"id":"whatsapp-business-support","type":"whatsapp_business","appId":"900000000000000003","wabaId":"900000000000000501","phoneNumberId":"900000000000000601","appSecret":"synthetic-facebook-app-secret-$-value-01234567890","webhookVerifyToken":"synthetic-facebook-verify-token-012345678901234567","operatorApiToken":"synthetic_whatsapp_operator_support_012345678901234567","webhookUrl":"https://example.test/v1/webhooks/meta"},{"id":"whatsapp-business-sales","type":"whatsapp_business","appId":"900000000000000003","wabaId":"900000000000000501","phoneNumberId":"900000000000000602","appSecret":"synthetic-facebook-app-secret-$-value-01234567890","webhookVerifyToken":"synthetic-facebook-verify-token-012345678901234567","operatorApiToken":"synthetic_whatsapp_operator_sales_0123456789012345678","webhookUrl":"https://example.test/v1/webhooks/meta"}],"inboxes":[{"id":"support-inbox","token":"synthetic_inbox_support_token_01234567890123456789","connectionIds":["telegram-bot-support","zalo-oa-support","facebook-page-support","whatsapp-business-support"]},{"id":"sales-inbox","token":"synthetic_inbox_sales_token_01234567890123456789012","connectionIds":["telegram-bot-sales","zalo-oa-sales","facebook-page-sales","whatsapp-business-sales"]}]}'
+readonly runtime_connections_configuration='{"version":1,"connections":[{"id":"telegram-bot-support","type":"telegram_bot","botToken":"123456789:synthetic-bot-token-support","operatorApiToken":"synthetic_operator_support_01234567890123456789","webhookSecret":"synthetic_support_webhook_secret_0123456789","webhookUrl":"https://example.test/v1/webhooks/telegram-bot/telegram-bot-support"},{"id":"telegram-bot-sales","type":"telegram_bot","botToken":"987654321:synthetic-bot-token-sales","operatorApiToken":"synthetic_operator_sales_0123456789012345678901","webhookSecret":"synthetic_sales_webhook_secret_01234567890123456789","webhookUrl":"https://example.test/v1/webhooks/telegram-bot/telegram-bot-sales"},{"id":"zalo-oa-support","type":"zalo_oa","appId":"900000000000000001","oaId":"900000000000000101","oaSecretKey":"synthetic-zalo-oa-support-secret-$-key","operatorApiToken":"synthetic_zalo_operator_support_012345678901234567","webhookUrl":"https://example.test/v1/webhooks/zalo-oa"},{"id":"zalo-oa-sales","type":"zalo_oa","appId":"900000000000000002","oaId":"900000000000000102","oaSecretKey":"synthetic-zalo-oa-sales-secret-$-key","operatorApiToken":"synthetic_zalo_operator_sales_0123456789012345678","webhookUrl":"https://example.test/v1/webhooks/zalo-oa"},{"id":"facebook-page-support","type":"facebook_page","appId":"900000000000000003","pageId":"900000000000000301","appSecret":"synthetic-facebook-app-secret-$-value-01234567890","webhookVerifyToken":"synthetic-facebook-verify-token-012345678901234567","operatorApiToken":"synthetic_facebook_operator_support_012345678901234567","webhookUrl":"https://example.test/v1/webhooks/meta"},{"id":"facebook-page-sales","type":"facebook_page","appId":"900000000000000003","pageId":"900000000000000302","appSecret":"synthetic-facebook-app-secret-$-value-01234567890","webhookVerifyToken":"synthetic-facebook-verify-token-012345678901234567","operatorApiToken":"synthetic_facebook_operator_sales_0123456789012345678","webhookUrl":"https://example.test/v1/webhooks/meta"},{"id":"whatsapp-business-support","type":"whatsapp_business","appId":"900000000000000003","wabaId":"900000000000000501","phoneNumberId":"900000000000000601","appSecret":"synthetic-facebook-app-secret-$-value-01234567890","webhookVerifyToken":"synthetic-facebook-verify-token-012345678901234567","operatorApiToken":"synthetic_whatsapp_operator_support_012345678901234567","webhookUrl":"https://example.test/v1/webhooks/meta"},{"id":"whatsapp-business-sales","type":"whatsapp_business","appId":"900000000000000003","wabaId":"900000000000000501","phoneNumberId":"900000000000000602","appSecret":"synthetic-facebook-app-secret-$-value-01234567890","webhookVerifyToken":"synthetic-facebook-verify-token-012345678901234567","operatorApiToken":"synthetic_whatsapp_operator_sales_0123456789012345678","webhookUrl":"https://example.test/v1/webhooks/meta"}],"inboxes":[{"id":"support-inbox","token":"synthetic_inbox_support_token_01234567890123456789","connectionIds":["telegram-bot-support","zalo-oa-support","facebook-page-support","whatsapp-business-support"]},{"id":"sales-inbox","token":"synthetic_inbox_sales_token_01234567890123456789012","connectionIds":["telegram-bot-sales","zalo-oa-sales","facebook-page-sales","whatsapp-business-sales"]}]}'
 
 compose=(docker compose --project-name "$project_name" --file compose.yaml)
 
@@ -101,9 +102,10 @@ wait_for_readiness() {
 post_webhook() {
   local connection_id=$1
   local webhook_secret=$2
+  local payload=${3:-$webhook_payload}
 
   curl --fail --silent --show-error --connect-timeout 3 --max-time 10 \
-    --data "$webhook_payload" \
+    --data "$payload" \
     --header 'content-type: application/json' \
     --header "x-telegram-bot-api-secret-token: ${webhook_secret}" \
     --output /dev/null \
@@ -352,6 +354,8 @@ assert_scoped_event_response() {
   if [[ "$response" != *'"success":true'* ||
     "$response" != *"\"connectionId\":\"${expected_connection_id}\""* ||
     "$response" == *"${forbidden_connection_id}"* ||
+    "$response" == *'telegramChatType'* ||
+    "$response" == *'providerIdentityFingerprint'* ||
     "$response" == *'rawProviderPayload'* ]]; then
     printf 'The operator inbound-event API did not remain scoped to the configured connection.\n' >&2
     return 1
@@ -378,6 +382,8 @@ assert_inbox_event_response() {
     "$response" == *"\"connectionId\":\"${forbidden_connection_two}\""* ||
     "$response" == *"\"connectionId\":\"${forbidden_connection_three}\""* ||
     "$response" == *"\"connectionId\":\"${forbidden_connection_four}\""* ||
+    "$response" == *'telegramChatType'* ||
+    "$response" == *'providerIdentityFingerprint'* ||
     "$response" == *'rawProviderPayload'* ]]; then
     printf 'The aggregate inbox API did not preserve configured scope or canonical-only output.\n' >&2
     return 1
@@ -411,6 +417,8 @@ assert_safe_outbound_command_response() {
     "$response" == *'sourceMessageId'* ||
     "$response" == *'sourceChannel'* ||
     "$response" == *'clientOperationId'* ||
+    "$response" == *'telegramChatType'* ||
+    "$response" == *'providerIdentityFingerprint'* ||
     "$response" == *'rawProviderPayload'* ||
     "$response" == *'"raw"'* ||
     "$response" == *'"credentials"'* ||
@@ -442,6 +450,8 @@ assert_safe_outbound_command_history_response() {
     "$response" == *'sourceMessageId'* ||
     "$response" == *'sourceChannel'* ||
     "$response" == *'clientOperationId'* ||
+    "$response" == *'telegramChatType'* ||
+    "$response" == *'providerIdentityFingerprint'* ||
     "$response" == *'rawProviderPayload'* ||
     "$response" == *'"raw"'* ||
     "$response" == *'"credentials"'* ||
@@ -466,6 +476,8 @@ assert_empty_outbound_command_history_response() {
     "$response" == *"${forbidden_text}"* ||
     "$response" == *'replyTargetId'* ||
     "$response" == *'clientOperationId'* ||
+    "$response" == *'telegramChatType'* ||
+    "$response" == *'providerIdentityFingerprint'* ||
     "$response" == *'rawProviderPayload'* ||
     "$response" == *'"raw"'* ||
     "$response" == *'"credentials"'* ||
@@ -603,7 +615,7 @@ assert_equal \
 migration_count="$(
   query_postgres "SELECT COUNT(*) FROM open_channel_hub.schema_migrations;"
 )"
-assert_equal '11' "$migration_count" 'immutable migration ledger entry count'
+assert_equal '12' "$migration_count" 'immutable migration ledger entry count'
 
 connection_registry_records="$(
   query_postgres "SELECT connection_id || ':' || connector_id || ':' || channel || ':' || tier FROM open_channel_hub.connection_registry ORDER BY connection_id;"
@@ -638,12 +650,20 @@ assert_equal \
   'non-secret WhatsApp Business provider identity fingerprints'
 
 telegram_provider_identity_fingerprints="$(
-  query_postgres "SELECT connection_id || ':' || CASE WHEN provider_identity_fingerprint IS NULL THEN 'absent' ELSE 'unexpected' END FROM open_channel_hub.connection_registry WHERE channel = 'telegram_bot' ORDER BY connection_id;"
+  query_postgres "SELECT connection_id || ':' || CASE WHEN provider_identity_fingerprint ~ '^[a-f0-9]{64}$' THEN 'present' ELSE 'missing' END FROM open_channel_hub.connection_registry WHERE channel = 'telegram_bot' ORDER BY connection_id;"
 )"
 assert_equal \
-  $'telegram-bot-sales:absent\ntelegram-bot-support:absent' \
+  $'telegram-bot-sales:present\ntelegram-bot-support:present' \
   "$telegram_provider_identity_fingerprints" \
-  'no unsupported Telegram provider identity fingerprint'
+  'non-secret Telegram Bot provider identity fingerprints'
+
+telegram_chat_types="$(
+  query_postgres "SELECT connection_id || ':' || COALESCE(telegram_chat_type, 'missing') FROM open_channel_hub.inbound_events WHERE channel = 'telegram_bot' ORDER BY connection_id;"
+)"
+assert_equal \
+  $'telegram-bot-sales:private\ntelegram-bot-support:private' \
+  "$telegram_chat_types" \
+  'durable Telegram private-chat evidence'
 
 support_inbound_events_response="$(read_inbound_events "$support_operator_api_token")"
 sales_inbound_events_response="$(read_inbound_events "$sales_operator_api_token")"
@@ -840,6 +860,35 @@ assert_equal \
   "$missing_source_outbound_body" \
   'out-of-scope and missing reply-command source responses'
 
+assert_equal \
+  '204' \
+  "$(post_webhook 'telegram-bot-support' "$support_webhook_secret" "$non_private_telegram_webhook_payload")" \
+  'non-private Telegram webhook receipt status'
+non_private_telegram_event_evidence="$(
+  query_postgres "SELECT CASE WHEN COUNT(*) = 1 AND COUNT(*) FILTER (WHERE telegram_chat_type = 'supergroup') = 1 THEN 'present' ELSE 'missing' END FROM open_channel_hub.inbound_events WHERE connection_id = 'telegram-bot-support' AND provider_event_id = '9002';"
+)"
+assert_equal \
+  'present' \
+  "$non_private_telegram_event_evidence" \
+  'durable non-private Telegram chat evidence'
+non_private_outbound_request_body="$(
+  outbound_command_request_body \
+    'synthetic-reply-non-private-0001' \
+    'telegram-bot-support' \
+    '9002' \
+    "$support_outbound_text"
+)"
+non_private_outbound_response="$(
+  post_inbox_outbound_command "$support_inbox_api_token" "$non_private_outbound_request_body"
+)"
+non_private_outbound_status="$(http_response_status "$non_private_outbound_response")"
+non_private_outbound_body="$(http_response_body "$non_private_outbound_response")"
+assert_equal '404' "$non_private_outbound_status" 'non-private Telegram reply-command source status'
+assert_equal \
+  "$missing_source_outbound_body" \
+  "$non_private_outbound_body" \
+  'non-private and missing reply-command source responses'
+
 support_outbound_history_request_body="$(
   outbound_command_request_body \
     "$support_outbound_history_client_operation_id" \
@@ -884,7 +933,7 @@ support_outbound_source_derivation="$(
   query_postgres "SELECT connection_id || ':' || source_provider_event_id || ':' || reply_target_id || ':' || source_message_id || ':' || source_channel || ':' || state FROM open_channel_hub.outbound_commands WHERE connection_id = 'telegram-bot-support' AND client_operation_id = '${support_outbound_client_operation_id}';"
 )"
 assert_equal \
-  'telegram-bot-support:9001:-1001234567890:301:telegram_bot:queued' \
+  'telegram-bot-support:9001:42:301:telegram_bot:queued' \
   "$support_outbound_source_derivation" \
   'source-derived private reply target, message ID, channel, and queued state'
 
@@ -892,6 +941,22 @@ outbound_command_schema_guards="$(
   query_postgres "SELECT CASE WHEN (SELECT COUNT(*) FROM pg_constraint WHERE conrelid = 'open_channel_hub.outbound_commands'::regclass AND conname IN ('outbound_commands_source_event_fk', 'outbound_commands_connection_client_operation_unique')) = 2 AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'open_channel_hub.outbound_commands'::regclass AND tgname = 'outbound_commands_immutable' AND NOT tgisinternal) THEN 'present' ELSE 'missing' END;"
 )"
 assert_equal 'present' "$outbound_command_schema_guards" 'source foreign key, idempotency constraint, and immutable trigger'
+
+outbound_telegram_command_eligibility_schema_guards="$(
+  query_postgres "SELECT CASE WHEN to_regclass('open_channel_hub.outbound_telegram_command_eligibility') IS NOT NULL AND (SELECT string_agg(column_name, ',' ORDER BY ordinal_position) FROM information_schema.columns WHERE table_schema = 'open_channel_hub' AND table_name = 'outbound_telegram_command_eligibility') = 'command_id,bot_identity_fingerprint,source_chat_type,recorded_at' AND (SELECT COUNT(*) FROM pg_constraint WHERE conrelid = 'open_channel_hub.outbound_telegram_command_eligibility'::regclass AND conname IN ('outbound_telegram_command_eligibility_command_fk', 'outbound_telegram_command_eligibility_bot_identity_fingerprint_format', 'outbound_telegram_command_eligibility_source_chat_type_private')) = 3 AND (SELECT COUNT(*) FROM pg_constraint WHERE conrelid = 'open_channel_hub.outbound_telegram_command_eligibility'::regclass AND contype = 'p' AND conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'open_channel_hub.outbound_telegram_command_eligibility'::regclass AND attname = 'command_id' AND NOT attisdropped)]) = 1 AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'open_channel_hub.outbound_telegram_command_eligibility'::regclass AND tgname = 'outbound_telegram_command_eligibility_immutable' AND NOT tgisinternal) THEN 'present' ELSE 'missing' END;"
+)"
+assert_equal \
+  'present' \
+  "$outbound_telegram_command_eligibility_schema_guards" \
+  'Telegram private-reply eligibility table, constraints, and immutable trigger'
+
+support_outbound_telegram_eligibility="$(
+  query_postgres "SELECT CASE WHEN COUNT(*) = 2 AND COUNT(*) FILTER (WHERE eligibility.source_chat_type = 'private' AND eligibility.bot_identity_fingerprint ~ '^[a-f0-9]{64}$') = 2 THEN 'present' ELSE 'missing' END FROM open_channel_hub.outbound_telegram_command_eligibility eligibility JOIN open_channel_hub.outbound_commands command ON command.command_id = eligibility.command_id WHERE command.connection_id = 'telegram-bot-support' AND command.client_operation_id IN ('${support_outbound_client_operation_id}', '${support_outbound_history_client_operation_id}');"
+)"
+assert_equal \
+  'present' \
+  "$support_outbound_telegram_eligibility" \
+  'private source and Bot identity evidence captured with each Telegram command'
 
 outbound_delivery_evidence_schema_guards="$(
   query_postgres "SELECT CASE WHEN to_regclass('open_channel_hub.outbound_delivery_attempts') IS NOT NULL AND to_regclass('open_channel_hub.outbound_delivery_attempt_receipts') IS NOT NULL AND (SELECT COUNT(*) FROM pg_constraint WHERE conrelid = 'open_channel_hub.outbound_delivery_attempts'::regclass AND conname = 'outbound_delivery_attempts_command_fk') = 1 AND (SELECT COUNT(*) FROM pg_constraint WHERE conrelid = 'open_channel_hub.outbound_delivery_attempts'::regclass AND contype = 'u' AND conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'open_channel_hub.outbound_delivery_attempts'::regclass AND attname = 'command_id' AND NOT attisdropped)]) = 1 AND (SELECT COUNT(*) FROM pg_constraint WHERE conrelid = 'open_channel_hub.outbound_delivery_attempt_receipts'::regclass AND conname IN ('outbound_delivery_attempt_receipts_attempt_fk', 'outbound_delivery_attempt_receipts_outcome_known', 'outbound_delivery_attempt_receipts_provider_message_id_format', 'outbound_delivery_attempt_receipts_provider_message_id_outcome')) = 4 AND (SELECT COUNT(*) FROM pg_constraint WHERE conrelid = 'open_channel_hub.outbound_delivery_attempt_receipts'::regclass AND contype = 'p' AND conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'open_channel_hub.outbound_delivery_attempt_receipts'::regclass AND attname = 'attempt_id' AND NOT attisdropped)]) = 1 AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'open_channel_hub.outbound_delivery_attempts'::regclass AND tgname = 'outbound_delivery_attempts_immutable' AND NOT tgisinternal) AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'open_channel_hub.outbound_delivery_attempt_receipts'::regclass AND tgname = 'outbound_delivery_attempt_receipts_immutable' AND NOT tgisinternal) THEN 'present' ELSE 'missing' END;"

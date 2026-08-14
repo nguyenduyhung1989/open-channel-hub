@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 
+import { CHANNELS, type Channel, type TelegramChatType } from '@open-channel-hub/contracts';
 import type {
   CreateOutboundReplyCommandResult,
   OutboundReplyCommand,
@@ -44,13 +45,26 @@ const FIND_IDEMPOTENCY_COMMAND_SQL = `
 SELECT
 ${COMMAND_COLUMNS_SQL},
   outbound_command.message_text,
+  outbound_command.source_channel AS command_source_channel,
   command_authorization.authorization_kind,
   command_authorization.inbox_id,
   command_authorization.dashboard_principal_id,
-  command_authorization.scope_fingerprint
+  command_authorization.scope_fingerprint,
+  source.channel AS source_channel,
+  source.telegram_chat_type,
+  source_registry.provider_identity_fingerprint AS current_provider_identity_fingerprint,
+  telegram_eligibility.bot_identity_fingerprint,
+  telegram_eligibility.source_chat_type AS eligibility_source_chat_type
 FROM ${POSTGRES_SCHEMA}.outbound_commands AS outbound_command
 LEFT JOIN ${POSTGRES_SCHEMA}.outbound_command_authorizations AS command_authorization
   ON command_authorization.command_id = outbound_command.command_id
+JOIN ${POSTGRES_SCHEMA}.inbound_events AS source
+  ON source.connection_id = outbound_command.connection_id
+  AND source.provider_event_id = outbound_command.source_provider_event_id
+LEFT JOIN ${POSTGRES_SCHEMA}.connection_registry AS source_registry
+  ON source_registry.connection_id = source.connection_id
+LEFT JOIN ${POSTGRES_SCHEMA}.outbound_telegram_command_eligibility AS telegram_eligibility
+  ON telegram_eligibility.command_id = outbound_command.command_id
 WHERE outbound_command.connection_id = $1
   AND outbound_command.client_operation_id = $2
   AND outbound_command.connection_id = ANY($3::text[])
@@ -62,6 +76,31 @@ WHERE outbound_command.connection_id = $1
  * source-message id, or channel field that could be tampered with.
  */
 const INSERT_SOURCE_BOUND_COMMAND_SQL = `
+WITH eligible_source AS (
+  SELECT
+    source.connection_id,
+    source.provider_event_id,
+    source.conversation_id,
+    source.message_id,
+    source.channel,
+    source.telegram_chat_type,
+    source_registry.provider_identity_fingerprint
+  FROM ${POSTGRES_SCHEMA}.inbound_events AS source
+  LEFT JOIN ${POSTGRES_SCHEMA}.connection_registry AS source_registry
+    ON source_registry.connection_id = source.connection_id
+  WHERE source.connection_id = $1
+    AND source.provider_event_id = $2
+    AND source.connection_id = ANY($5::text[])
+    AND (
+      source.channel <> 'telegram_bot'
+      OR (
+        source.telegram_chat_type = 'private'
+        AND source_registry.channel = 'telegram_bot'
+        AND source_registry.provider_identity_fingerprint ~ '^[a-f0-9]{64}$'
+      )
+    )
+),
+inserted AS (
 INSERT INTO ${POSTGRES_SCHEMA}.outbound_commands AS outbound_command (
   connection_id,
   source_provider_event_id,
@@ -73,21 +112,34 @@ INSERT INTO ${POSTGRES_SCHEMA}.outbound_commands AS outbound_command (
   state
 )
 SELECT
-  source.connection_id,
-  source.provider_event_id,
+  eligible_source.connection_id,
+  eligible_source.provider_event_id,
   $3,
-  source.conversation_id,
-  source.message_id,
-  source.channel,
+  eligible_source.conversation_id,
+  eligible_source.message_id,
+  eligible_source.channel,
   $4,
   'queued'
-FROM ${POSTGRES_SCHEMA}.inbound_events AS source
-WHERE source.connection_id = $1
-  AND source.provider_event_id = $2
-  AND source.connection_id = ANY($5::text[])
+FROM eligible_source
 ON CONFLICT (connection_id, client_operation_id) DO NOTHING
 RETURNING
-${COMMAND_COLUMNS_SQL}
+  outbound_command.command_id::text AS command_id,
+  outbound_command.connection_id,
+  outbound_command.source_provider_event_id,
+  outbound_command.state,
+  to_char(outbound_command.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at
+)
+SELECT
+  inserted.command_id,
+  inserted.connection_id,
+  inserted.source_provider_event_id,
+  inserted.state,
+  inserted.created_at,
+  eligible_source.channel AS source_channel,
+  eligible_source.telegram_chat_type,
+  eligible_source.provider_identity_fingerprint
+FROM inserted
+CROSS JOIN eligible_source
 `;
 
 const INSERT_OUTBOUND_COMMAND_AUTHORIZATION_SQL = `
@@ -107,6 +159,19 @@ RETURNING
   scope_fingerprint
 `;
 
+const INSERT_TELEGRAM_COMMAND_ELIGIBILITY_SQL = `
+INSERT INTO ${POSTGRES_SCHEMA}.outbound_telegram_command_eligibility (
+  command_id,
+  bot_identity_fingerprint,
+  source_chat_type
+)
+VALUES ($1::bigint, $2, $3)
+RETURNING
+  command_id::text AS command_id,
+  bot_identity_fingerprint,
+  source_chat_type
+`;
+
 type ValidatedCreateInput = Readonly<{
   allowedConnectionIds: readonly string[];
   authorization: OutboundReplyCommandAuthorization;
@@ -122,10 +187,28 @@ type StoredCommandAuthorization = Readonly<{
   scopeFingerprint: string;
 }>;
 
+type TelegramCommandEligibility = Readonly<{
+  botIdentityFingerprint: string;
+  sourceChatType: 'private';
+}>;
+
+type StoredTelegramCommandState = Readonly<{
+  currentBotIdentityFingerprint: string | undefined;
+  currentSourceChatType: TelegramChatType | undefined;
+  eligibility: TelegramCommandEligibility | undefined;
+  sourceChannel: Channel;
+}>;
+
 type StoredIdempotencyCommand = Readonly<{
   authorization: StoredCommandAuthorization | undefined;
   command: OutboundReplyCommand;
   messageText: string;
+  telegram: StoredTelegramCommandState;
+}>;
+
+type InsertedSourceBoundCommand = Readonly<{
+  command: OutboundReplyCommand;
+  telegramEligibility: TelegramCommandEligibility | undefined;
 }>;
 
 /**
@@ -217,8 +300,10 @@ export class PostgresOutboundReplyCommandStore implements OutboundReplyCommandSt
         throw new PostgresStorageError();
       }
 
-      const command = parsePublicCommand(row, input.sourceConnectionId);
+      const created = parseInsertedSourceBoundCommand(row, input.sourceConnectionId);
+      const command = created.command;
       await this.insertAuthorization(client, command, input);
+      await this.insertTelegramEligibility(client, command, created.telegramEligibility);
 
       return Object.freeze({
         command,
@@ -256,6 +341,24 @@ export class PostgresOutboundReplyCommandStore implements OutboundReplyCommandSt
     ]);
 
     assertInsertedAuthorization(result.rows, command.id, input);
+  }
+
+  private async insertTelegramEligibility(
+    client: SqlClient,
+    command: OutboundReplyCommand,
+    eligibility: TelegramCommandEligibility | undefined
+  ): Promise<void> {
+    if (eligibility === undefined) {
+      return;
+    }
+
+    const result = await client.query(INSERT_TELEGRAM_COMMAND_ELIGIBILITY_SQL, [
+      command.id,
+      eligibility.botIdentityFingerprint,
+      eligibility.sourceChatType
+    ]);
+
+    assertInsertedTelegramEligibility(result.rows, command.id, eligibility);
   }
 }
 
@@ -329,8 +432,40 @@ const parseOptionalStoredCommand = (
   return Object.freeze({
     authorization: parseStoredAuthorization(row),
     command: parsePublicCommand(row, expectedConnectionId),
-    messageText: row.message_text
+    messageText: row.message_text,
+    telegram: parseStoredTelegramCommandState(row)
   });
+};
+
+const parseInsertedSourceBoundCommand = (
+  row: Readonly<Record<string, unknown>>,
+  expectedConnectionId: string
+): InsertedSourceBoundCommand => {
+  const command = parsePublicCommand(row, expectedConnectionId);
+  const sourceChannel = row.source_channel;
+
+  if (!isChannel(sourceChannel)) {
+    throw new PostgresStorageError();
+  }
+
+  if (sourceChannel !== 'telegram_bot') {
+    if (row.telegram_chat_type !== null) {
+      throw new PostgresStorageError();
+    }
+
+    return Object.freeze({ command, telegramEligibility: undefined });
+  }
+
+  const telegramEligibility = parseTelegramCommandEligibility(
+    row.provider_identity_fingerprint,
+    row.telegram_chat_type
+  );
+
+  if (telegramEligibility === undefined) {
+    throw new PostgresStorageError();
+  }
+
+  return Object.freeze({ command, telegramEligibility });
 };
 
 const parsePublicCommand = (
@@ -369,7 +504,8 @@ const classifyExisting = (
 ): CreateOutboundReplyCommandResult =>
   existing.command.sourceProviderEventId === input.sourceProviderEventId &&
   existing.messageText === input.text &&
-  hasSameAuthorization(existing.authorization, input)
+  hasSameAuthorization(existing.authorization, input) &&
+  hasMatchingTelegramEligibility(existing.telegram)
     ? Object.freeze({ command: existing.command, kind: 'idempotent_replay' })
     : Object.freeze({ kind: 'idempotency_conflict' });
 
@@ -391,6 +527,30 @@ const assertInsertedAuthorization = (
   const authorization = parseStoredAuthorization(row);
 
   if (authorization === undefined || !hasSameAuthorization(authorization, input)) {
+    throw new PostgresStorageError();
+  }
+};
+
+const assertInsertedTelegramEligibility = (
+  rows: readonly Readonly<Record<string, unknown>>[],
+  expectedCommandId: string,
+  expected: TelegramCommandEligibility
+): void => {
+  if (rows.length !== 1) {
+    throw new PostgresStorageError();
+  }
+
+  const row = rows[0];
+  const inserted =
+    row === undefined
+      ? undefined
+      : parseTelegramCommandEligibility(row.bot_identity_fingerprint, row.source_chat_type);
+
+  if (
+    row?.command_id !== expectedCommandId ||
+    inserted === undefined ||
+    !sameTelegramEligibility(inserted, expected)
+  ) {
     throw new PostgresStorageError();
   }
 };
@@ -432,6 +592,79 @@ const parseStoredAuthorization = (
 
   throw new PostgresStorageError();
 };
+
+const parseStoredTelegramCommandState = (
+  row: Readonly<Record<string, unknown>>
+): StoredTelegramCommandState => {
+  const commandSourceChannel = row.command_source_channel;
+  const sourceChannel = row.source_channel;
+
+  if (
+    !isChannel(commandSourceChannel) ||
+    !isChannel(sourceChannel) ||
+    commandSourceChannel !== sourceChannel
+  ) {
+    throw new PostgresStorageError();
+  }
+
+  const currentSourceChatType =
+    row.telegram_chat_type === null
+      ? undefined
+      : isTelegramChatType(row.telegram_chat_type)
+        ? row.telegram_chat_type
+        : undefined;
+  const currentBotIdentityFingerprint =
+    row.current_provider_identity_fingerprint === null
+      ? undefined
+      : isSha256Hex(row.current_provider_identity_fingerprint)
+        ? row.current_provider_identity_fingerprint
+        : undefined;
+  const eligibility =
+    row.bot_identity_fingerprint === null && row.eligibility_source_chat_type === null
+      ? undefined
+      : parseTelegramCommandEligibility(
+          row.bot_identity_fingerprint,
+          row.eligibility_source_chat_type
+        );
+
+  if (
+    sourceChannel !== 'telegram_bot' &&
+    (currentSourceChatType !== undefined || eligibility !== undefined)
+  ) {
+    throw new PostgresStorageError();
+  }
+
+  return Object.freeze({
+    currentBotIdentityFingerprint,
+    currentSourceChatType,
+    eligibility,
+    sourceChannel
+  });
+};
+
+const parseTelegramCommandEligibility = (
+  botIdentityFingerprint: unknown,
+  sourceChatType: unknown
+): TelegramCommandEligibility | undefined =>
+  isSha256Hex(botIdentityFingerprint) && sourceChatType === 'private'
+    ? Object.freeze({ botIdentityFingerprint, sourceChatType })
+    : undefined;
+
+const hasMatchingTelegramEligibility = (stored: StoredTelegramCommandState): boolean =>
+  stored.sourceChannel !== 'telegram_bot'
+    ? stored.eligibility === undefined
+    : stored.currentSourceChatType === 'private' &&
+      stored.currentBotIdentityFingerprint !== undefined &&
+      stored.eligibility !== undefined &&
+      stored.eligibility.sourceChatType === stored.currentSourceChatType &&
+      stored.eligibility.botIdentityFingerprint === stored.currentBotIdentityFingerprint;
+
+const sameTelegramEligibility = (
+  left: TelegramCommandEligibility,
+  right: TelegramCommandEligibility
+): boolean =>
+  left.botIdentityFingerprint === right.botIdentityFingerprint &&
+  left.sourceChatType === right.sourceChatType;
 
 const hasSameAuthorization = (
   stored: StoredCommandAuthorization | undefined,
@@ -519,6 +752,12 @@ const isMessageText = (value: unknown): value is string =>
 
 const isSha256Hex = (value: unknown): value is string =>
   typeof value === 'string' && SHA256_HEX_PATTERN.test(value);
+
+const isChannel = (value: unknown): value is Channel =>
+  typeof value === 'string' && (CHANNELS as readonly string[]).includes(value);
+
+const isTelegramChatType = (value: unknown): value is TelegramChatType =>
+  value === 'private' || value === 'group' || value === 'supergroup' || value === 'channel';
 
 const isPostgresBigInt = (value: unknown): value is string =>
   typeof value === 'string' &&

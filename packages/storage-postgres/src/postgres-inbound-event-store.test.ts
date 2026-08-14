@@ -19,6 +19,7 @@ const EVENT: CanonicalEvent = Object.freeze({
   }),
   occurredAt: '2026-08-12T00:00:00.000Z',
   providerEventId: '9001',
+  telegramChatType: 'private',
   type: 'message.received'
 });
 
@@ -47,10 +48,11 @@ describe('PostgresInboundEventStore', () => {
         '42',
         '301',
         '42',
-        "Synthetic text with quote ' and SQL-looking punctuation; --"
+        "Synthetic text with quote ' and SQL-looking punctuation; --",
+        'private'
       ]
     });
-    expect(pool.client.queries[2]?.sql).toContain('$10');
+    expect(pool.client.queries[2]?.sql).toContain('$11');
     expect(pool.client.queries[2]?.sql).toContain(
       'ON CONFLICT (connection_id, provider_event_id) DO NOTHING'
     );
@@ -75,7 +77,47 @@ describe('PostgresInboundEventStore', () => {
     ]);
     expect(pool.client.released).toBe(true);
   });
+
+  it('rejects Telegram chat evidence that would violate the durable channel boundary before opening a transaction', async () => {
+    const withoutTelegramChatType = eventWithoutTelegramChatType();
+    const invalidEvents: readonly CanonicalEvent[] = [
+      Object.freeze(withoutTelegramChatType),
+      Object.freeze({ ...EVENT, telegramChatType: 'unsupported' as never }),
+      Object.freeze({ ...EVENT, channel: 'zalo_oa' as const })
+    ];
+
+    for (const event of invalidEvents) {
+      const pool = createSqlPool();
+
+      await expect(new PostgresInboundEventStore(pool).append([event])).rejects.toMatchObject({
+        message: 'PostgreSQL storage is unavailable.',
+        name: 'PostgresStorageError'
+      });
+      expect(pool.client.queries).toEqual([]);
+    }
+  });
+
+  it('stores no Telegram chat evidence for a non-Telegram canonical event', async () => {
+    const pool = createSqlPool();
+    const withoutTelegramChatType = eventWithoutTelegramChatType();
+    const nonTelegram = Object.freeze({ ...withoutTelegramChatType, channel: 'zalo_oa' as const });
+
+    await new PostgresInboundEventStore(pool).append([nonTelegram]);
+
+    expect(pool.client.queries[2]?.values.at(-1)).toBeNull();
+  });
 });
+
+const eventWithoutTelegramChatType = (): Omit<CanonicalEvent, 'telegramChatType'> =>
+  Object.freeze({
+    channel: EVENT.channel,
+    connectionId: EVENT.connectionId,
+    id: EVENT.id,
+    message: EVENT.message,
+    occurredAt: EVENT.occurredAt,
+    providerEventId: EVENT.providerEventId,
+    type: EVENT.type
+  });
 
 interface RecordedQuery {
   readonly sql: string;

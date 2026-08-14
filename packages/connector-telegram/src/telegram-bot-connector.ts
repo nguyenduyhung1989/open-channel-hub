@@ -118,6 +118,7 @@ export class TelegramBotConnectorAdapter implements ConnectorAdapter {
         },
         occurredAt: new Date(message.date * 1000).toISOString(),
         providerEventId: String(update.update_id),
+        telegramChatType: message.chat.type,
         type: 'message.received'
       }
     ];

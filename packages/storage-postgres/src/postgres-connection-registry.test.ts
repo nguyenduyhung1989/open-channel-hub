@@ -9,6 +9,7 @@ const REGISTRATION_A: ConnectionRegistration = Object.freeze({
   id: 'telegram-bot-support-a',
   connectorId: 'telegram-bot',
   channel: 'telegram_bot',
+  providerIdentityFingerprint: '1111111111111111111111111111111111111111111111111111111111111111',
   tier: 'OFFICIAL'
 });
 
@@ -16,6 +17,7 @@ const REGISTRATION_B: ConnectionRegistration = Object.freeze({
   id: 'telegram-bot-support-b',
   connectorId: 'telegram-bot',
   channel: 'telegram_bot',
+  providerIdentityFingerprint: '2222222222222222222222222222222222222222222222222222222222222222',
   tier: 'OFFICIAL'
 });
 
@@ -67,7 +69,13 @@ describe('PostgresConnectionRegistry', () => {
     ]);
     const insertQuery = pool.client.queries[3];
     expect(insertQuery).toMatchObject({
-      values: ['telegram-bot-support-a', 'telegram-bot', 'telegram_bot', null, 'OFFICIAL']
+      values: [
+        'telegram-bot-support-a',
+        'telegram-bot',
+        'telegram_bot',
+        '1111111111111111111111111111111111111111111111111111111111111111',
+        'OFFICIAL'
+      ]
     });
     expect(insertQuery?.sql).toContain('$1');
     expect(insertQuery?.sql).toContain('$5');
@@ -119,6 +127,55 @@ describe('PostgresConnectionRegistry', () => {
     );
     expect(pool.records).toEqual([]);
     expect(pool.client.queries.map((query) => query.sql)).toContain('ROLLBACK');
+  });
+
+  it('requires, preserves, and protects an opaque Telegram Bot provider identity', async () => {
+    const invalid = Object.freeze({
+      channel: 'telegram_bot' as const,
+      connectorId: 'telegram-bot',
+      id: 'telegram-bot-without-identity',
+      tier: 'OFFICIAL' as const
+    } satisfies ConnectionRegistration);
+    const rebound = Object.freeze({
+      ...REGISTRATION_A,
+      providerIdentityFingerprint:
+        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+    });
+
+    await expect(
+      new PostgresConnectionRegistry(createRegistryPool()).ensureRegistered([invalid])
+    ).rejects.toBeInstanceOf(PostgresStorageError);
+    await expect(
+      new PostgresConnectionRegistry(createRegistryPool([REGISTRATION_A])).ensureRegistered([
+        rebound
+      ])
+    ).rejects.toBeInstanceOf(PostgresStorageError);
+  });
+
+  it('rejects first binding a Telegram Bot id with historical events and permits a no-history registry upgrade', async () => {
+    await expect(
+      new PostgresConnectionRegistry(
+        createRegistryPool({ historicalConnectionIds: [REGISTRATION_A.id] })
+      ).ensureRegistered([REGISTRATION_A])
+    ).rejects.toBeInstanceOf(PostgresStorageError);
+
+    const legacyWithoutIdentity = Object.freeze({
+      channel: REGISTRATION_A.channel,
+      connectorId: REGISTRATION_A.connectorId,
+      id: REGISTRATION_A.id,
+      tier: REGISTRATION_A.tier
+    } satisfies ConnectionRegistration);
+    const pool = createRegistryPool([legacyWithoutIdentity]);
+
+    await expect(
+      new PostgresConnectionRegistry(pool).ensureRegistered([REGISTRATION_A])
+    ).resolves.toBeUndefined();
+    expect(pool.records).toEqual([REGISTRATION_A]);
+    expect(
+      pool.client.queries.find((query) =>
+        query.sql.includes('INSERT INTO open_channel_hub.connection_registry')
+      )?.sql
+    ).toContain('provider_identity_fingerprint = EXCLUDED.provider_identity_fingerprint');
   });
 
   it('requires an opaque provider identity fingerprint for a Facebook Page registration', async () => {
@@ -370,10 +427,30 @@ const createRegistryPool = (
           if (
             existing.connectorId !== connectorId ||
             existing.channel !== channel ||
-            (existing.providerIdentityFingerprint ?? null) !== providerIdentityFingerprint ||
             existing.tier !== tier
           ) {
             return Object.freeze({ rows: [] });
+          }
+
+          const existingFingerprint = existing.providerIdentityFingerprint ?? null;
+          const canAdoptNoHistoryIdentity =
+            existingFingerprint === null &&
+            typeof providerIdentityFingerprint === 'string' &&
+            options.historicalConnectionIds?.includes(id) !== true &&
+            sql.includes('provider_identity_fingerprint = EXCLUDED.provider_identity_fingerprint');
+
+          if (existingFingerprint !== providerIdentityFingerprint && !canAdoptNoHistoryIdentity) {
+            return Object.freeze({ rows: [] });
+          }
+
+          if (canAdoptNoHistoryIdentity) {
+            const updated: ConnectionRegistration = Object.freeze({
+              ...existing,
+              providerIdentityFingerprint
+            });
+            transactionRecords.set(id, updated);
+
+            return Object.freeze({ rows: [toRow(updated)] });
           }
 
           return Object.freeze({ rows: [toRow(existing)] });

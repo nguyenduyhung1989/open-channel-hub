@@ -167,7 +167,8 @@ independent review, and fresh GitHub CI/CodeQL are complete for exact commit
 - [x] A forward-only registry migration that binds each Zalo connection ID to a
       non-secret SHA-256 fingerprint of its configured `(appId, oaId)` pair. It
       prevents an ID with durable Zalo history from being silently rebound; it
-      does not assert an equivalent Telegram provider-account identity.
+      did not itself assert an equivalent Telegram provider-account identity;
+      candidate Phase 4i adds that separate Telegram-specific boundary.
 - [x] No OAuth, access-token storage/refresh, provider HTTP client, outbound
       messages, attachments, Zalo User, automatic webhook registration, or live
       provider request.
@@ -510,6 +511,36 @@ deployment.
       independent review, run the synthetic Compose proof, and verify GitHub
       CI/CodeQL before calling this source verified.
 
+### 4i — Telegram private-reply eligibility evidence
+
+**Status: candidate source; verification is not complete.**
+
+- [x] Forward migration
+      <code>0012_telegram_private_reply_eligibility</code> preserves one of
+      Telegram's documented chat types (`private`, `group`, `supergroup`, or
+      `channel`) for a newly stored Telegram inbound event. It leaves historic
+      rows as unknown and does not expose this internal field through public
+      readers or dashboard HTML.
+- [x] A Telegram connection registration now requires a domain-separated
+      non-secret SHA-256 fingerprint derived from the numeric Bot-ID prefix of
+      the configured `<bot-id>:<secret>` token. It never stores the prefix or
+      secret. A historic connection with inbound rows and no prior fingerprint
+      cannot be silently adopted; use a new connection ID instead.
+- [x] A new Telegram reply command can be recorded only from a durable private
+      source with a current Bot fingerprint. Its command, Phase 4h authority
+      provenance, and one immutable `outbound_telegram_command_eligibility`
+      row are one PostgreSQL transaction.
+- [x] Group, supergroup, channel, unknown historic chat type, missing/changed
+      Bot binding, missing source, and out-of-scope source fail closed. A
+      Telegram command predating this row is not adopted by an idempotent
+      replay. Non-Telegram command behavior stays unchanged.
+- [x] No provider request, SDK, credential/OAuth storage, worker, dispatcher,
+      retry, attempt write, receipt write, browser field, command mutation,
+      delivery/read state, or live-provider test is introduced.
+- [ ] Freeze the exact source, run final local verification, complete
+      independent review, run the synthetic Compose proof, and verify GitHub
+      CI/CodeQL before calling this source verified.
+
 ### Later Phase 4 work
 
 - Full user accounts/organizations, tested RBAC, invitation/password-reset
@@ -519,8 +550,8 @@ deployment.
   assurance.
 - Provider-specific dispatch policy/capabilities, timeout uncertainty,
   delivery/read status, and retries only after official provider review and a
-  separate security boundary. Phase 4g evidence and Phase 4h provenance are
-  not any of those delivery capabilities.
+  separate security boundary. Phase 4g evidence, Phase 4h provenance, and
+  Phase 4i private-reply evidence are not any of those delivery capabilities.
 
 ## Phase 5 — experimental connectors, only with evidence
 

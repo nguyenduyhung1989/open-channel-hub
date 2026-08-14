@@ -1,4 +1,4 @@
-# Phase 0–4h threat model
+# Phase 0–4i threat model
 
 **Review date:** 2026-08-14
 
@@ -31,9 +31,10 @@ with zero high/medium findings, and those two GitHub checks. No live Telegram,
 Zalo, Meta, public TLS, provider send, or production flow has been used. Phase
 4g is a storage-only verified source; its evidence does not prove live provider
 I/O, provider acceptance, delivery, read status, or production deployment.
-Phase 4h is a candidate-only immutable authorization-provenance change. It has
-not yet received final local, independent, synthetic Compose, or GitHub
-verification and does not authorize provider I/O.
+Phases 4h–4i are candidate-only changes. They have not yet received final
+local, independent, synthetic Compose, or GitHub verification and do not
+authorize provider I/O. Phase 4i adds only internal Telegram private-chat and
+Bot-identity evidence; it does not add a sender.
 
 ## Facts before plans
 
@@ -44,6 +45,7 @@ verification and does not authorize provider I/O.
 | Runtime multi-connection JSON is parsed only from an absolute secret file. It accepts strict `telegram_bot`, `zalo_oa`, `facebook_page`, and `whatsapp_business` entries, optional `inboxes`, and optional `dashboard` principals with an exact public HTTPS origin and exact-profile Argon2id password hashes. Phase 4f adds optional principal `replyIntentInboxIds` as an explicit subset of readable inboxes.                                                                                                                                                                           | Configuration loader tests use synthetic documents and reject malformed/duplicate/unsafe input without leaking content. A Meta App used by both Facebook Page and WhatsApp requires matching credentials and one common declared `/v1/webhooks/meta` callback. Phase 4f checks passed at `74fca30`.                                                                                                                                                                         | Managed secret store, rotation procedure, host hardening, and audit logging.                                                                                                 |
 | Provider webhook routes resolve configured accounts internally; account bearers resolve one account; inbox bearers resolve one explicit connection set; dashboard sessions resolve one configured principal and then its configured inboxes. A configured inbox bearer can record a source-bound reply intent and read its queued history; the target remains private and history exposes recorded text only. Phase 4f requires an explicit principal write subset before a narrow dashboard closure can record the same intent. Zalo checks raw JSON hashing; Meta checks raw Buffer HMAC. | Route tests cover bearer scoping, wrong-secret/unknown-identity equivalence, raw-byte signature mismatch, Page/WABA batch isolation, Meta challenge handling, shared callback dispatch, inbox bearer/cursor scope rejection, canonical-only output, dashboard controls, and source-bound command/history controls with synthetic features. Phase 4f checks passed at `74fca30`.                                                                                             | Full user login/organization/RBAC model, distributed rate limit, audit trail, public connection administration, provider dispatch policy, and provider timing/load evidence. |
 | Candidate Phase 4h code creates one immutable authorization-provenance row alongside each new reply command. It stores only kind, configured inbox ID, optional dashboard principal ID, scope fingerprint, and time; old command rows are not backfilled.                                                                                                                                                                                                                                                                                                                                   | Verification is pending. The candidate has no public API field or browser field for provenance and no provider I/O.                                                                                                                                                                                                                                                                                                                                                         | A current authorization recheck, legacy-command policy, provider eligibility, dispatcher, retry policy, and production deployment.                                           |
+| Candidate Phase 4i code preserves the allowed Telegram chat type only internally, binds new Telegram registrations to an opaque Bot fingerprint, and records an immutable private-chat eligibility row with a new Telegram command. Historic rows are not backfilled or adopted.                                                                                                                                                                                                                                                                                                            | Verification is pending. The candidate does not project chat type or fingerprint to public readers/dashboard and makes no provider request.                                                                                                                                                                                                                                                                                                                                 | Current provider policy, command selection, sender, attempt ordering, timeout/receipt handling, live-provider/TLS, and production verification.                              |
 
 Do not treat a source fact, historical CI result, or synthetic proof as a
 production claim.
@@ -135,6 +137,28 @@ production claim.
   No provider request, worker, queue, dispatcher, retry, browser send control,
   delivery/read state, or live-provider test is in scope.
 
+## Phase 4i candidate Telegram private-reply boundary
+
+- `0012_telegram_private_reply_eligibility` stores only the four recognized
+  Telegram chat types for new Telegram inbound rows. A non-Telegram row cannot
+  carry this field, and historic missing data remains unknown rather than being
+  inferred from a raw payload or command.
+- The runtime accepts a Telegram Bot token only in `<numeric Bot ID>:<secret>`
+  form and computes a domain-separated SHA-256 fingerprint from the numeric
+  prefix only. It neither stores nor returns the prefix or secret. A Telegram
+  registration requires the fingerprint; a historical registry row with
+  inbound history and no fingerprint cannot be silently adopted.
+- A new Telegram command needs a private source, a current registry fingerprint,
+  Phase 4h provenance, and a matching one-to-one immutable eligibility record
+  in the same transaction. Group, supergroup, channel, missing chat evidence,
+  missing/changed Bot identity, missing source, and out-of-scope source fail
+  closed through the existing generic source-unavailable boundary.
+- The chat type and fingerprint do not enter account readers, inbox readers,
+  queued history, dashboard HTML, or browser form fields. Old Telegram commands
+  without eligibility are conflicts on replay rather than being adopted.
+- No Telegram provider HTTP request, worker, dispatcher, retry, attempt/receipt
+  write, delivery result, or live-provider test is in scope.
+
 ## Trust zones and data flow
 
 ### Zone A — external and untrusted
@@ -172,10 +196,11 @@ fingerprint, and the closure itself remain server-side.
 
 This zone contains the Docker volume, database, schema, migration ledger,
 connection registry, dashboard session table, source-bound reply-command table,
-candidate authorization-provenance table, and canonical inbound events. The
-registry contains opaque internal connection ID, connector metadata, and — only
-for Zalo OA, Facebook Page, and WhatsApp Business — domain-separated SHA-256
-account-binding fingerprints. The dashboard-session table contains only
+candidate authorization-provenance and Telegram-eligibility tables, and
+canonical inbound events. The registry contains opaque internal connection ID,
+connector metadata, and domain-separated SHA-256 account-binding fingerprints
+for Zalo OA, Facebook Page, WhatsApp Business, and candidate Telegram
+registrations. The dashboard-session table contains only
 domain-separated HMACs of random browser token values, local principal ID, and
 lifecycle timestamps. Neither table contains raw provider identifiers,
 credentials, raw browser tokens, or password hashes. The reply-command table
@@ -199,6 +224,11 @@ only the internal authority kind, configured inbox ID, optional dashboard
 principal ID, scope fingerprint, and time. The adapter derives this evidence
 from its server-owned scope and writes it atomically with a new command; it
 does not persist any credential or make current authorization/delivery claims.
+
+The Phase 4i candidate adds an internal inbound chat-type field and a separate
+append-only Telegram eligibility table. It retains only a command reference,
+opaque Bot fingerprint, `private`, and recording time. Neither field is a
+current send authorization or provider delivery claim.
 
 The intended path is:
 
@@ -237,6 +267,10 @@ does not copy an authority tuple from that form/API input: it resolves the
 fixed principal-and-inbox closure, then supplies kind, principal, and scope
 fingerprint itself.
 
+For a candidate Phase 4i Telegram command, the same transaction additionally
+requires private chat evidence and a current Bot binding before it writes the
+eligibility snapshot. Neither comes from the caller's request body.
+
 Raw provider payloads, runtime credentials, and caller-chosen recipient IDs do
 not cross the storage boundary.
 
@@ -261,6 +295,9 @@ not cross the storage boundary.
   text, authenticated dashboard HTML that renders a smaller queued-text
   projection, the Phase 4f form's hidden source transport values, and the
   PostgreSQL volume that holds them.
+- Candidate Telegram chat-type evidence and opaque Bot-identity fingerprints.
+  They are sensitive operational linkage data even though they are not tokens,
+  raw Bot IDs, or authorization to send.
 - The Docker host and any backup destination added later.
 
 ## Threats and controls
@@ -271,10 +308,10 @@ not cross the storage boundary.
 | Cross-account webhook or operator access                                               | Telegram resolves a dynamic account then checks its secret. Zalo resolves `(appId, oaId)` then checks that OA secret. Facebook resolves every Page ID and WhatsApp resolves every WABA ID to exactly one App then checks its App secret. The shared Meta callback selects exactly one product/App. Unknown identity/path and wrong secret/signature are nondiagnostic `401`. Unique bearer selects one server-side connection; no operator route accepts a connection ID; cursors bind the resolved connection.                                                                                                                                                                                                                                                                                                                                                                                                               | Real authorization/RBAC, audit logging, rate limiting, token rotation, and production load testing.                                                                                                              |
 | Inbox scope escalation, source probing, target injection, or history disclosure        | A distinct configured inbox bearer resolves one explicit immutable-at-runtime connection set before query parsing or storage access. Neither route accepts a caller-selected inbox or scope. Feed and command-history cursors each bind the inbox ID and canonical connection set; malformed or foreign history cursors share generic `400`. The command route requires a source event inside that set, derives its private target from canonical `conversation_id`, and accepts no `recipientId`; missing and out-of-scope sources share one generic `404`. History returns recorded text only with safe identifiers and omits private target/source metadata and the client operation ID. Inbox tokens cannot collide with provider, webhook, or per-account operator credentials. The Phase 4e source separately resolves an assigned inbox after dashboard authentication; an unassigned inbox reaches no history reader. | User/organization/RBAC design, audit trail, managed rotation, rate limiting, and production authorization testing.                                                                                               |
 | Dashboard session theft, CSRF, or scope escalation                                     | The optional dashboard is server-rendered without a browser bearer or client-side inbox API. It authenticates only configured principals with exact-profile Argon2id hashes, signed `__Host-` `Secure` `HttpOnly` `SameSite=Strict` cookies, exact-origin form checks, and hidden anti-forgery values. Session/anti-forgery values are random; PostgreSQL retains HMACs only. The server resolves only the principal's preconfigured inboxes; URL input cannot add a connection. The Phase 4e source uses that same session before query/cursor/history access, reuses the inbox/scope-bound cursor, returns no-store escaped HTML, and introduces no outbound browser action.                                                                                                                                                                                                                                                | Public TLS/proxy proof, cross-instance edge rate limiting, cookie/header log-redaction verification, password/secret rotation drill, audit trail, and a full authorization design.                               |
-| Unregistered or drifting connection identity                                           | Startup registers manifest-derived immutable metadata; PostgreSQL blocks new event rows without a registry row; changed metadata for an existing ID fails registration. Zalo OA, Facebook Page, and WhatsApp Business registrations require domain-separated SHA-256 fingerprints of configured provider identities, and the first identity binding is refused when pre-registry history already uses that ID. Telegram still lacks an equivalent configured non-secret provider-account identity.                                                                                                                                                                                                                                                                                                                                                                                                                            | Historical-row reconciliation and a deliberate later foreign-key validation migration; a future Telegram account-identity design if a suitable non-secret value is configured.                                   |
+| Unregistered or drifting connection identity                                           | Startup registers manifest-derived immutable metadata; PostgreSQL blocks new event rows without a registry row; changed metadata for an existing ID fails registration. Zalo OA, Facebook Page, WhatsApp Business, and candidate Telegram registrations require domain-separated SHA-256 fingerprints of configured provider identities. The first identity binding is refused when pre-registry history already uses that ID; Telegram's fingerprint derives only from the configured token's numeric Bot-ID prefix.                                                                                                                                                                                                                                                                                                                                                                                                         | Historical-row reconciliation, a deliberate later foreign-key validation migration, and a provider-specific live identity policy before dispatch.                                                                |
 | SQL injection or query abuse                                                           | Storage uses fixed schema-qualified SQL and positional parameters. Read routes bound page size, reject malformed/cross-account/cross-inbox cursors before storage access, and exclude raw provider payloads. The queued-command history reader filters `queued` rows in the bearer-selected scope and projects no private columns. The command store parameterizes source lookup/insert, validates bounded IDs/text/scope, and never interpolates a caller target into SQL. The Phase 4e source uses only the existing scoped history closure; it adds no SQL text or browser-selected database scope.                                                                                                                                                                                                                                                                                                                        | Adapter integration coverage against production-sized data and review of each new query.                                                                                                                         |
 | Secret disclosure                                                                      | Git ignores local configuration; Compose mounts unpadded base64url configuration only as a `10001:10001 0400` secret file, avoiding `.env` expansion of credential `$` characters; docs avoid credential-bearing commands; generic errors omit config details. Inbox bearers, dashboard raw browser tokens, raw Zalo/Meta payloads, and signatures are not persisted.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Managed secret store, rotation, host/process inspection hardening, log-redaction verification, history scanning, and incident drill.                                                                             |
-| Durable message-data disclosure or loss                                                | Canonical inbound fields plus Phase 4c outgoing text and private source-derived reply metadata are stored; raw payloads and credentials are excluded. Phase 4c create/replay responses omit text and private fields; Phase 4d history intentionally returns recorded text only with safe command metadata. The Phase 4e source renders a still-smaller escaped subset in authenticated no-store HTML. Verified Phase 4g evidence tables exclude target, text, credential, raw provider response, error/reason, HTTP detail, URL, retry, and mutable state; a provider message ID remains sensitive operational metadata. Normal Compose shutdown preserves the named volume.                                                                                                                                                                                                                                                  | Data classification, encryption-at-rest decision, backup encryption, tested restore, retention/deletion workflow, and access review.                                                                             |
+| Durable message-data disclosure or loss                                                | Canonical inbound fields plus Phase 4c outgoing text and private source-derived reply metadata are stored; raw payloads and credentials are excluded. Candidate Phase 4i adds internal Telegram chat type and opaque Bot identity only to the PostgreSQL boundary, never public projections. Phase 4c create/replay responses omit text and private fields; Phase 4d history intentionally returns recorded text only with safe command metadata. The Phase 4e source renders a still-smaller escaped subset in authenticated no-store HTML. Verified Phase 4g evidence tables exclude target, text, credential, raw provider response, error/reason, HTTP detail, URL, retry, and mutable state; a provider message ID remains sensitive operational metadata. Normal Compose shutdown preserves the named volume.                                                                                                           | Data classification, encryption-at-rest decision, backup encryption, tested restore, retention/deletion workflow, and access review.                                                                             |
 | Migration race, mismatch, unsafe manual schema change, or overstated delivery evidence | Migration, registry, reply-command creation, and the verified Phase 4g migration use transaction-scoped advisory locks; immutable checksums record applied IDs; Compose starts API only after migration; `/ready` checks known migrations. The command row has a source-event foreign key, unique operation key, and update/delete-rejection trigger. At Phase 4d's verified revision, `0009_outbound_reply_commands` was the ninth entry. Verified Phase 4g `0010_outbound_delivery_attempt_receipts` adds source-bound attempt/receipt foreign keys and separate immutable triggers, without changing command state. The absence of an attempt row supports only the derived `not_attempted` in this ledger label, never proof an external call did not happen; a stored attempt with no receipt remains unknown.                                                                                                           | Production-sized migration test, expand/contract design for later large tables, recovery plan, foreign-key validation procedure, provider-specific attempt ordering, and independently reviewed receipt mapping. |
 | Container privilege or network exposure                                                | API/migration are non-root, drop capabilities, use `no-new-privileges`, and use an internal data network. API host access is loopback-only. The local loopback Compose configuration intentionally omits the dashboard, whose browser cookies require an external HTTPS origin.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | TLS proxy, resource limits, monitoring, host hardening, and a secret-delivery design that permits read-only roots.                                                                                               |
 | Provider URL or SDK abuse for SSRF/unintended egress                                   | Telegram gateway fixes its destination, rejects redirects, bounds timeout, and validates responses. Telegram, Zalo, Facebook Page, and WhatsApp Business webhook URL validation excludes credentials, query, fragment, private hostnames, and non-HTTPS values. Zalo and Meta inbound code make no provider request; Phases 4c–4g create no provider client, dispatch worker, or provider request.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Authorized live-provider check, bounded retry policy, and private-network/DNS controls if configurable destinations appear.                                                                                      |
@@ -297,9 +334,11 @@ not cross the storage boundary.
 - `NOT VALID` means PostgreSQL enforces the new foreign key for new rows but
   does not assert that every historical Phase 2a row already has a registry
   parent.
-- Zalo OA, Facebook Page, and WhatsApp Business fingerprints protect configured
-  provider-identity reuse after history exists without retaining raw account
-  IDs. They do not make the same claim for Telegram.
+- Zalo OA, Facebook Page, WhatsApp Business, and candidate Telegram
+  fingerprints protect configured provider-identity reuse after history exists
+  without retaining raw account IDs. Telegram's candidate binding comes only
+  from its token's numeric Bot-ID prefix and does not establish historic identity
+  continuity for pre-existing rows.
 - No backup, restore drill, retention/deletion flow, password/token rotation,
   encryption-at-rest guarantee, full user/organization/RBAC model, or audit
   trail exists. A configured inbox bearer or dashboard local principal is not a
@@ -332,6 +371,11 @@ not cross the storage boundary.
   provenance. They are not credentials and do not prove current authorization.
   A command without this row must remain a no-dispatch candidate; a command
   with it still needs a fresh authorization and provider-eligibility recheck.
+- The Phase 4i candidate's `private` eligibility record is a historical
+  snapshot, not current authorization or proof that a provider will accept a
+  send. Group/supergroup/channel and historic missing chat type remain
+  no-dispatch candidates. A new Bot fingerprint must not be attached to a
+  historic Telegram connection with inbound data.
 - A liveness response does not prove database availability; only `/ready`
   checks expected migrations.
 - A green test, synthetic Docker proof, historical CI, or webhook registration
@@ -347,8 +391,9 @@ Update this model before a real Telegram, Zalo OA, Facebook Page, or WhatsApp
 Business test, public webhook/TLS exposure, dashboard public deployment,
 Phase 4e history-projection or scope-boundary change, any Phase 4f
 reply-intent authorization, form, source-binding, rate-limit, or projection
-change, any Phase 4h authorization-provenance schema, transaction, replay,
-scope-fingerprint, or projection change,
+change, any Phase 4h authorization-provenance or Phase 4i Telegram
+chat-type/identity/eligibility schema, transaction, replay, scope-fingerprint,
+or projection change,
 inbox-scope/password/session-key rotation change, backup or retention work,
 foreign-key validation, new database access path or history projection,
 dispatch/attempt/retry work, full login/RBAC, AI feature, production deployment,

@@ -64,20 +64,27 @@ the local environment file before starting Compose; never use a synthetic URL
 or upstream URL unless it actually serves the exact corresponding source for
 the version running.
 
-| Variable                             | Needed when      | Requirement                                                                                                                                                                                                          |
-| ------------------------------------ | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| <code>TELEGRAM_BOT_ENABLED</code>    | Always           | Defaults to <code>false</code>. Only <code>true</code> or <code>false</code> is valid; keep it disabled until ready.                                                                                                 |
-| <code>TELEGRAM_BOT_TOKEN</code>      | Telegram enabled | A Telegram-issued bot token; it must not be blank.                                                                                                                                                                   |
-| <code>OPERATOR_API_TOKEN</code>      | Telegram enabled | A separate key for the local operator API; 32–512 characters. Do not reuse it as the webhook secret.                                                                                                                 |
-| <code>TELEGRAM_CONNECTION_ID</code>  | Telegram enabled | Internal connection label; defaults to <code>telegram-bot-default</code>, is at most 128 characters, and uses only letters, digits, <code>.</code>, <code>_</code>, <code>:</code>, and <code>-</code>.              |
-| <code>TELEGRAM_WEBHOOK_SECRET</code> | Telegram enabled | A separate random secret Telegram returns in its header: 32–256 characters from <code>A-Z</code>, <code>a-z</code>, <code>0-9</code>, <code>_</code>, and <code>-</code>.                                            |
-| <code>TELEGRAM_WEBHOOK_URL</code>    | Optional         | Blank is valid. When set with Telegram enabled, it must be an absolute public HTTPS URL for <code>/v1/webhooks/telegram-bot</code>, with no username, password, query string, fragment, or secret.                   |
-| <code>SOURCE_OFFER_URL</code>        | Production       | Required when <code>NODE_ENV=production</code>. It must be the public, unauthenticated, exact corresponding-source HTTPS URL for the version running, with no username, password, query string, fragment, or secret. |
+| Variable                             | Needed when      | Requirement                                                                                                                                                                                                                     |
+| ------------------------------------ | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| <code>TELEGRAM_BOT_ENABLED</code>    | Always           | Defaults to <code>false</code>. Only <code>true</code> or <code>false</code> is valid; keep it disabled until ready.                                                                                                            |
+| <code>TELEGRAM_BOT_TOKEN</code>      | Telegram enabled | A Telegram-issued token in exact <code>&lt;numeric Bot user ID&gt;:&lt;secret&gt;</code> form. The application derives an opaque non-secret fingerprint from the numeric prefix only; never print or manually hash either part. |
+| <code>OPERATOR_API_TOKEN</code>      | Telegram enabled | A separate key for the local operator API; 32–512 characters. Do not reuse it as the webhook secret.                                                                                                                            |
+| <code>TELEGRAM_CONNECTION_ID</code>  | Telegram enabled | Internal connection label; defaults to <code>telegram-bot-default</code>, is at most 128 characters, and uses only letters, digits, <code>.</code>, <code>_</code>, <code>:</code>, and <code>-</code>.                         |
+| <code>TELEGRAM_WEBHOOK_SECRET</code> | Telegram enabled | A separate random secret Telegram returns in its header: 32–256 characters from <code>A-Z</code>, <code>a-z</code>, <code>0-9</code>, <code>_</code>, and <code>-</code>.                                                       |
+| <code>TELEGRAM_WEBHOOK_URL</code>    | Optional         | Blank is valid. When set with Telegram enabled, it must be an absolute public HTTPS URL for <code>/v1/webhooks/telegram-bot</code>, with no username, password, query string, fragment, or secret.                              |
+| <code>SOURCE_OFFER_URL</code>        | Production       | Required when <code>NODE_ENV=production</code>. It must be the public, unauthenticated, exact corresponding-source HTTPS URL for the version running, with no username, password, query string, fragment, or secret.            |
 
 When <code>TELEGRAM_BOT_ENABLED=true</code>, the server must refuse to start if
 <code>TELEGRAM_BOT_TOKEN</code>, <code>OPERATOR_API_TOKEN</code>, or
 <code>TELEGRAM_WEBHOOK_SECRET</code> is missing, if the two Telegram
 authentication values are the same, or if PostgreSQL storage is not configured.
+
+The candidate Phase 4i private-reply boundary also rejects a legacy Telegram
+connection ID with durable inbound history but no Bot fingerprint. Do not
+backfill it or alter PostgreSQL manually: retain the historical connection and
+configure the Bot under a new connection ID. This is only internal evidence for
+a future sender; it does not change the legacy direct-send endpoint or call
+Telegram.
 
 The API publishes <code>SOURCE_OFFER_URL</code> through unauthenticated
 <code>GET /source</code> and the
@@ -155,6 +162,10 @@ Before a real-token test, the operator must confirm:
   backup, restore drill, or retention/deletion policy.
 - No proof of real network communication or Telegram acceptance during this
   work.
+- No provider-send authorization from a `queued` intent. The candidate Phase 4i
+  private-chat/Bot-identity record is not a worker, dispatch, retry, or delivery
+  capability; see the
+  [Phase 4i guide](telegram-private-reply-eligibility-4i.md).
 - No production deployment. Any public configuration needs a separate threat
   model, TLS, rate limiting, observability, secret operations, backup/recovery,
   and verification.

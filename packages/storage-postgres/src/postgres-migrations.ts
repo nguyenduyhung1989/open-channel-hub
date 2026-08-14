@@ -483,6 +483,70 @@ EXECUTE FUNCTION ${POSTGRES_SCHEMA}.reject_outbound_command_authorization_mutati
 `
 ]);
 
+/**
+ * Telegram reply eligibility is captured as immutable evidence rather than
+ * inferred later from a mutable command or a historical raw webhook payload.
+ * Existing ledger rows predate this evidence and remain untouched: a missing
+ * chat type or eligibility row can never become permission to dispatch.
+ */
+const TELEGRAM_PRIVATE_REPLY_ELIGIBILITY_ID = '0012_telegram_private_reply_eligibility';
+
+const TELEGRAM_PRIVATE_REPLY_ELIGIBILITY_STATEMENTS = Object.freeze([
+  `
+ALTER TABLE ${POSTGRES_SCHEMA}.inbound_events
+  ADD COLUMN telegram_chat_type text
+`,
+  `
+ALTER TABLE ${POSTGRES_SCHEMA}.inbound_events
+  ADD CONSTRAINT inbound_events_telegram_chat_type_channel_match CHECK (
+    (
+      channel = 'telegram_bot'
+      AND telegram_chat_type IS NOT NULL
+      AND telegram_chat_type IN ('private', 'group', 'supergroup', 'channel')
+    )
+    OR (channel <> 'telegram_bot' AND telegram_chat_type IS NULL)
+  ) NOT VALID
+`,
+  `
+ALTER TABLE ${POSTGRES_SCHEMA}.connection_registry
+  ADD CONSTRAINT connection_registry_telegram_bot_provider_identity_required CHECK (
+    channel <> 'telegram_bot' OR provider_identity_fingerprint IS NOT NULL
+  ) NOT VALID
+`,
+  `
+CREATE TABLE ${POSTGRES_SCHEMA}.outbound_telegram_command_eligibility (
+  command_id bigint PRIMARY KEY,
+  bot_identity_fingerprint text NOT NULL,
+  source_chat_type text NOT NULL,
+  recorded_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT outbound_telegram_command_eligibility_command_fk FOREIGN KEY (command_id)
+    REFERENCES ${POSTGRES_SCHEMA}.outbound_commands (command_id),
+  CONSTRAINT outbound_telegram_command_eligibility_bot_identity_fingerprint_format CHECK (
+    bot_identity_fingerprint ~ '^[a-f0-9]{64}$'
+  ),
+  CONSTRAINT outbound_telegram_command_eligibility_source_chat_type_private CHECK (
+    source_chat_type = 'private'
+  )
+)
+`,
+  `
+CREATE FUNCTION ${POSTGRES_SCHEMA}.reject_outbound_telegram_command_eligibility_mutation()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RAISE EXCEPTION 'Outbound Telegram command eligibility is immutable.';
+END;
+$$
+`,
+  `
+CREATE TRIGGER outbound_telegram_command_eligibility_immutable
+BEFORE UPDATE OR DELETE ON ${POSTGRES_SCHEMA}.outbound_telegram_command_eligibility
+FOR EACH ROW
+EXECUTE FUNCTION ${POSTGRES_SCHEMA}.reject_outbound_telegram_command_eligibility_mutation()
+`
+]);
+
 const MIGRATIONS = Object.freeze([
   Object.freeze({
     id: INBOUND_EVENT_LEDGER_ID,
@@ -559,6 +623,14 @@ const MIGRATIONS = Object.freeze([
       OUTBOUND_COMMAND_AUTHORIZATIONS_STATEMENTS
     ),
     statements: OUTBOUND_COMMAND_AUTHORIZATIONS_STATEMENTS
+  }),
+  Object.freeze({
+    id: TELEGRAM_PRIVATE_REPLY_ELIGIBILITY_ID,
+    checksum: checksumFor(
+      TELEGRAM_PRIVATE_REPLY_ELIGIBILITY_ID,
+      TELEGRAM_PRIVATE_REPLY_ELIGIBILITY_STATEMENTS
+    ),
+    statements: TELEGRAM_PRIVATE_REPLY_ELIGIBILITY_STATEMENTS
   })
 ]);
 

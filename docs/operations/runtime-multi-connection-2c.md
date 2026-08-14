@@ -34,7 +34,10 @@ The strict document shape is:
 }
 ```
 
-<code>webhookUrl</code> is optional. When present, it must be a public HTTPS
+<code>botToken</code> must use Telegram's exact
+<code>&lt;numeric Bot user ID&gt;:&lt;secret&gt;</code> structure. The runtime derives
+an opaque non-secret Bot fingerprint from the numeric prefix only; it does not
+store or print either part. <code>webhookUrl</code> is optional. When present, it must be a public HTTPS
 URL with no username, password, query string, or fragment, and its path must
 match that entry's exact dynamic webhook route. Each connection ID uses only
 letters, digits, <code>.</code>, <code>_</code>, <code>:</code>, and
@@ -334,9 +337,13 @@ domain-separated SHA-256 fingerprint of the configured
 <code>(appId, oaId)</code> pair. It is not the raw pair or a credential. It
 binds a Zalo connection ID to that pair after registration: an existing Zalo ID
 cannot be restarted with a different fingerprint, and a first Zalo binding is
-refused if pre-registry history already uses that ID. This configuration does
-not contain an equivalent non-secret Telegram provider-account identifier, so
-Telegram registry entries retain their existing connector/channel/tier binding.
+refused if pre-registry history already uses that ID. The candidate Phase 4i
+migration <code>0012_telegram_private_reply_eligibility</code> requires an
+equivalent opaque fingerprint for new Telegram registry registrations. It
+derives only from the configured token's numeric Bot-ID prefix, never stores the
+prefix or token, and refuses to add a first fingerprint to a Telegram connection
+ID that already has durable inbound history. Use a new connection ID for that
+Bot rather than manually editing or backfilling PostgreSQL.
 
 For Facebook Page, migration
 <code>0006_connection_registry_facebook_page_provider_identity</code> requires

@@ -1,4 +1,10 @@
-import { CHANNELS, type CanonicalEvent, type Channel } from '@open-channel-hub/contracts';
+import {
+  CHANNELS,
+  TELEGRAM_CHAT_TYPES,
+  type CanonicalEvent,
+  type Channel,
+  type TelegramChatType
+} from '@open-channel-hub/contracts';
 import type {
   InboundEventListInput,
   InboundEventPage,
@@ -31,7 +37,8 @@ SELECT
   conversation_id,
   message_id,
   sender_id,
-  message_text
+  message_text,
+  telegram_chat_type
 FROM ${POSTGRES_SCHEMA}.inbound_events AS inbound_event
 WHERE inbound_event.connection_id = $1
   AND inbound_event.ledger_id <= $2::bigint
@@ -51,7 +58,8 @@ SELECT
   conversation_id,
   message_id,
   sender_id,
-  message_text
+  message_text,
+  telegram_chat_type
 FROM ${POSTGRES_SCHEMA}.inbound_events AS inbound_event
 WHERE inbound_event.connection_id = $1
   AND inbound_event.ledger_id <= $2::bigint
@@ -230,6 +238,8 @@ const parseLedgerRow = (
     throw new PostgresStorageError();
   }
 
+  const telegramChatType = parseTelegramChatType(channel, row.telegram_chat_type);
+
   return Object.freeze({
     sequence,
     event: Object.freeze({
@@ -239,6 +249,7 @@ const parseLedgerRow = (
       connectionId,
       channel,
       occurredAt,
+      ...(telegramChatType === undefined ? {} : { telegramChatType }),
       message: Object.freeze({
         id: messageId,
         senderId,
@@ -284,6 +295,26 @@ const isPositivePostgresBigIntString = (value: unknown): value is string =>
 
 const isChannel = (value: unknown): value is Channel =>
   typeof value === 'string' && (CHANNELS as readonly string[]).includes(value);
+
+const parseTelegramChatType = (channel: Channel, value: unknown): TelegramChatType | undefined => {
+  if (channel !== 'telegram_bot') {
+    if (value !== null) {
+      throw new PostgresStorageError();
+    }
+
+    return undefined;
+  }
+
+  if (value === null) {
+    return undefined;
+  }
+
+  if (typeof value === 'string' && (TELEGRAM_CHAT_TYPES as readonly string[]).includes(value)) {
+    return value as TelegramChatType;
+  }
+
+  throw new PostgresStorageError();
+};
 
 const isOccurredAt = (value: unknown): value is string =>
   typeof value === 'string' && value.length > 0 && !Number.isNaN(Date.parse(value));

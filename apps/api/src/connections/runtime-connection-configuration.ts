@@ -1,6 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { isIP } from 'node:net';
 
+import { isTelegramBotToken } from '../telegram-bot/telegram-bot-provider-identity.js';
+
 export interface RuntimeTelegramBotConnection {
   readonly id: string;
   readonly type: 'telegram_bot';
@@ -745,7 +747,7 @@ const parseTelegramBotConnection = (value: unknown): RuntimeTelegramBotConnectio
     ) ||
     !isConnectionId(value.id) ||
     value.type !== 'telegram_bot' ||
-    !isPrintableToken(value.botToken, 1) ||
+    !isTelegramBotToken(value.botToken) ||
     !isPrintableToken(value.operatorApiToken, 32) ||
     !isWebhookSecret(value.webhookSecret)
   ) {
