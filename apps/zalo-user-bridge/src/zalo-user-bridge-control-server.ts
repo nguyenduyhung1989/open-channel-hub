@@ -5,6 +5,7 @@ import { timingSafeEqual } from 'node:crypto';
 import {
   ZaloUserBridgeCommandRejectedError,
   ZaloUserBridgeProviderError,
+  ZaloUserBridgeRateLimitedError,
   type ZaloUserBridgeImageAttachment,
   type ZaloUserGroupImageReply,
   type ZaloUserGroupTextReply
@@ -154,6 +155,11 @@ const handleRequest = async (
 
     if (error instanceof ZaloUserBridgeProviderError) {
       reply(response, 502, 'provider_unavailable');
+      return;
+    }
+
+    if (error instanceof ZaloUserBridgeRateLimitedError) {
+      reply(response, 429, 'rate_limited');
       return;
     }
 

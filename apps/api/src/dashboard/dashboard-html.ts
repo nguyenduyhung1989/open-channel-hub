@@ -9,6 +9,7 @@ export interface DashboardLoginPageInput {
 }
 
 export interface DashboardPageInput {
+  readonly connectionIds: readonly string[];
   readonly csrfToken: string;
   readonly events: readonly CanonicalEvent[];
   readonly inboxes: readonly Readonly<{ id: string }>[];
@@ -20,6 +21,7 @@ export interface DashboardPageInput {
 
 export interface DashboardOutboundCommandHistoryPageInput {
   readonly commands: readonly OutboundReplyCommandHistoryEntry[];
+  readonly connectionIds: readonly string[];
   readonly csrfToken: string;
   readonly inboxes: readonly Readonly<{ id: string }>[];
   readonly nextCursor?: string;
@@ -109,6 +111,8 @@ export const renderDashboardPage = (input: DashboardPageInput): string => {
           )}">Ý định trả lời đang chờ</a>
           <p>Người vận hành: <strong>${escapeHtml(input.principalId)}</strong></p>
         </section>
+        ${renderWorkflowRail('inbound')}
+        ${renderConnectionScope(input.connectionIds)}
         <section class="ledger" aria-labelledby="ledger-title">
           <div class="ledger-heading">
             <p class="eyebrow">SỔ SỰ KIỆN / MỚI NHẤT TRƯỚC</p>
@@ -171,11 +175,13 @@ export const renderDashboardOutboundCommandHistoryPage = (
           )}">Xem tin nhắn đến</a>
           <p>Người vận hành: <strong>${escapeHtml(input.principalId)}</strong></p>
         </section>
+        ${renderWorkflowRail('outbound')}
+        ${renderConnectionScope(input.connectionIds)}
         <section class="ledger" aria-labelledby="ledger-title">
           <div class="ledger-heading">
             <p class="eyebrow">Ý ĐỊNH TRẢ LỜI / MỚI NHẤT TRƯỚC</p>
             <h2 id="ledger-title">${escapeHtml(input.selectedInboxId)}</h2>
-            <p class="ledger-note">Các mục này mới chỉ được ghi nhận; chưa có tin nào được gửi đến nhà cung cấp.</p>
+            <p class="ledger-note">Các mục này mới chỉ được ghi nhận. Nhãn bên dưới chỉ nói điều sổ bền đã lưu, không tự gọi bất kỳ tin nào là đã giao hoặc đã đọc.</p>
           </div>
           ${commandRows}
           ${nextPage}
@@ -183,6 +189,38 @@ export const renderDashboardOutboundCommandHistoryPage = (
       </main>`
   });
 };
+
+/** A truthful map of the operational path; it never implies a dispatch exists. */
+const renderWorkflowRail = (active: 'inbound' | 'outbound'): string => `
+  <section class="workflow-rail" aria-label="Luồng vận hành hiện có">
+    <p class="eyebrow">LUỒNG VẬN HÀNH</p>
+    <ol>
+      <li class="workflow-step ${active === 'inbound' ? 'workflow-active' : ''}">
+        <span>01</span><strong>Tin đến</strong><small>Đã lưu theo phạm vi hộp thư</small>
+      </li>
+      <li class="workflow-step ${active === 'outbound' ? 'workflow-active' : ''}">
+        <span>02</span><strong>Ý định trả lời</strong><small>Chỉ ghi bền, không chọn người nhận</small>
+      </li>
+      <li class="workflow-step ${active === 'outbound' ? 'workflow-active' : ''}">
+        <span>03</span><strong>Bằng chứng</strong><small>Quyền, điều kiện Telegram và lần thử đã ghi</small>
+      </li>
+      <li class="workflow-step workflow-paused">
+        <span>04</span><strong>Gửi nhà cung cấp</strong><small>Chưa bật — không có bộ tự gửi hoặc gửi lại</small>
+      </li>
+    </ol>
+  </section>`;
+
+/** Connection IDs are already inside the selected server-side inbox scope. */
+const renderConnectionScope = (connectionIds: readonly string[]): string => `
+  <section class="connection-scope" aria-label="Kết nối đang theo dõi">
+    <div>
+      <p class="eyebrow">KẾT NỐI TRONG PHẠM VI</p>
+      <p>Những đường vào dưới đây được máy chủ chọn theo hộp thư này; trình duyệt không tự đổi hoặc thêm kết nối.</p>
+    </div>
+    <ul>${connectionIds
+      .map((connectionId) => `<li><code>${escapeHtml(connectionId)}</code></li>`)
+      .join('')}</ul>
+  </section>`;
 
 const renderEvent = (event: CanonicalEvent, input: DashboardPageInput): string => `
   <li class="event-card">
@@ -229,12 +267,72 @@ const renderOutboundCommand = (
     <dl>
       <div><dt>Kết nối</dt><dd>${escapeHtml(command.sourceConnectionId)}</dd></div>
     </dl>
+    ${renderOutboundCommandEvidence(command)}
     ${
       input.telegramDeliveryAuthorizationEnabled && command.telegramDeliveryAuthorizationEligible
         ? renderTelegramDeliveryAuthorizationForm(command, input)
         : ''
     }
   </li>`;
+
+/**
+ * Shows only bounded, local ledger facts. In particular it never renders a
+ * reply target, provider message ID, raw response, source-message metadata,
+ * scope fingerprint, or authorization identity.
+ */
+const renderOutboundCommandEvidence = (command: OutboundReplyCommandHistoryEntry): string => {
+  const authorization = command.authorizationRecorded
+    ? '<li class="evidence-chip evidence-positive">Nguồn quyền đã ghi</li>'
+    : '<li class="evidence-chip evidence-muted">Nguồn quyền chưa có trong sổ</li>';
+  const telegramPrivateReply = command.telegramPrivateReplyEligibilityRecorded
+    ? '<li class="evidence-chip evidence-positive">Nguồn Telegram riêng đã xác minh</li>'
+    : '';
+  const telegramAuthorization = command.telegramDeliveryAuthorizationRecorded
+    ? '<li class="evidence-chip evidence-positive">Chấp thuận Telegram đã ghi</li>'
+    : '';
+
+  return `
+    <section class="command-evidence" aria-label="Bằng chứng đã ghi">
+      <p class="evidence-title">Bằng chứng đã ghi</p>
+      <ul class="evidence-list">
+        <li class="evidence-chip ${deliveryEvidenceClass(command.deliveryEvidenceStatus)}">${deliveryEvidenceLabel(command.deliveryEvidenceStatus)}</li>
+        ${authorization}
+        ${telegramPrivateReply}
+        ${telegramAuthorization}
+      </ul>
+      <p class="ledger-note">Chưa có tin nào được gọi là đã giao hoặc đã đọc.</p>
+    </section>`;
+};
+
+const deliveryEvidenceLabel = (
+  status: OutboundReplyCommandHistoryEntry['deliveryEvidenceStatus']
+): string => {
+  switch (status) {
+    case 'not_attempted':
+      return 'Chưa có lần thử nào được ghi';
+    case 'outcome_unknown':
+      return 'Đã có lần thử, chưa có kết quả chắc chắn';
+    case 'provider_accepted':
+      return 'Nhà cung cấp đã nhận yêu cầu';
+    case 'provider_rejected':
+      return 'Nhà cung cấp đã từ chối yêu cầu';
+  }
+};
+
+const deliveryEvidenceClass = (
+  status: OutboundReplyCommandHistoryEntry['deliveryEvidenceStatus']
+): string => {
+  switch (status) {
+    case 'not_attempted':
+      return 'evidence-muted';
+    case 'outcome_unknown':
+      return 'evidence-warning';
+    case 'provider_accepted':
+      return 'evidence-positive';
+    case 'provider_rejected':
+      return 'evidence-danger';
+  }
+};
 
 /**
  * The command ID is a non-secret, server-validated transport reference. This

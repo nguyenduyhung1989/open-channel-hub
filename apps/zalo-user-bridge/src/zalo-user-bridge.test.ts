@@ -9,6 +9,7 @@ import {
   ZaloUserBridgeCommandRejectedError,
   ZaloUserBridgeConfigurationError,
   ZaloUserBridgeProviderError,
+  ZaloUserBridgeRateLimitedError,
   type ZaloUserBridgeApi,
   type ZaloUserBridgeInboundMessage,
   type ZaloUserBridgeListener,
@@ -148,6 +149,61 @@ describe('ZaloUserBridge', () => {
     );
   });
 
+  it('lists group names only on the active session and marks durable observed groups as send-eligible', async () => {
+    const groups = vi.fn(async (): Promise<unknown> => ({
+      '146845883529197922': { groupName: 'Nhóm hỗ trợ', memberCount: 12 },
+      '246845883529197923': { groupName: 'Nhóm chưa nhận tin', memberCount: 3 }
+    }));
+    const harness = createHarness({ getAllGroups: groups });
+    harness.bridge.start(harness.api);
+
+    await expect(harness.bridge.listGroups()).rejects.toBeInstanceOf(
+      ZaloUserBridgeCommandRejectedError
+    );
+
+    harness.listener.emitConnected();
+    harness.listener.emitMessage(groupMessage());
+    await settle();
+
+    await expect(harness.bridge.listGroups()).resolves.toEqual([
+      {
+        id: '146845883529197922',
+        memberCount: 12,
+        name: 'Nhóm hỗ trợ',
+        sendEligible: true
+      },
+      {
+        id: '246845883529197923',
+        memberCount: 3,
+        name: 'Nhóm chưa nhận tin',
+        sendEligible: false
+      }
+    ]);
+    expect(groups).toHaveBeenCalledOnce();
+  });
+
+  it('shares one send ceiling across text and image controls instead of allowing a local bulk bypass', async () => {
+    const harness = createHarness({ maximumSendsPerMinute: 1 });
+    harness.bridge.start(harness.api);
+    harness.listener.emitConnected();
+    harness.listener.emitMessage(groupMessage());
+    await settle();
+
+    await harness.bridge.sendGroupText({ groupId: GROUP_ID, text: 'Lần duy nhất.' });
+
+    await expect(
+      harness.bridge.sendGroupImage({
+        groupId: GROUP_ID,
+        image: {
+          data: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+          filename: 'status.png',
+          metadata: { totalSize: 8 }
+        }
+      })
+    ).rejects.toBeInstanceOf(ZaloUserBridgeRateLimitedError);
+    expect(harness.sendMessage).toHaveBeenCalledOnce();
+  });
+
   it.each([
     { data: Buffer.alloc(0), filename: 'empty.png', metadata: { totalSize: 0 } },
     { data: Buffer.from('x'), filename: 'script.svg', metadata: { totalSize: 1 } },
@@ -278,6 +334,8 @@ describe('ZaloUserBridge', () => {
 const createHarness = (
   overrides: Readonly<{
     deliverEvent?: ZaloUserBridgeOptions['deliverEvent'];
+    getAllGroups?: ZaloUserBridgeApi['getAllGroups'];
+    maximumSendsPerMinute?: number;
     sendMessage?: ZaloUserBridgeApi['sendMessage'];
   }> = {}
 ) => {
@@ -292,6 +350,7 @@ const createHarness = (
     overrides.sendMessage ??
     vi.fn<ZaloUserBridgeApi['sendMessage']>(async (): Promise<unknown> => undefined);
   const api: ZaloUserBridgeApi = {
+    getAllGroups: overrides.getAllGroups ?? vi.fn(async (): Promise<unknown> => ({})),
     getOwnId: (): string => ACCOUNT_ID,
     listener,
     sendMessage
@@ -304,6 +363,9 @@ const createHarness = (
     },
     connectionId: CONNECTION_ID,
     deliverEvent,
+    ...(overrides.maximumSendsPerMinute === undefined
+      ? {}
+      : { maximumSendsPerMinute: overrides.maximumSendsPerMinute }),
     onStateChange: (state): void => {
       states.push(state);
     },

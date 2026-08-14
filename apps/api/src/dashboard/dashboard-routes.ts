@@ -394,6 +394,7 @@ export const registerDashboardRoutes = async (
       return sendDashboardHtml(
         reply,
         renderDashboardPage({
+          connectionIds: context.selectedInbox.connectionIds,
           csrfToken: context.authenticated.csrfToken,
           events: page.events,
           inboxes: context.availableInboxes,
@@ -439,6 +440,7 @@ export const registerDashboardRoutes = async (
         reply,
         renderDashboardOutboundCommandHistoryPage({
           commands: page.commands,
+          connectionIds: context.selectedInbox.connectionIds,
           csrfToken: context.authenticated.csrfToken,
           inboxes: context.availableInboxes,
           ...(page.nextCursor === undefined

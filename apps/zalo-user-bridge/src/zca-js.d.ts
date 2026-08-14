@@ -35,6 +35,7 @@ declare module 'zca-js' {
 
   export interface API {
     readonly listener: unknown;
+    getAllGroups(): Promise<unknown>;
     getOwnId(): string;
     sendMessage(
       message: string | MessageContent | Readonly<Record<string, unknown>>,

@@ -85,6 +85,10 @@ describe('dashboard routes', () => {
     );
     expect(response.body).not.toContain('<script>');
     expect(response.body).toContain('ĐÃ GHI, CHƯA GỬI');
+    expect(response.body).toContain('LUỒNG VẬN HÀNH');
+    expect(response.body).toContain('Gửi nhà cung cấp');
+    expect(response.body).toContain('Chưa bật — không có bộ tự gửi hoặc gửi lại');
+    expect(response.body).toContain('KẾT NỐI TRONG PHẠM VI');
     expect(response.body).toContain('Xem tin nhắn đến');
     expect(response.body).not.toContain(SUPPORT_INBOX_TOKEN);
     expect(response.body).not.toContain(SALES_INBOX_TOKEN);
@@ -148,6 +152,45 @@ describe('dashboard routes', () => {
     expect(response.body).toContain('Yêu cầu không thể xử lý an toàn.');
     expect(response.body).not.toContain('synthetic durable history failure');
     expect(historyRead).toHaveBeenCalledWith({ pageSize: 50 });
+  });
+
+  it('renders bounded delivery and authorization evidence without leaking provider details', async () => {
+    const historyRead = vi.fn(async (): Promise<OutboundReplyCommandHistoryPage> => ({
+      commands: [
+        unsafeHistoryEntry({ deliveryEvidenceStatus: 'not_attempted' }),
+        unsafeHistoryEntry({ deliveryEvidenceStatus: 'outcome_unknown' }),
+        unsafeHistoryEntry({
+          authorizationRecorded: true,
+          deliveryEvidenceStatus: 'provider_accepted',
+          telegramDeliveryAuthorizationRecorded: true,
+          telegramPrivateReplyEligibilityRecorded: true
+        }),
+        unsafeHistoryEntry({ deliveryEvidenceStatus: 'provider_rejected' })
+      ]
+    }));
+    const harness = await createHarness({ historyRead });
+    applications.push(harness.app);
+    const sessionCookie = await loginAndGetSessionCookie(harness.app);
+
+    const response = await harness.app.inject({
+      headers: { cookie: cookiePair(sessionCookie) },
+      method: 'GET',
+      url: '/operator/outbound-commands'
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain('Chưa có lần thử nào được ghi');
+    expect(response.body).toContain('Đã có lần thử, chưa có kết quả chắc chắn');
+    expect(response.body).toContain('Nhà cung cấp đã nhận yêu cầu');
+    expect(response.body).toContain('Nhà cung cấp đã từ chối yêu cầu');
+    expect(response.body).toContain('Nguồn quyền đã ghi');
+    expect(response.body).toContain('Nguồn Telegram riêng đã xác minh');
+    expect(response.body).toContain('Chấp thuận Telegram đã ghi');
+    expect(response.body).toContain('Chưa có tin nào được gọi là đã giao hoặc đã đọc.');
+    expect(response.body).not.toContain('synthetic-private-reply-target');
+    expect(response.body).not.toContain('synthetic-private-source-message');
+    expect(response.body).not.toContain('synthetic-provider-message-id');
+    expect(response.body).not.toContain('synthetic-bot-identity-fingerprint');
   });
 
   it('renders and records only a server-eligible Telegram delivery authorization fact', async () => {
@@ -445,6 +488,9 @@ describe('dashboard routes', () => {
     expect(dashboard.body).not.toContain(SUPPORT_INBOX_TOKEN);
     expect(dashboard.body).not.toContain(SALES_INBOX_TOKEN);
     expect(dashboard.body).not.toContain('Authorization');
+    expect(dashboard.body).toContain('LUỒNG VẬN HÀNH');
+    expect(dashboard.body).toContain('Tin đến');
+    expect(dashboard.body).toContain('KẾT NỐI TRONG PHẠM VI');
     expect(supportRead).toHaveBeenCalledWith({ pageSize: 50 });
 
     const nextCursor = nextCursorFrom(dashboard.body);
@@ -1321,7 +1367,15 @@ const canonicalEvent = (
 const unsafeHistoryEntry = (
   overrides: Readonly<
     Partial<
-      Pick<OutboundReplyCommandHistoryEntry, 'telegramDeliveryAuthorizationEligible' | 'text'>
+      Pick<
+        OutboundReplyCommandHistoryEntry,
+        | 'authorizationRecorded'
+        | 'deliveryEvidenceStatus'
+        | 'telegramDeliveryAuthorizationEligible'
+        | 'telegramDeliveryAuthorizationRecorded'
+        | 'telegramPrivateReplyEligibilityRecorded'
+        | 'text'
+      >
     >
   > = {}
 ): OutboundReplyCommandHistoryEntry =>
@@ -1329,14 +1383,20 @@ const unsafeHistoryEntry = (
     botIdentityFingerprint: 'synthetic-bot-identity-fingerprint',
     clientOperationId: 'synthetic-private-client-operation',
     createdAt: '2026-08-13T00:00:00.000Z',
+    authorizationRecorded: overrides.authorizationRecorded ?? false,
+    deliveryEvidenceStatus: overrides.deliveryEvidenceStatus ?? 'not_attempted',
     id: '42',
     replyTargetId: 'synthetic-private-reply-target',
+    providerMessageId: 'synthetic-provider-message-id',
     sourceChannel: 'synthetic-private-source-channel',
     sourceConnectionId: 'telegram-bot-support',
     sourceMessageId: 'synthetic-private-source-message',
     sourceProviderEventId: 'synthetic-provider-event-should-not-render',
     state: 'queued' as const,
+    telegramDeliveryAuthorizationRecorded: overrides.telegramDeliveryAuthorizationRecorded ?? false,
     telegramDeliveryAuthorizationEligible: overrides.telegramDeliveryAuthorizationEligible ?? false,
+    telegramPrivateReplyEligibilityRecorded:
+      overrides.telegramPrivateReplyEligibilityRecorded ?? false,
     text: overrides.text ?? 'Synthetic queued dashboard history'
   }) as unknown as OutboundReplyCommandHistoryEntry;
 

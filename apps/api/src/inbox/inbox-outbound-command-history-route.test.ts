@@ -58,6 +58,10 @@ describe('Inbox outbound-command history route', () => {
       replyTargetId: 'synthetic-private-reply-target',
       sourceChannel: 'telegram_bot',
       sourceMessageId: 'synthetic-private-source-message',
+      authorizationRecorded: true,
+      deliveryEvidenceStatus: 'provider_accepted',
+      telegramDeliveryAuthorizationRecorded: true,
+      telegramPrivateReplyEligibilityRecorded: true,
       telegramDeliveryAuthorizationEligible: true
     }) as OutboundReplyCommandHistoryEntry;
     const { feature, readOutboundReplyCommandHistory } = createFeature({
@@ -92,6 +96,10 @@ describe('Inbox outbound-command history route', () => {
     expect(firstPage.body).not.toContain('sourceChannel');
     expect(firstPage.body).not.toContain('sourceMessageId');
     expect(firstPage.body).not.toContain('telegramDeliveryAuthorizationEligible');
+    expect(firstPage.body).not.toContain('authorizationRecorded');
+    expect(firstPage.body).not.toContain('deliveryEvidenceStatus');
+    expect(firstPage.body).not.toContain('telegramDeliveryAuthorizationRecorded');
+    expect(firstPage.body).not.toContain('telegramPrivateReplyEligibilityRecorded');
     expect(firstPage.body).not.toContain('synthetic-private-client-operation');
     expect(firstPage.body).not.toContain('synthetic-private-raw-payload');
     expect(firstPage.body).not.toContain('synthetic-private-reply-target');
@@ -250,12 +258,16 @@ describe('Inbox outbound-command history route', () => {
 
 const command = (): OutboundReplyCommandHistoryEntry =>
   Object.freeze({
+    authorizationRecorded: false,
     createdAt: '2026-08-13T00:00:00.000Z',
+    deliveryEvidenceStatus: 'not_attempted',
     id: '42',
     sourceConnectionId: 'telegram-bot-support',
     sourceProviderEventId: '9001',
     state: 'queued',
+    telegramDeliveryAuthorizationRecorded: false,
     telegramDeliveryAuthorizationEligible: false,
+    telegramPrivateReplyEligibilityRecorded: false,
     text: 'Synthetic queued operator reply'
   });
 

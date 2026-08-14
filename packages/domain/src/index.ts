@@ -20,6 +20,7 @@ export type {
 } from './ports/inbound-event-reader.js';
 export type { OutboundMessagePort } from './ports/outbound-message-port.js';
 export type {
+  OutboundDeliveryEvidenceStatus,
   OutboundReplyCommandHistoryEntry,
   OutboundReplyCommandHistoryListInput,
   OutboundReplyCommandHistoryPage,

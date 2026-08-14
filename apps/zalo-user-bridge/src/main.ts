@@ -1,4 +1,4 @@
-import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,12 +14,18 @@ import {
 
 import { createZaloUserBridgeControlServer } from './zalo-user-bridge-control-server.js';
 import {
+  createZaloUserBridgeOperatorUiServer,
+  type ZaloUserOperatorUiStatus
+} from './zalo-user-bridge-operator-ui-server.js';
+import {
   loadZaloUserBridgeRuntimeConfiguration,
   type ZaloUserBridgeRuntimeConfiguration,
   type ZaloUserBridgeRuntimeEnvironment
 } from './zalo-user-bridge-runtime-configuration.js';
 import {
   ZaloUserBridge,
+  type ZaloUserGroupImageReply,
+  type ZaloUserGroupTextReply,
   type ZaloUserBridgeApi,
   type ZaloUserBridgeImageAttachment,
   type ZaloUserBridgeListener
@@ -51,6 +57,8 @@ export const runZaloUserBridge = async (options: RunZaloUserBridgeOptions = {}):
   const qrPath = join(qrDirectory, 'login.png');
   let bridge: ZaloUserBridge | undefined;
   let controlServer: ReturnType<typeof createZaloUserBridgeControlServer> | undefined;
+  let operatorUiServer: ReturnType<typeof createZaloUserBridgeOperatorUiServer> | undefined;
+  let operatorUiStatus: ZaloUserOperatorUiStatus = 'awaiting_qr';
   let abortPendingQrLogin: (() => unknown) | undefined;
   let shutdownRequestedWhileWaitingForQr = false;
   const stopQrLogin = (): void => {
@@ -62,6 +70,28 @@ export const runZaloUserBridge = async (options: RunZaloUserBridgeOptions = {}):
     await chmod(qrDirectory, 0o700);
     await writeFile(qrPath, '', { mode: 0o600 });
 
+    if (configuration.operatorUi !== undefined) {
+      operatorUiServer = createZaloUserBridgeOperatorUiServer({
+        passwordHash: configuration.operatorUi.passwordHash,
+        port: configuration.operatorUi.port,
+        sessionPepper: configuration.operatorUi.sessionPepper,
+        source: Object.freeze({
+          getQrPng: async (): Promise<Buffer | undefined> =>
+            await readOperatorQrPng(qrPath, operatorUiStatus),
+          getStatus: (): ZaloUserOperatorUiStatus => operatorUiStatus,
+          listGroups: async () => await requireBridge(bridge).listGroups(),
+          sendGroupImage: async (reply: ZaloUserGroupImageReply): Promise<void> =>
+            await requireBridge(bridge).sendGroupImage(reply),
+          sendGroupText: async (reply: ZaloUserGroupTextReply): Promise<void> =>
+            await requireBridge(bridge).sendGroupText(reply)
+        })
+      });
+      const operatorUiPort = await operatorUiServer.start();
+      process.stdout.write(
+        `Zalo User operator UI is running at http://127.0.0.1:${operatorUiPort}/operator/login\n`
+      );
+    }
+
     const zalo = new Zalo({ checkUpdate: false, logging: false });
     process.once('SIGINT', stopQrLogin);
     process.once('SIGTERM', stopQrLogin);
@@ -70,13 +100,19 @@ export const runZaloUserBridge = async (options: RunZaloUserBridgeOptions = {}):
     try {
       api = await zalo.loginQR(
         { language: 'vi', qrPath },
-        createZaloUserBridgeQrCallback(qrPath, defaultQrReporter, (actions) => {
-          abortPendingQrLogin = actions.abort;
+        createZaloUserBridgeQrCallback(
+          qrPath,
+          createOperatorUiQrReporter((status) => {
+            operatorUiStatus = status;
+          }),
+          (actions) => {
+            abortPendingQrLogin = actions.abort;
 
-          if (shutdownRequestedWhileWaitingForQr) {
-            actions.abort();
+            if (shutdownRequestedWhileWaitingForQr) {
+              actions.abort();
+            }
           }
-        })
+        )
       );
     } finally {
       process.off('SIGINT', stopQrLogin);
@@ -93,7 +129,10 @@ export const runZaloUserBridge = async (options: RunZaloUserBridgeOptions = {}):
       accountId: configuration.accountId,
       connectionId: configuration.connectionId,
       deliverEvent,
-      onStateChange: reportBridgeState,
+      onStateChange: (status) => {
+        operatorUiStatus = status;
+        reportBridgeState(status);
+      },
       reportOperationalFailure: reportOperationalFailure
     });
     bridge.start(toBridgeApi(api));
@@ -112,9 +151,50 @@ export const runZaloUserBridge = async (options: RunZaloUserBridgeOptions = {}):
   } finally {
     bridge?.stop();
     await controlServer?.stop();
+    await operatorUiServer?.stop();
     await rm(qrDirectory, { force: true, recursive: true });
   }
 };
+
+const requireBridge = (bridge: ZaloUserBridge | undefined): ZaloUserBridge => {
+  if (bridge === undefined) {
+    throw new Error('The Zalo User bridge is not ready.');
+  }
+  return bridge;
+};
+
+const readOperatorQrPng = async (
+  qrPath: string,
+  status: ZaloUserOperatorUiStatus
+): Promise<Buffer | undefined> => {
+  if (status !== 'awaiting_qr') {
+    return undefined;
+  }
+
+  try {
+    const qr = await readFile(qrPath);
+    return qr.length > 0 ? qr : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+const createOperatorUiQrReporter = (
+  setStatus: (status: ZaloUserOperatorUiStatus) => void
+): ZaloUserBridgeQrReporter => ({
+  onQrExpired: (): void => {
+    setStatus('reauthentication_required');
+    defaultQrReporter.onQrExpired();
+  },
+  onQrPreparationFailure: (): void => {
+    setStatus('error');
+    defaultQrReporter.onQrPreparationFailure();
+  },
+  onQrReady: (qrPath: string): void => {
+    setStatus('awaiting_qr');
+    defaultQrReporter.onQrReady(qrPath);
+  }
+});
 
 export const createZaloUserBridgeQrCallback =
   (
@@ -170,6 +250,7 @@ const defaultQrReporter: ZaloUserBridgeQrReporter = Object.freeze({
 
 const toBridgeApi = (api: API): ZaloUserBridgeApi =>
   Object.freeze({
+    getAllGroups: async (): Promise<unknown> => api.getAllGroups(),
     getOwnId: (): string => api.getOwnId(),
     listener: api.listener as unknown as ZaloUserBridgeListener,
     sendMessage: async (

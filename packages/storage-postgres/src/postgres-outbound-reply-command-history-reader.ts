@@ -1,4 +1,5 @@
 import type {
+  OutboundDeliveryEvidenceStatus,
   OutboundReplyCommandHistoryEntry,
   OutboundReplyCommandHistoryListInput,
   OutboundReplyCommandHistoryPage,
@@ -28,9 +29,10 @@ WHERE outbound_command.connection_id = ANY($1::text[])
 `;
 
 /**
- * The public fields stop at safe command-history material. The dashboard-only
- * eligibility boolean is computed from immutable provenance and current
- * binding, but private targets and message metadata never enter this reader.
+ * The selected fields stop at safe command-history material. Dashboard-only
+ * facts are bounded booleans/enums computed from immutable evidence and
+ * current binding; private targets, message metadata, provider IDs, and raw
+ * provider data never enter this reader.
  */
 const COMMAND_HISTORY_COLUMNS_SQL = `
   outbound_command.command_id::text AS command_id,
@@ -38,6 +40,18 @@ const COMMAND_HISTORY_COLUMNS_SQL = `
   outbound_command.source_provider_event_id,
   outbound_command.message_text,
   outbound_command.state,
+  CASE
+    WHEN delivery_attempt.attempt_id IS NULL THEN 'not_attempted'
+    WHEN delivery_receipt.attempt_id IS NULL
+      OR delivery_receipt.outcome = 'outcome_unknown' THEN 'outcome_unknown'
+    WHEN delivery_receipt.outcome = 'provider_accepted' THEN 'provider_accepted'
+    WHEN delivery_receipt.outcome = 'provider_rejected' THEN 'provider_rejected'
+    ELSE NULL
+  END AS delivery_evidence_status,
+  (command_authorization.command_id IS NOT NULL) AS authorization_recorded,
+  (telegram_eligibility.command_id IS NOT NULL) AS telegram_private_reply_eligibility_recorded,
+  (telegram_delivery_authorization.command_id IS NOT NULL)
+    AS telegram_delivery_authorization_recorded,
   CASE WHEN
     command_authorization.inbox_id = $2
     AND command_authorization.scope_fingerprint = $3
@@ -78,6 +92,13 @@ LEFT JOIN ${POSTGRES_SCHEMA}.inbound_events AS source
   AND source.provider_event_id = outbound_command.source_provider_event_id
 LEFT JOIN ${POSTGRES_SCHEMA}.connection_registry AS connection_registry
   ON connection_registry.connection_id = outbound_command.connection_id
+LEFT JOIN ${POSTGRES_SCHEMA}.outbound_delivery_attempts AS delivery_attempt
+  ON delivery_attempt.command_id = outbound_command.command_id
+LEFT JOIN ${POSTGRES_SCHEMA}.outbound_delivery_attempt_receipts AS delivery_receipt
+  ON delivery_receipt.attempt_id = delivery_attempt.attempt_id
+LEFT JOIN ${POSTGRES_SCHEMA}.outbound_telegram_delivery_authorizations
+  AS telegram_delivery_authorization
+  ON telegram_delivery_authorization.command_id = outbound_command.command_id
 WHERE outbound_command.connection_id = ANY($1::text[])
   AND outbound_command.state = 'queued'
   AND outbound_command.command_id <= $4::bigint
@@ -98,6 +119,13 @@ LEFT JOIN ${POSTGRES_SCHEMA}.inbound_events AS source
   AND source.provider_event_id = outbound_command.source_provider_event_id
 LEFT JOIN ${POSTGRES_SCHEMA}.connection_registry AS connection_registry
   ON connection_registry.connection_id = outbound_command.connection_id
+LEFT JOIN ${POSTGRES_SCHEMA}.outbound_delivery_attempts AS delivery_attempt
+  ON delivery_attempt.command_id = outbound_command.command_id
+LEFT JOIN ${POSTGRES_SCHEMA}.outbound_delivery_attempt_receipts AS delivery_receipt
+  ON delivery_receipt.attempt_id = delivery_attempt.attempt_id
+LEFT JOIN ${POSTGRES_SCHEMA}.outbound_telegram_delivery_authorizations
+  AS telegram_delivery_authorization
+  ON telegram_delivery_authorization.command_id = outbound_command.command_id
 WHERE outbound_command.connection_id = ANY($1::text[])
   AND outbound_command.state = 'queued'
   AND outbound_command.command_id <= $4::bigint
@@ -306,6 +334,10 @@ const parseCommandHistoryRow = (
   const sourceProviderEventId = row.source_provider_event_id;
   const text = row.message_text;
   const state = row.state;
+  const deliveryEvidenceStatus = row.delivery_evidence_status;
+  const authorizationRecorded = row.authorization_recorded;
+  const telegramPrivateReplyEligibilityRecorded = row.telegram_private_reply_eligibility_recorded;
+  const telegramDeliveryAuthorizationRecorded = row.telegram_delivery_authorization_recorded;
   const telegramDeliveryAuthorizationEligible = row.telegram_delivery_authorization_eligible;
   const createdAt = row.created_at;
 
@@ -316,6 +348,10 @@ const parseCommandHistoryRow = (
     !isProviderIdentifier(sourceProviderEventId) ||
     !isMessageText(text) ||
     state !== 'queued' ||
+    !isDeliveryEvidenceStatus(deliveryEvidenceStatus) ||
+    typeof authorizationRecorded !== 'boolean' ||
+    typeof telegramPrivateReplyEligibilityRecorded !== 'boolean' ||
+    typeof telegramDeliveryAuthorizationRecorded !== 'boolean' ||
     typeof telegramDeliveryAuthorizationEligible !== 'boolean' ||
     !isCanonicalIsoUtc(createdAt) ||
     compareDecimalStrings(sequence, snapshotMaxSequence) > 0 ||
@@ -326,12 +362,16 @@ const parseCommandHistoryRow = (
 
   return Object.freeze({
     command: Object.freeze({
+      authorizationRecorded,
       createdAt,
+      deliveryEvidenceStatus,
       id: sequence,
       sourceConnectionId,
       sourceProviderEventId,
       state: 'queued',
+      telegramDeliveryAuthorizationRecorded,
       telegramDeliveryAuthorizationEligible,
+      telegramPrivateReplyEligibilityRecorded,
       text
     }),
     sequence
@@ -369,6 +409,12 @@ const isMessageText = (value: unknown): value is string =>
   value.length >= 1 &&
   value.length <= MAXIMUM_MESSAGE_LENGTH &&
   value.trim().length > 0;
+
+const isDeliveryEvidenceStatus = (value: unknown): value is OutboundDeliveryEvidenceStatus =>
+  value === 'not_attempted' ||
+  value === 'outcome_unknown' ||
+  value === 'provider_accepted' ||
+  value === 'provider_rejected';
 
 const isPageSize = (value: unknown): value is number =>
   typeof value === 'number' &&

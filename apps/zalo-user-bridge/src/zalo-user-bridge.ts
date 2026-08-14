@@ -9,6 +9,7 @@ const MAXIMUM_GROUP_ID_LENGTH = 512;
 const MAXIMUM_TEXT_LENGTH = 16_384;
 const MAXIMUM_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAXIMUM_RECONNECT_ATTEMPTS = 3;
+const DEFAULT_MAXIMUM_SENDS_PER_MINUTE = 20;
 const RECONNECT_DELAYS_MILLISECONDS = Object.freeze([1_000, 5_000, 30_000] as const);
 const IMAGE_FILE_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}\.(?:jpe?g|png|webp)$/i;
 
@@ -38,6 +39,7 @@ export interface ZaloUserBridgeListener {
 
 export interface ZaloUserBridgeApi {
   readonly listener: ZaloUserBridgeListener;
+  getAllGroups(): Promise<unknown>;
   getOwnId(): string;
   sendMessage(
     message:
@@ -49,6 +51,14 @@ export interface ZaloUserBridgeApi {
     threadId: string,
     type: number
   ): Promise<unknown>;
+}
+
+/** A non-secret group summary used only by the local owner-operated UI. */
+export interface ZaloUserBridgeGroup {
+  readonly id: string;
+  readonly memberCount?: number;
+  readonly name: string;
+  readonly sendEligible: boolean;
 }
 
 export interface ZaloUserBridgeImageAttachment {
@@ -77,6 +87,7 @@ export interface ZaloUserBridgeOptions {
   readonly connectionId: string;
   readonly deliverEvent: (event: ZaloUserInboundTextEvent) => Promise<void>;
   readonly onStateChange?: (status: ZaloUserBridgeStatus) => void;
+  readonly maximumSendsPerMinute?: number;
   readonly reportOperationalFailure?: () => void;
   readonly schedule?: (callback: () => void, delayMilliseconds: number) => unknown;
   readonly cancelScheduled?: (handle: unknown) => void;
@@ -98,6 +109,7 @@ export class ZaloUserBridge {
   readonly #onStateChange: (status: ZaloUserBridgeStatus) => void;
   readonly #reportOperationalFailure: () => void;
   readonly #schedule: (callback: () => void, delayMilliseconds: number) => unknown;
+  readonly #sendRateLimiter: ZaloUserBridgeSendRateLimiter;
   #api: ZaloUserBridgeApi | undefined;
   #reconnectAttempts = 0;
   #reconnectHandle: unknown;
@@ -118,6 +130,38 @@ export class ZaloUserBridge {
       ((callback, delayMilliseconds) => setTimeout(callback, delayMilliseconds));
     this.#cancelScheduled =
       options.cancelScheduled ?? ((handle) => clearTimeout(handle as NodeJS.Timeout));
+    this.#sendRateLimiter = new ZaloUserBridgeSendRateLimiter(
+      options.maximumSendsPerMinute ?? DEFAULT_MAXIMUM_SENDS_PER_MINUTE,
+      60_000
+    );
+  }
+
+  /** Current in-memory connection state; it never implies provider delivery. */
+  public getStatus(): ZaloUserBridgeStatus {
+    return this.#status;
+  }
+
+  /**
+   * Retrieves the account's group names only while the local session is active.
+   * A group remains send-eligible only after this bridge durably admitted one
+   * inbound group text in the current running session.
+   */
+  public async listGroups(): Promise<readonly ZaloUserBridgeGroup[]> {
+    const api = this.#api;
+
+    if (api === undefined || this.#stopped || this.#status !== 'connected') {
+      throw new ZaloUserBridgeCommandRejectedError();
+    }
+
+    try {
+      return toGroups(await api.getAllGroups(), this.#knownGroupIds);
+    } catch (error) {
+      if (error instanceof ZaloUserBridgeCommandRejectedError) {
+        throw error;
+      }
+
+      throw new ZaloUserBridgeProviderError();
+    }
   }
 
   public start(api: ZaloUserBridgeApi): void {
@@ -156,6 +200,10 @@ export class ZaloUserBridge {
       throw new ZaloUserBridgeCommandRejectedError();
     }
 
+    if (!this.#sendRateLimiter.reserve(Date.now())) {
+      throw new ZaloUserBridgeRateLimitedError();
+    }
+
     try {
       await api.sendMessage({ msg: text }, groupId, ZALO_USER_GROUP_THREAD_TYPE);
     } catch {
@@ -178,6 +226,10 @@ export class ZaloUserBridge {
       this.#status !== 'connected'
     ) {
       throw new ZaloUserBridgeCommandRejectedError();
+    }
+
+    if (!this.#sendRateLimiter.reserve(Date.now())) {
+      throw new ZaloUserBridgeRateLimitedError();
     }
 
     try {
@@ -318,6 +370,14 @@ export class ZaloUserBridgeProviderError extends Error {
   }
 }
 
+/** Applies one shared in-memory ceiling across UI and loopback control sends. */
+export class ZaloUserBridgeRateLimitedError extends Error {
+  public constructor() {
+    super('The Zalo User local send limit was reached.');
+    this.name = 'ZaloUserBridgeRateLimitedError';
+  }
+}
+
 const toGroupInboundTextEvent = ({
   accountId,
   message
@@ -373,11 +433,17 @@ const isValidOptions = (value: unknown): value is ZaloUserBridgeOptions =>
   /^[A-Za-z0-9._:-]{1,128}$/.test(value.connectionId) &&
   value.connectionId !== '.' &&
   value.connectionId !== '..' &&
-  typeof value.deliverEvent === 'function';
+  typeof value.deliverEvent === 'function' &&
+  (value.maximumSendsPerMinute === undefined ||
+    (typeof value.maximumSendsPerMinute === 'number' &&
+      Number.isSafeInteger(value.maximumSendsPerMinute) &&
+      value.maximumSendsPerMinute >= 1 &&
+      value.maximumSendsPerMinute <= 100));
 
 const isApi = (value: unknown): value is ZaloUserBridgeApi =>
   isRecord(value) &&
   isRecord(value.listener) &&
+  typeof value.getAllGroups === 'function' &&
   typeof value.getOwnId === 'function' &&
   typeof value.listener.on === 'function' &&
   typeof value.listener.start === 'function' &&
@@ -405,6 +471,60 @@ const toProviderId = (value: unknown): string | undefined =>
   !hasAsciiControlCharacter(value)
     ? value
     : undefined;
+
+const toGroups = (
+  value: unknown,
+  knownGroupIds: ReadonlySet<string>
+): readonly ZaloUserBridgeGroup[] => {
+  if (!isRecord(value)) {
+    throw new ZaloUserBridgeProviderError();
+  }
+
+  const groups: ZaloUserBridgeGroup[] = [];
+
+  for (const [id, candidate] of Object.entries(value)) {
+    const groupId = toProviderId(id);
+
+    if (!isRecord(candidate) || groupId === undefined) {
+      throw new ZaloUserBridgeProviderError();
+    }
+
+    const name = toGroupName(candidate.groupName);
+    const memberCount = toMemberCount(candidate.memberCount);
+
+    if (name === undefined) {
+      throw new ZaloUserBridgeProviderError();
+    }
+
+    groups.push(
+      Object.freeze({
+        id: groupId,
+        ...(memberCount === undefined ? {} : { memberCount }),
+        name,
+        sendEligible: knownGroupIds.has(groupId)
+      })
+    );
+  }
+
+  return Object.freeze(
+    groups.sort((left, right) => left.id.localeCompare(right.id))
+  );
+};
+
+const toGroupName = (value: unknown): string | undefined =>
+  typeof value === 'string' &&
+  value.trim().length > 0 &&
+  value.length <= 512 &&
+  !hasAsciiControlCharacter(value)
+    ? value
+    : undefined;
+
+const toMemberCount = (value: unknown): number | undefined =>
+  value === undefined
+    ? undefined
+    : typeof value === 'number' && Number.isSafeInteger(value) && value >= 1 && value <= 100_000
+      ? value
+      : undefined;
 
 const toOccurredAt = (value: unknown): string | undefined => {
   if (typeof value !== 'string' || !/^\d{1,16}$/.test(value)) {
@@ -497,3 +617,26 @@ const toImageType = (data: Buffer): 'jpeg' | 'png' | 'webp' | undefined => {
 
   return undefined;
 };
+
+class ZaloUserBridgeSendRateLimiter {
+  readonly #maximumSends: number;
+  readonly #windowMilliseconds: number;
+  #timestamps: number[] = [];
+
+  public constructor(maximumSends: number, windowMilliseconds: number) {
+    this.#maximumSends = maximumSends;
+    this.#windowMilliseconds = windowMilliseconds;
+  }
+
+  public reserve(now: number): boolean {
+    const minimumTimestamp = now - this.#windowMilliseconds;
+    this.#timestamps = this.#timestamps.filter((timestamp) => timestamp > minimumTimestamp);
+
+    if (this.#timestamps.length >= this.#maximumSends) {
+      return false;
+    }
+
+    this.#timestamps = [...this.#timestamps, now];
+    return true;
+  }
+}

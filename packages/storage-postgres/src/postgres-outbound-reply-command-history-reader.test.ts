@@ -58,10 +58,52 @@ describe('PostgresOutboundReplyCommandHistoryReader', () => {
     expect(pool.queries[1]?.sql).not.toContain('source_message_id');
     expect(pool.queries[1]?.sql).not.toContain('AS source_channel');
     expect(pool.queries[1]?.sql).not.toContain('client_operation_id');
+    expect(pool.queries[1]?.sql).not.toContain('reply_target_id');
+    expect(pool.queries[1]?.sql).not.toContain('provider_message_id');
     expect(result.commands[0]).not.toHaveProperty('replyTargetId');
     expect(result.commands[0]).not.toHaveProperty('sourceMessageId');
     expect(result.commands[0]).not.toHaveProperty('sourceChannel');
     expect(result.commands[0]).not.toHaveProperty('clientOperationId');
+  });
+
+  it('returns only safe, bounded evidence labels for the dashboard without provider details', async () => {
+    const pool = createPool({
+      firstPageRows: [
+        row('12', CONNECTION_A, {
+          authorization_recorded: true,
+          delivery_evidence_status: 'provider_accepted',
+          telegram_delivery_authorization_recorded: true,
+          telegram_private_reply_eligibility_recorded: true
+        })
+      ],
+      snapshotRows: [Object.freeze({ snapshot_max_sequence: '12' })]
+    });
+
+    await expect(
+      new PostgresOutboundReplyCommandHistoryReader(pool).list({
+        allowedConnectionIds: CONNECTION_IDS,
+        inboxId: INBOX_ID,
+        pageSize: 1
+      })
+    ).resolves.toEqual({
+      commands: [
+        {
+          ...command('12', CONNECTION_A),
+          authorizationRecorded: true,
+          deliveryEvidenceStatus: 'provider_accepted',
+          telegramDeliveryAuthorizationRecorded: true,
+          telegramPrivateReplyEligibilityRecorded: true
+        }
+      ]
+    });
+
+    const historyQuery = pool.queries[1]?.sql;
+
+    expect(historyQuery).toContain('outbound_delivery_attempts AS delivery_attempt');
+    expect(historyQuery).toContain('outbound_delivery_attempt_receipts AS delivery_receipt');
+    expect(historyQuery).toContain('outbound_telegram_delivery_authorizations');
+    expect(historyQuery).toContain('AS telegram_delivery_authorization');
+    expect(historyQuery).not.toContain('delivery_receipt.provider_message_id');
   });
 
   it('orders the underlying bigint command column numerically rather than the projected text alias', async () => {
@@ -201,6 +243,18 @@ describe('PostgresOutboundReplyCommandHistoryReader', () => {
     });
     await expect(
       new PostgresOutboundReplyCommandHistoryReader(malformedRowPool).list({
+        allowedConnectionIds: CONNECTION_IDS,
+        inboxId: INBOX_ID,
+        pageSize: 1
+      })
+    ).rejects.toBeInstanceOf(PostgresStorageError);
+
+    const malformedEvidencePool = createPool({
+      firstPageRows: [row('12', CONNECTION_A, { delivery_evidence_status: 'delivered' })],
+      snapshotRows: [Object.freeze({ snapshot_max_sequence: '12' })]
+    });
+    await expect(
+      new PostgresOutboundReplyCommandHistoryReader(malformedEvidencePool).list({
         allowedConnectionIds: CONNECTION_IDS,
         inboxId: INBOX_ID,
         pageSize: 1
@@ -464,7 +518,11 @@ const row = (
     message_text: `Synthetic reply ${sequence}`,
     source_provider_event_id: `provider-${sequence}`,
     state: 'queued',
+    authorization_recorded: false,
+    delivery_evidence_status: 'not_attempted',
+    telegram_delivery_authorization_recorded: false,
     telegram_delivery_authorization_eligible: false,
+    telegram_private_reply_eligibility_recorded: false,
     ...overrides
   });
 
@@ -474,7 +532,11 @@ const command = (sequence: string, connectionId: string, text = `Synthetic reply
   sourceConnectionId: connectionId,
   sourceProviderEventId: `provider-${sequence}`,
   state: 'queued' as const,
+  authorizationRecorded: false,
+  deliveryEvidenceStatus: 'not_attempted' as const,
+  telegramDeliveryAuthorizationRecorded: false,
   telegramDeliveryAuthorizationEligible: false,
+  telegramPrivateReplyEligibilityRecorded: false,
   text
 });
 
