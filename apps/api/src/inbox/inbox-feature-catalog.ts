@@ -1,5 +1,5 @@
 import { matchesBearerToken } from '../http/secret-match.js';
-import type { InboxFeature } from './inbox-feature.js';
+import type { InboxBearerFeature, InboxFeature } from './inbox-feature.js';
 
 const MAXIMUM_INBOX_FEATURES = 100;
 const MAXIMUM_CONNECTIONS_PER_INBOX = 100;
@@ -19,7 +19,7 @@ export class InboxFeatureCatalogError extends Error {
  * exposes a caller-controlled connection identifier or principal selection.
  */
 export interface InboxFeatureCatalog {
-  findByAuthorization(authorization: string | undefined): InboxFeature | undefined;
+  findByAuthorization(authorization: string | undefined): InboxBearerFeature | undefined;
 }
 
 export const createInboxFeatureCatalog = (
@@ -28,8 +28,8 @@ export const createInboxFeatureCatalog = (
   const snapshot = toFeatureSnapshot(features);
 
   return Object.freeze({
-    findByAuthorization: (authorization: string | undefined): InboxFeature | undefined => {
-      let matchedFeature: InboxFeature | undefined;
+    findByAuthorization: (authorization: string | undefined): InboxBearerFeature | undefined => {
+      let matchedFeature: InboxBearerFeature | undefined;
 
       for (const feature of snapshot) {
         if (matchesBearerToken(authorization, feature.token)) {
@@ -42,7 +42,7 @@ export const createInboxFeatureCatalog = (
   });
 };
 
-const toFeatureSnapshot = (features: readonly InboxFeature[]): readonly InboxFeature[] => {
+const toFeatureSnapshot = (features: readonly InboxFeature[]): readonly InboxBearerFeature[] => {
   if (
     !Array.isArray(features) ||
     features.length === 0 ||
@@ -80,6 +80,7 @@ const isFeature = (value: unknown): value is InboxFeature => {
     typeof value !== 'object' ||
     value === null ||
     !('connectionIds' in value) ||
+    !('createDashboardReplyIntentCapability' in value) ||
     !('createOutboundReplyCommand' in value) ||
     !('id' in value) ||
     !('readInboundEvents' in value) ||
@@ -90,6 +91,7 @@ const isFeature = (value: unknown): value is InboxFeature => {
     value.connectionIds.length > MAXIMUM_CONNECTIONS_PER_INBOX ||
     typeof value.id !== 'string' ||
     !isIdentifier(value.id) ||
+    typeof value.createDashboardReplyIntentCapability !== 'function' ||
     typeof value.createOutboundReplyCommand !== 'function' ||
     typeof value.readInboundEvents !== 'function' ||
     typeof value.readOutboundReplyCommandHistory !== 'function' ||

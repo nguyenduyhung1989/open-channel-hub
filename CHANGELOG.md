@@ -181,6 +181,17 @@ follows [Semantic Versioning](https://semver.org/).
   row supports a derived `not_attempted`-in-this-ledger label only; it never
   proves no external call happened. A stored attempt with no receipt is
   conservatively unknown.
+- Phase 4h candidate: forward migration
+  <code>0011_outbound_command_authorizations</code> adds one immutable
+  authorization-provenance row at most per new source-bound command. It records
+  only `inbox_bearer` or `dashboard_principal`, configured inbox ID, optional
+  dashboard principal ID, a scope fingerprint, and recording time.
+- Phase 4h candidate: the server supplies provenance only inside the inbox
+  feature boundary. The PostgreSQL adapter derives the fingerprint from the
+  sorted allowed connection scope, writes the row atomically with a new
+  command, and treats a mismatched authority provenance on replay as a
+  conflict. It adds no provider I/O, provider credential, worker, dispatch,
+  retry, browser send control, or delivery/read claim.
 
 ### Changed
 
@@ -226,13 +237,17 @@ follows [Semantic Versioning](https://semver.org/).
   sequence rather than a text alias; callers must restart from page one after
   upgrading so a mixed ordering cannot silently skip events.
 - The supplied loopback-only HTTP Compose smoke remains intentionally dashboard
-  free. The verified Phase 4g source advances it to ten immutable schema migrations
-  and adds structural checks for delivery-evidence tables, foreign keys,
-  outcome/provider-ID constraints, and immutable triggers. It still verifies
+  free. The Phase 4h candidate advances it to eleven immutable schema migrations
+  and adds structural checks for the authorization-provenance table, foreign
+  key, primary key, named constraints, exact columns, and immutable trigger.
+  The existing Phase 4g delivery-evidence structural checks remain. It still verifies
   source-bound reply-command idempotency/target derivation plus queued-history
   scope, safe projection, cursor continuation, and cursor rejection. It does
-  not insert an attempt/receipt, attempt a browser login whose `Secure` cookies
-  and exact origin require TLS, or contact a provider.
+  not use direct SQL/DML to create authorization evidence or a direct
+  authorization semantic assertion; the existing API command checks may create
+  provenance atomically with their commands. It does not insert an
+  attempt/receipt, attempt a browser login whose `Secure` cookies and exact
+  origin require TLS, or contact a provider.
 - Exact commit <code>465186e</code> completed Phase 4e local verification:
   formatting, lint, strict type checking, 53 test files / 351 tests, build,
   low-threshold dependency audit, secret scan, diff check, and synthetic

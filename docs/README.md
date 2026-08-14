@@ -38,9 +38,11 @@
   server-rendered form; no provider send or browser bearer.
 - [Phase 4g outbound delivery evidence](operations/outbound-delivery-evidence-4g.md):
   verified append-only attempt/receipt evidence with no provider dispatch.
-- [Phase 0–4g threat model](security/threat-model.md): assets, trust
+- [Phase 4h command authorization provenance](operations/outbound-command-authorization-provenance-4h.md):
+  candidate immutable authority evidence with no provider dispatch.
+- [Phase 0–4h threat model](security/threat-model.md): assets, trust
   boundaries, current controls, and planned work.
 - [Open-source readiness](maintainers/oss-readiness.md): an honest operating
   checklist for maintainers.
-- [Phase 4a–4g checkpoint](maintainers/current-phase.md): verified milestones,
-  the Phase 4g verified-source boundary, risks, and next design work.
+- [Phase 4a–4h checkpoint](maintainers/current-phase.md): verified milestones,
+  the Phase 4h candidate boundary, risks, and next design work.

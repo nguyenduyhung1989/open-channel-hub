@@ -12,11 +12,29 @@ export interface OutboundReplyCommand {
 }
 
 /**
+ * Immutable provenance for the authority that recorded a reply command.
+ * It intentionally names an inbox and, for dashboard actions, a principal;
+ * credentials, sessions, reply targets, and message content never belong in
+ * this boundary.
+ */
+export type OutboundReplyCommandAuthorization =
+  | Readonly<{
+      inboxId: string;
+      kind: 'inbox_bearer';
+    }>
+  | Readonly<{
+      dashboardPrincipalId: string;
+      inboxId: string;
+      kind: 'dashboard_principal';
+    }>;
+
+/**
  * A caller supplies the exact immutable connection scope it already owns.
  * The source event is the sole authority for a later provider reply target.
  */
 export interface OutboundReplyCommandCreateInput {
   readonly allowedConnectionIds: readonly string[];
+  readonly authorization: OutboundReplyCommandAuthorization;
   readonly clientOperationId: string;
   readonly sourceConnectionId: string;
   readonly sourceProviderEventId: string;

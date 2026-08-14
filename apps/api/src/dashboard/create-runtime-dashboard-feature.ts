@@ -32,8 +32,8 @@ export const createRuntimeDashboardFeature = (
   sessionStore: DashboardSessionStore
 ): DashboardFeature => {
   const inboxById = toInboxSnapshot(inboxes);
-  const replyIntentInboxById = toReplyIntentInboxSnapshot(inboxes);
   const principalById = toPrincipalSnapshot(configuration.principals, inboxById);
+  const replyIntentInboxesByPrincipal = toReplyIntentInboxesByPrincipal(principalById, inboxes);
   const inboxesByPrincipal = new Map<string, readonly DashboardInbox[]>();
 
   for (const principal of principalById.values()) {
@@ -61,13 +61,8 @@ export const createRuntimeDashboardFeature = (
     findReplyIntentInbox: (
       principalId: string,
       inboxId: string
-    ): DashboardReplyIntentInbox | undefined => {
-      const principal = principalById.get(principalId);
-
-      return principal === undefined || !principal.replyIntentInboxIds.includes(inboxId)
-        ? undefined
-        : replyIntentInboxById.get(inboxId);
-    },
+    ): DashboardReplyIntentInbox | undefined =>
+      replyIntentInboxesByPrincipal.get(principalId)?.get(inboxId),
     findPrincipal: (principalId: string): DashboardPrincipal | undefined =>
       principalById.get(principalId),
     listInboxes: (principalId: string): readonly DashboardInbox[] =>
@@ -106,36 +101,58 @@ const toInboxSnapshot = (inboxes: readonly InboxFeature[]): ReadonlyMap<string, 
  * method to DashboardInbox. Read-only rendering code cannot accidentally gain
  * the ability to record an intent.
  */
-const toReplyIntentInboxSnapshot = (
+const toReplyIntentInboxesByPrincipal = (
+  principals: ReadonlyMap<string, DashboardPrincipal>,
   inboxes: readonly InboxFeature[]
-): ReadonlyMap<string, DashboardReplyIntentInbox> => {
-  const inboxById = new Map<string, DashboardReplyIntentInbox>();
+): ReadonlyMap<string, ReadonlyMap<string, DashboardReplyIntentInbox>> => {
+  const inboxById = new Map<string, InboxFeature>();
 
   for (const inbox of inboxes) {
     if (inboxById.has(inbox.id)) {
       throw new RuntimeDashboardFeatureError();
     }
 
-    const recordReplyIntent = inbox.createOutboundReplyCommand;
-
-    inboxById.set(
-      inbox.id,
-      Object.freeze({
-        id: inbox.id,
-        recordReplyIntent: async (input: DashboardReplyIntentInput) =>
-          recordReplyIntent(
-            Object.freeze({
-              clientOperationId: input.clientOperationId,
-              sourceConnectionId: input.sourceConnectionId,
-              sourceProviderEventId: input.sourceProviderEventId,
-              text: input.text
-            })
-          )
-      })
-    );
+    inboxById.set(inbox.id, inbox);
   }
 
-  return inboxById;
+  const replyIntentInboxesByPrincipal = new Map<
+    string,
+    ReadonlyMap<string, DashboardReplyIntentInbox>
+  >();
+
+  for (const principal of principals.values()) {
+    const writableInboxes = new Map<string, DashboardReplyIntentInbox>();
+
+    for (const inboxId of principal.replyIntentInboxIds) {
+      const inbox = inboxById.get(inboxId);
+
+      if (inbox === undefined) {
+        throw new RuntimeDashboardFeatureError();
+      }
+
+      const capability = inbox.createDashboardReplyIntentCapability(principal.id);
+
+      writableInboxes.set(
+        inboxId,
+        Object.freeze({
+          id: inboxId,
+          recordReplyIntent: async (input: DashboardReplyIntentInput) =>
+            capability.recordReplyIntent(
+              Object.freeze({
+                clientOperationId: input.clientOperationId,
+                sourceConnectionId: input.sourceConnectionId,
+                sourceProviderEventId: input.sourceProviderEventId,
+                text: input.text
+              })
+            )
+        })
+      );
+    }
+
+    replyIntentInboxesByPrincipal.set(principal.id, writableInboxes);
+  }
+
+  return replyIntentInboxesByPrincipal;
 };
 
 const toPrincipalSnapshot = (

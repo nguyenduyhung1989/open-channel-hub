@@ -8,6 +8,14 @@ import type { SqlClient, SqlPool, SqlQueryResult } from './sql.js';
 const CONNECTION_SALES = 'telegram-bot-sales';
 const CONNECTION_SUPPORT = 'telegram-bot-support';
 const ALLOWED_CONNECTION_IDS = Object.freeze([CONNECTION_SALES, CONNECTION_SUPPORT]);
+const SUPPORT_INBOX = 'support-inbox';
+const SALES_INBOX = 'sales-inbox';
+const DASHBOARD_PRINCIPAL_A = 'dashboard-principal-a';
+const DASHBOARD_PRINCIPAL_B = 'dashboard-principal-b';
+const EXPECTED_SCOPE_FINGERPRINT =
+  '3d58dc520e577fc8205c5baa6c1fa853232cb7e40fab9a73b0e44a36c95e321e';
+const EXPECTED_SUPPORT_ONLY_SCOPE_FINGERPRINT =
+  '7893b2565513a5b5cd5cacee0dd46ab3485505434c2a5e3c63effe2cea85ba68';
 const SOURCE: SourceEvent = Object.freeze({
   channel: 'telegram_bot',
   connectionId: CONNECTION_SUPPORT,
@@ -19,7 +27,7 @@ const SOURCE: SourceEvent = Object.freeze({
 const CREATED_AT = '2026-08-13T12:00:00.000Z';
 
 describe('PostgresOutboundReplyCommandStore', () => {
-  it('creates one source-bound queued command through parameterized INSERT SELECT without exposing its target', async () => {
+  it('creates one source-bound queued command and immutable inbox-bearer authorization without exposing private fields', async () => {
     const pool = createPool({ sources: [SOURCE] });
     const store = new PostgresOutboundReplyCommandStore(pool);
     const input = createInput({ text: "Reply '; DROP TABLE outbound_commands; --" });
@@ -46,6 +54,7 @@ describe('PostgresOutboundReplyCommandStore', () => {
     expect(result.command).not.toHaveProperty('sourceMessageId');
     expect(result.command).not.toHaveProperty('sourceChannel');
     expect(result.command).not.toHaveProperty('text');
+    expect(result.command).not.toHaveProperty('authorization');
 
     const insert = pool.queries.find((query) =>
       query.sql.includes('INSERT INTO open_channel_hub.outbound_commands')
@@ -67,6 +76,7 @@ describe('PostgresOutboundReplyCommandStore', () => {
     expect(insert?.sql).toContain('source.connection_id = ANY($5::text[])');
     expect(insert?.sql).not.toContain(SOURCE.conversationId);
     expect(insert?.sql).not.toContain(input.text);
+    expect(insert?.sql).not.toContain(input.authorization.inboxId);
     expect(pool.records).toEqual([
       expect.objectContaining({
         messageText: input.text,
@@ -75,9 +85,96 @@ describe('PostgresOutboundReplyCommandStore', () => {
         sourceMessageId: SOURCE.messageId
       })
     ]);
+
+    const authorizationInsert = pool.queries.find((query) =>
+      query.sql.includes('INSERT INTO open_channel_hub.outbound_command_authorizations')
+    );
+
+    expect(authorizationInsert).toMatchObject({
+      values: ['1', 'inbox_bearer', SUPPORT_INBOX, null, EXPECTED_SCOPE_FINGERPRINT]
+    });
+    expect(authorizationInsert?.sql).toContain('VALUES ($1::bigint, $2, $3, $4, $5)');
+    expect(authorizationInsert?.sql).not.toContain(SOURCE.conversationId);
+    expect(authorizationInsert?.sql).not.toContain(input.text);
+    expect(authorizationInsert?.sql).not.toContain('reply_target_id');
+    expect(authorizationInsert?.sql).not.toContain('message_text');
+    expect(authorizationInsert?.sql).not.toContain('token');
+    expect(authorizationInsert?.sql).not.toContain('session');
+    expect(authorizationInsert?.sql).not.toContain('cookie');
+    expect(pool.authorizations).toEqual([
+      Object.freeze({
+        authorizationKind: 'inbox_bearer',
+        commandId: '1',
+        inboxId: SUPPORT_INBOX,
+        scopeFingerprint: EXPECTED_SCOPE_FINGERPRINT
+      })
+    ]);
   });
 
-  it('returns an idempotent replay only when the original source and text both match', async () => {
+  it('persists dashboard-principal provenance with its bound inbox and no bearer material', async () => {
+    const pool = createPool({ sources: [SOURCE] });
+    const input = createInput({
+      authorization: Object.freeze({
+        dashboardPrincipalId: DASHBOARD_PRINCIPAL_A,
+        inboxId: SUPPORT_INBOX,
+        kind: 'dashboard_principal'
+      })
+    });
+
+    await expect(new PostgresOutboundReplyCommandStore(pool).create(input)).resolves.toMatchObject({
+      kind: 'created'
+    });
+
+    const authorizationInsert = pool.queries.find((query) =>
+      query.sql.includes('INSERT INTO open_channel_hub.outbound_command_authorizations')
+    );
+
+    expect(authorizationInsert).toMatchObject({
+      values: [
+        '1',
+        'dashboard_principal',
+        SUPPORT_INBOX,
+        DASHBOARD_PRINCIPAL_A,
+        EXPECTED_SCOPE_FINGERPRINT
+      ]
+    });
+    expect(pool.authorizations).toEqual([
+      Object.freeze({
+        authorizationKind: 'dashboard_principal',
+        commandId: '1',
+        dashboardPrincipalId: DASHBOARD_PRINCIPAL_A,
+        inboxId: SUPPORT_INBOX,
+        scopeFingerprint: EXPECTED_SCOPE_FINGERPRINT
+      })
+    ]);
+  });
+
+  it('derives a different versioned scope fingerprint when the sorted allowed connection scope changes', async () => {
+    const pool = createPool({ sources: [SOURCE] });
+    const store = new PostgresOutboundReplyCommandStore(pool);
+
+    await store.create(createInput());
+    await store.create(
+      createInput({
+        allowedConnectionIds: Object.freeze([CONNECTION_SUPPORT]),
+        clientOperationId: 'support-only-scope-operation'
+      })
+    );
+
+    expect(pool.authorizations).toEqual([
+      expect.objectContaining({
+        commandId: '1',
+        scopeFingerprint: EXPECTED_SCOPE_FINGERPRINT
+      }),
+      expect.objectContaining({
+        commandId: '2',
+        scopeFingerprint: EXPECTED_SUPPORT_ONLY_SCOPE_FINGERPRINT
+      })
+    ]);
+    expect(EXPECTED_SCOPE_FINGERPRINT).not.toBe(EXPECTED_SUPPORT_ONLY_SCOPE_FINGERPRINT);
+  });
+
+  it('returns an idempotent replay only when source, text, provenance, and scope all match', async () => {
     const pool = createPool({ sources: [SOURCE] });
     const store = new PostgresOutboundReplyCommandStore(pool);
     const input = createInput();
@@ -97,9 +194,15 @@ describe('PostgresOutboundReplyCommandStore', () => {
       kind: 'idempotent_replay'
     });
     expect(pool.records).toHaveLength(1);
+    expect(pool.authorizations).toHaveLength(1);
     expect(
       pool.queries.filter((query) =>
         query.sql.includes('INSERT INTO open_channel_hub.outbound_commands')
+      )
+    ).toHaveLength(1);
+    expect(
+      pool.queries.filter((query) =>
+        query.sql.includes('INSERT INTO open_channel_hub.outbound_command_authorizations')
       )
     ).toHaveLength(1);
   });
@@ -128,6 +231,67 @@ describe('PostgresOutboundReplyCommandStore', () => {
       kind: 'idempotency_conflict'
     });
     expect(pool.records).toHaveLength(1);
+  });
+
+  it('returns an idempotency conflict when the authorizing inbox, dashboard principal, or scope changes', async () => {
+    const pool = createPool({ sources: [SOURCE] });
+    const store = new PostgresOutboundReplyCommandStore(pool);
+    const bearerInput = createInput();
+
+    await store.create(bearerInput);
+
+    await expect(
+      store.create({
+        ...bearerInput,
+        authorization: Object.freeze({ inboxId: SALES_INBOX, kind: 'inbox_bearer' })
+      })
+    ).resolves.toEqual({ kind: 'idempotency_conflict' });
+    await expect(
+      store.create({
+        ...bearerInput,
+        allowedConnectionIds: Object.freeze([CONNECTION_SUPPORT])
+      })
+    ).resolves.toEqual({ kind: 'idempotency_conflict' });
+
+    const dashboardInput = createInput({
+      authorization: Object.freeze({
+        dashboardPrincipalId: DASHBOARD_PRINCIPAL_A,
+        inboxId: SUPPORT_INBOX,
+        kind: 'dashboard_principal'
+      }),
+      clientOperationId: 'dashboard-principal-operation'
+    });
+    await store.create(dashboardInput);
+
+    await expect(
+      store.create({
+        ...dashboardInput,
+        authorization: Object.freeze({
+          dashboardPrincipalId: DASHBOARD_PRINCIPAL_B,
+          inboxId: SUPPORT_INBOX,
+          kind: 'dashboard_principal'
+        })
+      })
+    ).resolves.toEqual({ kind: 'idempotency_conflict' });
+
+    expect(pool.records).toHaveLength(2);
+    expect(pool.authorizations).toHaveLength(2);
+  });
+
+  it('treats a legacy command without durable authorization provenance as an idempotency conflict', async () => {
+    const input = createInput();
+    const pool = createPool({ initialCommands: [storedCommand(input)], sources: [SOURCE] });
+
+    await expect(new PostgresOutboundReplyCommandStore(pool).create(input)).resolves.toEqual({
+      kind: 'idempotency_conflict'
+    });
+    expect(pool.records).toHaveLength(1);
+    expect(pool.authorizations).toEqual([]);
+    expect(
+      pool.queries.filter((query) =>
+        query.sql.includes('INSERT INTO open_channel_hub.outbound_command_authorizations')
+      )
+    ).toEqual([]);
   });
 
   it('returns the same source-unavailable result for an out-of-scope source and a missing source', async () => {
@@ -183,7 +347,32 @@ describe('PostgresOutboundReplyCommandStore', () => {
       Object.freeze({ ...createInput(), clientOperationId: '..' }),
       Object.freeze({ ...createInput(), sourceProviderEventId: 'has a space' }),
       Object.freeze({ ...createInput(), text: ' \n\t ' }),
-      Object.freeze({ ...createInput(), text: 'x'.repeat(4_097) })
+      Object.freeze({ ...createInput(), text: 'x'.repeat(4_097) }),
+      Object.freeze({ ...createInput(), authorization: undefined }),
+      Object.freeze({
+        ...createInput(),
+        authorization: Object.freeze({ inboxId: '..', kind: 'inbox_bearer' })
+      }),
+      Object.freeze({
+        ...createInput(),
+        authorization: Object.freeze({
+          inboxId: SUPPORT_INBOX,
+          kind: 'inbox_bearer',
+          token: 'must-not-cross-the-boundary'
+        })
+      }),
+      Object.freeze({
+        ...createInput(),
+        authorization: Object.freeze({ inboxId: SUPPORT_INBOX, kind: 'dashboard_principal' })
+      }),
+      Object.freeze({
+        ...createInput(),
+        authorization: Object.freeze({
+          dashboardPrincipalId: '..',
+          inboxId: SUPPORT_INBOX,
+          kind: 'dashboard_principal'
+        })
+      })
     ];
 
     for (const input of invalidInputs) {
@@ -197,7 +386,7 @@ describe('PostgresOutboundReplyCommandStore', () => {
     }
   });
 
-  it('fails closed when storage returns a malformed idempotency row or a query fails', async () => {
+  it('fails closed when storage returns a malformed idempotency row or a command query fails', async () => {
     const malformedPool = createPool({
       corruptExistingRow: Object.freeze({ state: 'accepted' }),
       initialCommands: [storedCommand(createInput())],
@@ -221,6 +410,21 @@ describe('PostgresOutboundReplyCommandStore', () => {
     });
     expect(failingPool.queries.map((query) => query.sql)).toContain('ROLLBACK');
     expect(failingPool.clients.every((client) => client.released)).toBe(true);
+  });
+
+  it('rolls back the source-bound command when its authorization insert fails', async () => {
+    const pool = createPool({
+      failOnQuery: 'INSERT INTO open_channel_hub.outbound_command_authorizations',
+      sources: [SOURCE]
+    });
+
+    await expect(new PostgresOutboundReplyCommandStore(pool).create(createInput())).rejects.toEqual(
+      new PostgresStorageError()
+    );
+    expect(pool.queries.map((query) => query.sql)).toContain('ROLLBACK');
+    expect(pool.records).toEqual([]);
+    expect(pool.authorizations).toEqual([]);
+    expect(pool.clients.every((client) => client.released)).toBe(true);
   });
 });
 
@@ -246,6 +450,14 @@ interface StoredCommand {
   readonly state: 'queued';
 }
 
+interface StoredCommandAuthorization {
+  readonly authorizationKind: 'dashboard_principal' | 'inbox_bearer';
+  readonly commandId: string;
+  readonly dashboardPrincipalId?: string;
+  readonly inboxId: string;
+  readonly scopeFingerprint: string;
+}
+
 interface RecordedQuery {
   readonly sql: string;
   readonly values: readonly unknown[];
@@ -257,6 +469,7 @@ interface FakeSqlClient extends SqlClient {
 }
 
 interface FakePool extends SqlPool {
+  readonly authorizations: readonly StoredCommandAuthorization[];
   readonly clients: readonly FakeSqlClient[];
   readonly connectionCount: number;
   readonly outboundLockAcquisitions: number;
@@ -267,6 +480,7 @@ interface FakePool extends SqlPool {
 interface PoolOptions {
   readonly corruptExistingRow?: Readonly<Record<string, unknown>>;
   readonly failOnQuery?: string;
+  readonly initialAuthorizations?: readonly StoredCommandAuthorization[];
   readonly initialCommands?: readonly StoredCommand[];
   readonly sources?: readonly SourceEvent[];
 }
@@ -276,6 +490,7 @@ const createInput = (
 ): OutboundReplyCommandCreateInput =>
   Object.freeze({
     allowedConnectionIds: ALLOWED_CONNECTION_IDS,
+    authorization: Object.freeze({ inboxId: SUPPORT_INBOX, kind: 'inbox_bearer' }),
     clientOperationId: 'reply-operation-1',
     sourceConnectionId: CONNECTION_SUPPORT,
     sourceProviderEventId: SOURCE.providerEventId,
@@ -298,6 +513,7 @@ const storedCommand = (input: OutboundReplyCommandCreateInput): StoredCommand =>
   });
 
 const createPool = (options: PoolOptions = {}): FakePool => {
+  const authorizations = new Map<string, StoredCommandAuthorization>();
   const commands = new Map<string, StoredCommand>();
   const sources = new Map<string, SourceEvent>();
   const queries: RecordedQuery[] = [];
@@ -315,10 +531,36 @@ const createPool = (options: PoolOptions = {}): FakePool => {
     nextCommandId = Math.max(nextCommandId, Number(command.commandId) + 1);
   }
 
+  for (const authorization of options.initialAuthorizations ?? []) {
+    authorizations.set(authorization.commandId, authorization);
+  }
+
   const createClient = (): FakeSqlClient => {
     const clientQueries: RecordedQuery[] = [];
+    const createdAuthorizationIds = new Set<string>();
+    const createdCommandKeys = new Set<string>();
     let releaseLock: (() => void) | undefined;
     let released = false;
+    let transactionCommitted = false;
+
+    const rollbackCreatedRecords = (): void => {
+      for (const authorizationId of createdAuthorizationIds) {
+        authorizations.delete(authorizationId);
+      }
+
+      for (const commandKeyToRemove of createdCommandKeys) {
+        const command = commands.get(commandKeyToRemove);
+
+        if (command !== undefined) {
+          authorizations.delete(command.commandId);
+        }
+
+        commands.delete(commandKeyToRemove);
+      }
+
+      createdAuthorizationIds.clear();
+      createdCommandKeys.clear();
+    };
 
     const client: FakeSqlClient = {
       get queries(): readonly RecordedQuery[] {
@@ -337,6 +579,12 @@ const createPool = (options: PoolOptions = {}): FakePool => {
         }
 
         if (sql === 'COMMIT' || sql === 'ROLLBACK') {
+          if (sql === 'ROLLBACK') {
+            rollbackCreatedRecords();
+          } else {
+            transactionCommitted = true;
+          }
+
           releaseLock?.();
           releaseLock = undefined;
           return Object.freeze({ rows: [] });
@@ -359,7 +607,16 @@ const createPool = (options: PoolOptions = {}): FakePool => {
               : undefined;
 
           return Object.freeze({
-            rows: command === undefined ? [] : [existingRow(command, options.corruptExistingRow)]
+            rows:
+              command === undefined
+                ? []
+                : [
+                    existingRow(
+                      command,
+                      authorizations.get(command.commandId),
+                      options.corruptExistingRow
+                    )
+                  ]
           });
         }
 
@@ -406,13 +663,74 @@ const createPool = (options: PoolOptions = {}): FakePool => {
           });
           nextCommandId += 1;
           commands.set(key, command);
+          createdCommandKeys.add(key);
 
           return Object.freeze({ rows: [publicRow(command)] });
+        }
+
+        if (sql.includes('INSERT INTO open_channel_hub.outbound_command_authorizations')) {
+          const [commandId, authorizationKind, inboxId, dashboardPrincipalId, scopeFingerprint] =
+            values;
+
+          if (
+            typeof commandId !== 'string' ||
+            (authorizationKind !== 'inbox_bearer' && authorizationKind !== 'dashboard_principal') ||
+            typeof inboxId !== 'string' ||
+            (dashboardPrincipalId !== null && typeof dashboardPrincipalId !== 'string') ||
+            typeof scopeFingerprint !== 'string' ||
+            authorizations.has(commandId)
+          ) {
+            throw new Error('The synthetic authorization query values are invalid.');
+          }
+
+          const command = [...commands.values()].find(
+            (candidate) => candidate.commandId === commandId
+          );
+
+          if (
+            command === undefined ||
+            (authorizationKind === 'inbox_bearer' && dashboardPrincipalId !== null) ||
+            (authorizationKind === 'dashboard_principal' &&
+              typeof dashboardPrincipalId !== 'string')
+          ) {
+            throw new Error('The synthetic authorization does not match a stored command.');
+          }
+
+          let authorization: StoredCommandAuthorization;
+
+          if (authorizationKind === 'dashboard_principal') {
+            if (typeof dashboardPrincipalId !== 'string') {
+              throw new Error('The synthetic dashboard principal is missing.');
+            }
+
+            authorization = Object.freeze({
+              authorizationKind,
+              commandId,
+              dashboardPrincipalId,
+              inboxId,
+              scopeFingerprint
+            });
+          } else {
+            authorization = Object.freeze({
+              authorizationKind,
+              commandId,
+              inboxId,
+              scopeFingerprint
+            });
+          }
+          authorizations.set(commandId, authorization);
+          createdAuthorizationIds.add(commandId);
+
+          return Object.freeze({ rows: [authorizationRow(authorization)] });
         }
 
         return Object.freeze({ rows: [] });
       },
       release: () => {
+        if (!transactionCommitted) {
+          rollbackCreatedRecords();
+        }
+
         releaseLock?.();
         releaseLock = undefined;
         released = true;
@@ -424,6 +742,9 @@ const createPool = (options: PoolOptions = {}): FakePool => {
   };
 
   return Object.freeze({
+    get authorizations(): readonly StoredCommandAuthorization[] {
+      return Object.freeze([...authorizations.values()]);
+    },
     get clients(): readonly FakeSqlClient[] {
       return Object.freeze([...clients]);
     },
@@ -448,12 +769,28 @@ const createPool = (options: PoolOptions = {}): FakePool => {
 
 const existingRow = (
   command: StoredCommand,
+  authorization: StoredCommandAuthorization | undefined,
   overrides: Readonly<Record<string, unknown>> | undefined
 ): Readonly<Record<string, unknown>> =>
   Object.freeze({
     ...publicRow(command),
     message_text: command.messageText,
+    authorization_kind: authorization?.authorizationKind ?? null,
+    inbox_id: authorization?.inboxId ?? null,
+    dashboard_principal_id: authorization?.dashboardPrincipalId ?? null,
+    scope_fingerprint: authorization?.scopeFingerprint ?? null,
     ...overrides
+  });
+
+const authorizationRow = (
+  authorization: StoredCommandAuthorization
+): Readonly<Record<string, unknown>> =>
+  Object.freeze({
+    authorization_kind: authorization.authorizationKind,
+    command_id: authorization.commandId,
+    dashboard_principal_id: authorization.dashboardPrincipalId ?? null,
+    inbox_id: authorization.inboxId,
+    scope_fingerprint: authorization.scopeFingerprint
   });
 
 const publicRow = (command: StoredCommand): Readonly<Record<string, unknown>> =>

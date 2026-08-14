@@ -23,6 +23,18 @@ export interface InboxOutboundReplyCommandInput {
   readonly text: string;
 }
 
+/**
+ * A dashboard-only write closure. The runtime composition root creates it
+ * only after it has selected one configured dashboard principal; browser
+ * forms and bearer routes receive neither the principal identifier nor this
+ * factory.
+ */
+export interface InboxDashboardReplyIntentCapability {
+  readonly recordReplyIntent: (
+    input: InboxOutboundReplyCommandInput
+  ) => Promise<CreateOutboundReplyCommandResult>;
+}
+
 /** An inbox-local outbound-command history request with no caller-selected scope. */
 export interface InboxOutboundReplyCommandHistoryListInput {
   readonly cursor?: OutboundReplyCommandHistoryPageCursor;
@@ -30,10 +42,11 @@ export interface InboxOutboundReplyCommandHistoryListInput {
 }
 
 /**
- * A configured inbox principal. Its immutable connection set is selected from
- * runtime configuration, never from the HTTP request.
+ * The bearer-route view of a configured inbox. It deliberately excludes the
+ * dashboard-only capability factory, so resolving a bearer credential cannot
+ * yield a way to name a dashboard principal.
  */
-export interface InboxFeature {
+export interface InboxBearerFeature {
   readonly connectionIds: readonly string[];
   readonly createOutboundReplyCommand: (
     input: InboxOutboundReplyCommandInput
@@ -44,4 +57,20 @@ export interface InboxFeature {
     input: InboxOutboundReplyCommandHistoryListInput
   ) => Promise<OutboundReplyCommandHistoryPage>;
   readonly token: string;
+}
+
+/**
+ * A configured inbox principal. Its immutable connection set is selected from
+ * runtime configuration, never from the HTTP request. Only the server-side
+ * dashboard composition root receives the additional capability factory.
+ */
+export interface InboxFeature extends InboxBearerFeature {
+  /**
+   * Returns a distinct write closure whose dashboard principal is fixed by the
+   * server-side composition root. It is intentionally not part of a bearer
+   * route or dashboard-rendering capability.
+   */
+  readonly createDashboardReplyIntentCapability: (
+    dashboardPrincipalId: string
+  ) => InboxDashboardReplyIntentCapability;
 }

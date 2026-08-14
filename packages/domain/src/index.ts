@@ -29,6 +29,7 @@ export type {
 export type {
   CreateOutboundReplyCommandResult,
   OutboundReplyCommand,
+  OutboundReplyCommandAuthorization,
   OutboundReplyCommandCreateInput,
   OutboundReplyCommandStore
 } from './ports/outbound-reply-command-store.js';

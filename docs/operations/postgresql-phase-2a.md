@@ -6,7 +6,9 @@ implemented. The verified Phase 4e server-rendered queued-history source and
 verified Phase 4f dashboard reply-intent source add no schema change. The
 Phase 4g append-only delivery-evidence migration is a verified source at exact
 commit <code>6444699</code>; it has no provider dispatch or production
-verification claim. Phase 4e's final local
+verification claim. Phase 4h adds a candidate authorization-provenance
+migration; it is not verified source evidence or a provider-dispatch claim.
+Phase 4e's final local
 verification includes a synthetic Compose proof, but that loopback HTTP proof
 does not establish external HTTPS cookie behavior. Phase 4f source verification
 at `74fca30` likewise does not prove a production deployment, a backup/restore
@@ -36,6 +38,7 @@ application schema contains:
 | <code>outbound_commands</code>                  | Phase 4c immutable source-bound reply intents. It retains a private target derived from canonical inbound `conversation_id`, source message/channel, message text, client operation ID, `queued` state, and timestamps. Phase 4d reads a safe scoped projection of queued rows without changing this table; the Phase 4e source reuses that reader for a smaller server-rendered dashboard projection. The verified Phase 4f source reuses the existing source-bound store through an explicitly granted dashboard form. It has no provider credential, raw payload, attempt, receipt, or delivery state. |
 | <code>outbound_delivery_attempts</code>         | Verified Phase 4g append-only evidence that one command has a durable local attempt fact. One command can have at most one such row. It contains no target, message text, credential, provider response, HTTP detail, retry field, or mutable delivery state.                                                                                                                                                                                                                                                                                                                                             |
 | <code>outbound_delivery_attempt_receipts</code> | Verified Phase 4g append-only recorded-outcome evidence for one stored attempt. Its constraint permits exactly `provider_accepted`, `provider_rejected`, or `outcome_unknown`; only acceptance has a provider message ID. It proves neither network delivery nor read status.                                                                                                                                                                                                                                                                                                                             |
+| <code>outbound_command_authorizations</code>    | Candidate Phase 4h immutable provenance for a newly created command. It records only authority kind, configured inbox ID, optional dashboard principal ID, scope fingerprint, and recording time. It has no bearer, browser session, password/hash, target, text, provider data, delivery result, retry, or mutable state.                                                                                                                                                                                                                                                                                |
 
 The ledger stores a canonical event ID, channel/type/timestamps, conversation
 and sender/message identifiers, and message text. It intentionally does **not**
@@ -124,6 +127,20 @@ conservatively unknown. This verified source adds no route, reader, dashboard re
 worker, provider HTTP request, credential, retry policy, or command state
 transition. See the dedicated
 [Phase 4g delivery-evidence guide](outbound-delivery-evidence-4g.md).
+
+The Phase 4h candidate adds forward migration
+<code>0011_outbound_command_authorizations</code>. `command_id` is both its
+primary key and foreign key to <code>outbound_commands</code>, so a new command
+has at most one immutable provenance row. Its exact authority kind is either
+<code>inbox_bearer</code> with no dashboard principal or
+<code>dashboard_principal</code> with one valid dashboard principal; both have
+one configured inbox ID and a SHA-256 fingerprint of the sorted connection
+scope evaluated at command creation. The PostgreSQL adapter writes it in the
+same transaction as a new command and never accepts it from HTTP/browser input.
+The migration does not backfill old commands. A row is historical evidence, not
+current permission, and it adds no provider request, delivery behavior, worker,
+or command state transition. See the candidate
+[Phase 4h authorization-provenance guide](outbound-command-authorization-provenance-4h.md).
 
 ## Configure without exposing passwords
 
@@ -247,6 +264,14 @@ and <code>Analyze JavaScript and TypeScript</code>. This verifies frozen source
 and synthetic local evidence only; it does not prove public TLS, live provider
 I/O, provider acceptance, delivery, read status, or production deployment.
 
+The Phase 4h candidate advances the expected migration count to eleven. Its
+Compose addition checks only the migration, exact column shape, foreign key,
+primary key, named constraints, and immutable trigger. The existing Phase 4c
+API command checks remain and may create provenance atomically with their
+source-bound commands; the Phase 4h smoke adds no direct SQL/DML or semantic
+assertion for authorization rows. It makes no provider call. Final Phase 4h
+local and GitHub verification remains pending.
+
 ## Container and network boundary
 
 PostgreSQL is reachable only from services on the internal
@@ -294,8 +319,10 @@ any data you need to keep.
   TLS/proxy, real Telegram, Zalo OA, Facebook Page, or WhatsApp Business
   confirmation, or production monitoring. The verified Phase 4g source stores only
   a narrow append-only evidence foundation; it is not a dispatcher or delivery
-  feature. The Phase 4e source renders queued intent through an authenticated
-  dashboard session, and the Phase 4f source can record that existing
-  source-bound intent through an explicit dashboard grant.
+  feature. The Phase 4h candidate stores historical authority provenance only;
+  it is not current authorization or a send feature. The Phase 4e source renders
+  queued intent through an authenticated dashboard session, and the Phase 4f
+  source can record that existing source-bound intent through an explicit
+  dashboard grant.
 
 These gaps are intentionally left visible in the roadmap and threat model.

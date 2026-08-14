@@ -37,6 +37,7 @@ describe('createInboxFeatureCatalog', () => {
     expect(selectedSupport?.readOutboundReplyCommandHistory).toBe(
       support.readOutboundReplyCommandHistory
     );
+    expect(selectedSupport).not.toHaveProperty('createDashboardReplyIntentCapability');
     expect(selectedSales).toMatchObject({
       connectionIds: ['telegram-bot-sales'],
       id: 'sales',
@@ -101,6 +102,12 @@ describe('createInboxFeatureCatalog', () => {
 const createFeature = (overrides: Readonly<Partial<InboxFeature>> = {}): InboxFeature =>
   Object.freeze({
     connectionIds: Object.freeze(['telegram-bot-support']),
+    createDashboardReplyIntentCapability: vi.fn(() =>
+      Object.freeze({
+        recordReplyIntent: async (): Promise<CreateOutboundReplyCommandResult> =>
+          Object.freeze({ kind: 'source_unavailable' })
+      })
+    ),
     createOutboundReplyCommand: vi.fn(async (): Promise<CreateOutboundReplyCommandResult> =>
       Object.freeze({ kind: 'source_unavailable' })
     ),

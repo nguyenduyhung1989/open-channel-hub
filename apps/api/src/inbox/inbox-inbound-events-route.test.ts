@@ -226,6 +226,12 @@ const createFeature = (
     overrides.readInboundEvents ?? vi.fn(async (): Promise<InboundEventPage> => ({ events: [] }));
   const feature = Object.freeze({
     connectionIds: SUPPORT_CONNECTION_IDS,
+    createDashboardReplyIntentCapability: vi.fn(() =>
+      Object.freeze({
+        recordReplyIntent: async (): Promise<CreateOutboundReplyCommandResult> =>
+          Object.freeze({ kind: 'source_unavailable' })
+      })
+    ),
     createOutboundReplyCommand: vi.fn(async (): Promise<CreateOutboundReplyCommandResult> =>
       Object.freeze({ kind: 'source_unavailable' })
     ),

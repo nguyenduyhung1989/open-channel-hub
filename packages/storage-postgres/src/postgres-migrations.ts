@@ -417,6 +417,72 @@ EXECUTE FUNCTION ${POSTGRES_SCHEMA}.reject_outbound_delivery_attempt_receipt_mut
 `
 ]);
 
+/**
+ * A reply command retains only the immutable, non-secret provenance of the
+ * authority that created it. The scope fingerprint binds that provenance to
+ * the sorted connection scope evaluated at creation; it is not caller input
+ * and never substitutes for a future authorization recheck before dispatch.
+ */
+const OUTBOUND_COMMAND_AUTHORIZATIONS_ID = '0011_outbound_command_authorizations';
+
+const OUTBOUND_COMMAND_AUTHORIZATIONS_STATEMENTS = Object.freeze([
+  `
+CREATE TABLE ${POSTGRES_SCHEMA}.outbound_command_authorizations (
+  command_id bigint PRIMARY KEY,
+  authorization_kind text NOT NULL,
+  inbox_id text NOT NULL,
+  dashboard_principal_id text,
+  scope_fingerprint text NOT NULL,
+  recorded_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT outbound_command_authorizations_command_fk FOREIGN KEY (command_id)
+    REFERENCES ${POSTGRES_SCHEMA}.outbound_commands (command_id),
+  CONSTRAINT outbound_command_authorizations_kind_known CHECK (
+    authorization_kind IN ('inbox_bearer', 'dashboard_principal')
+  ),
+  CONSTRAINT outbound_command_authorizations_inbox_id_format CHECK (
+    char_length(inbox_id) BETWEEN 1 AND 128
+    AND inbox_id ~ '^[A-Za-z0-9._:-]{1,128}$'
+    AND inbox_id NOT IN ('.', '..')
+  ),
+  CONSTRAINT outbound_command_authorizations_dashboard_principal_id_format CHECK (
+    dashboard_principal_id IS NULL
+    OR (
+      char_length(dashboard_principal_id) BETWEEN 1 AND 128
+      AND dashboard_principal_id ~ '^[A-Za-z0-9._:-]{1,128}$'
+      AND dashboard_principal_id NOT IN ('.', '..')
+    )
+  ),
+  CONSTRAINT outbound_command_authorizations_principal_kind_match CHECK (
+    (authorization_kind = 'inbox_bearer' AND dashboard_principal_id IS NULL)
+    OR (
+      authorization_kind = 'dashboard_principal'
+      AND dashboard_principal_id IS NOT NULL
+    )
+  ),
+  CONSTRAINT outbound_command_authorizations_scope_fingerprint_format CHECK (
+    char_length(scope_fingerprint) = 64
+    AND scope_fingerprint ~ '^[a-f0-9]{64}$'
+  )
+)
+`,
+  `
+CREATE FUNCTION ${POSTGRES_SCHEMA}.reject_outbound_command_authorization_mutation()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RAISE EXCEPTION 'Outbound command authorizations are immutable.';
+END;
+$$
+`,
+  `
+CREATE TRIGGER outbound_command_authorizations_immutable
+BEFORE UPDATE OR DELETE ON ${POSTGRES_SCHEMA}.outbound_command_authorizations
+FOR EACH ROW
+EXECUTE FUNCTION ${POSTGRES_SCHEMA}.reject_outbound_command_authorization_mutation()
+`
+]);
+
 const MIGRATIONS = Object.freeze([
   Object.freeze({
     id: INBOUND_EVENT_LEDGER_ID,
@@ -485,6 +551,14 @@ const MIGRATIONS = Object.freeze([
       OUTBOUND_DELIVERY_ATTEMPT_RECEIPTS_STATEMENTS
     ),
     statements: OUTBOUND_DELIVERY_ATTEMPT_RECEIPTS_STATEMENTS
+  }),
+  Object.freeze({
+    id: OUTBOUND_COMMAND_AUTHORIZATIONS_ID,
+    checksum: checksumFor(
+      OUTBOUND_COMMAND_AUTHORIZATIONS_ID,
+      OUTBOUND_COMMAND_AUTHORIZATIONS_STATEMENTS
+    ),
+    statements: OUTBOUND_COMMAND_AUTHORIZATIONS_STATEMENTS
   })
 ]);
 

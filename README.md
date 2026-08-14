@@ -2,13 +2,14 @@
 
 > A self-hosted, official-first multichannel messaging hub.
 
-**Status: Phase 4g alpha source verified.** The repository contains a durable
+**Status: Phase 4g alpha source verified; Phase 4h candidate source.** The repository contains a durable
 PostgreSQL inbound-event ledger, account-scoped operator read APIs, a
 configured multi-connection inbox API, an optional server-rendered read-only
 operator dashboard, a durable source-bound reply-command ledger, a scoped
 queued-command history API, a verified server-rendered queued-command history
 page, a verified opt-in server-rendered reply-intent form, secret-backed
-runtime configuration for official accounts, and narrow
+runtime configuration for official accounts, a candidate immutable
+authorization-provenance record for newly created reply commands, and narrow
 official Zalo Official Account (OA), Facebook Page, and WhatsApp Business
 signed inbound-text boundaries. Phase 4a passed final local checks,
 independent review, a synthetic Docker proof, and GitHub CI/CodeQL for exact
@@ -37,6 +38,17 @@ independent security review, synthetic Compose smoke, and GitHub CI/CodeQL for
 exact commit <code>6444699</code>. It records narrow local evidence for a
 future dispatcher; it does not create a provider request, provider acceptance,
 delivery, or read result.
+
+Phase 4h is a candidate source extension, not verified source evidence yet.
+Migration <code>0011_outbound_command_authorizations</code> records one
+immutable authority-provenance row at most for each newly created command:
+whether the server used a configured inbox bearer or an explicitly writable
+dashboard principal/inbox closure, plus a non-secret fingerprint of its
+evaluated connection scope. It stores no bearer, session, target, text,
+provider credential, delivery result, or retry state. Existing commands are
+not backfilled and remain provenance-free no-dispatch candidates. This does
+not add a provider request, worker, dispatch, retry, browser send control, or
+delivery claim.
 
 The official Telegram Bot HTTP transport is wired for a deliberately narrow
 legacy text send/receive slice. Legacy mode uses <code>OPERATOR_API_TOKEN</code>;
@@ -215,6 +227,14 @@ GitHub checks <code>Verify Node 24.18.1</code> and
 <code>Analyze JavaScript and TypeScript</code>. This verifies the frozen source
 and synthetic local path only; it does not prove public TLS, live provider I/O,
 provider acceptance, delivery, read status, or production deployment.
+
+Phase 4h adds candidate immutable authorization provenance before any provider
+dispatch. The new row is created atomically with a new source-bound command,
+but it remains historical evidence rather than a current permission or send
+authorization. A replay must prove the same authority kind, configured inbox,
+optional dashboard principal, and evaluated scope fingerprint; it cannot fill
+or alter provenance. A later sender must still separately recheck current
+authorization and provider-specific eligibility.
 
 Multi-connection IDs are opaque safe route labels; <code>.</code> and
 <code>..</code> are rejected because webhook ingress places the ID in a dynamic
@@ -423,6 +443,7 @@ front of Compose, keep the operator API on loopback, and follow the
 [Phase 4e dashboard queued-command history guide](docs/operations/operator-dashboard-queued-history-4e.md), or
 [Phase 4f dashboard reply-intent guide](docs/operations/operator-dashboard-reply-intents-4f.md), or
 [Phase 4g delivery-evidence guide](docs/operations/outbound-delivery-evidence-4g.md), or
+[Phase 4h authorization-provenance guide](docs/operations/outbound-command-authorization-provenance-4h.md), or
 [Phase 4b operator dashboard guide](docs/operations/operator-dashboard-4b.md), or
 [Phase 1a legacy guide](docs/operations/telegram-bot-1a.md) only after an
 authorized test is agreed. Starting Compose does not provide TLS or register a
@@ -517,7 +538,9 @@ records the verified source's separate no-send/history boundary. The
 records the verified source's explicit opt-in write scope, per-principal local rate
 guard, and no-send boundary. The [Phase 4g delivery-evidence guide](docs/operations/outbound-delivery-evidence-4g.md)
 records the separate verified source attempt/receipt foundation; it adds no dashboard
-delivery result or provider action.
+delivery result or provider action. The [Phase 4h authorization-provenance guide](docs/operations/outbound-command-authorization-provenance-4h.md)
+records candidate historical authority evidence for new commands only; it grants
+no browser or provider send capability.
 
 ## Corresponding-source offer
 

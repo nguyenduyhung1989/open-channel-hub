@@ -406,6 +406,27 @@ describe('dashboard routes', () => {
     expect(readOnlyPage.body).not.toContain('name="clientOperationId"');
     expect(readOnlyPage.body).not.toContain('name="text"');
 
+    const readOnlyWriteAttempt = await readOnlyHarness.app.inject({
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        cookie: cookiePair(readOnlySessionCookie),
+        origin: PUBLIC_ORIGIN
+      },
+      method: 'POST',
+      payload: new URLSearchParams({
+        clientOperationId: 'a12904ec-0d47-4d5f-98bb-352720f9d0d5',
+        csrf: hiddenCsrf(readOnlyPage.body),
+        inbox: 'support-inbox',
+        sourceConnectionId: 'telegram-bot-support',
+        sourceProviderEventId: 'synthetic-provider-event-101',
+        text: 'A forged read-only dashboard write.'
+      }).toString(),
+      url: '/operator/reply-intents'
+    });
+
+    expect(readOnlyWriteAttempt.statusCode).toBe(404);
+    expect(readOnlyHarness.replyIntentRecord).not.toHaveBeenCalled();
+
     const writableHarness = await createHarness({
       replyIntentInboxIds: ['support-inbox'],
       supportRead
@@ -434,6 +455,8 @@ describe('dashboard routes', () => {
     expect(writablePage.body).not.toContain('Hội thoại');
     expect(writablePage.body).not.toContain('Người gửi');
     expect(writablePage.body).not.toContain('name="recipientId"');
+    expect(writablePage.body).not.toContain('name="dashboardPrincipalId"');
+    expect(writablePage.body).not.toContain('name="authorization"');
     expect(writablePage.body).not.toContain('name="channel"');
     expect(writablePage.body).not.toContain('name="sourceMessageId"');
     expect(writablePage.body).not.toContain('name="attempt"');
@@ -623,6 +646,26 @@ describe('dashboard routes', () => {
       payload: `${payload}&recipientId=forbidden`,
       url: '/operator/reply-intents'
     });
+    const forgedPrincipal = await harness.app.inject({
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        cookie: cookiePair(sessionCookie),
+        origin: PUBLIC_ORIGIN
+      },
+      method: 'POST',
+      payload: `${payload}&dashboardPrincipalId=sales-agent`,
+      url: '/operator/reply-intents'
+    });
+    const forgedAuthorization = await harness.app.inject({
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        cookie: cookiePair(sessionCookie),
+        origin: PUBLIC_ORIGIN
+      },
+      method: 'POST',
+      payload: `${payload}&authorization=dashboard_principal`,
+      url: '/operator/reply-intents'
+    });
     const duplicate = await harness.app.inject({
       headers: {
         'content-type': 'application/x-www-form-urlencoded',
@@ -659,12 +702,22 @@ describe('dashboard routes', () => {
     expect(unauthenticated.headers['set-cookie']).toContain('__Host-och_dashboard_session=;');
     expect(csrfFailure.statusCode).toBe(403);
     expect(malformed.statusCode).toBe(400);
+    expect(forgedPrincipal.statusCode).toBe(400);
+    expect(forgedAuthorization.statusCode).toBe(400);
     expect(duplicate.statusCode).toBe(400);
     expect(oversized.statusCode).toBe(413);
     expect(oversized.headers['cache-control']).toBe('no-store');
     expect(outOfScope.statusCode).toBe(404);
 
-    for (const response of [originFailure, csrfFailure, malformed, duplicate, outOfScope]) {
+    for (const response of [
+      originFailure,
+      csrfFailure,
+      malformed,
+      forgedPrincipal,
+      forgedAuthorization,
+      duplicate,
+      outOfScope
+    ]) {
       expect(response.body).toContain('Yêu cầu không thể xử lý an toàn.');
       expect(response.body).not.toContain(text);
     }

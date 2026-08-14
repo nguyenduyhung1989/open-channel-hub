@@ -1,6 +1,9 @@
+import { createHash } from 'node:crypto';
+
 import type {
   CreateOutboundReplyCommandResult,
   OutboundReplyCommand,
+  OutboundReplyCommandAuthorization,
   OutboundReplyCommandCreateInput,
   OutboundReplyCommandStore
 } from '@open-channel-hub/domain';
@@ -18,15 +21,18 @@ const MAXIMUM_MESSAGE_LENGTH = 4_096;
 const MAXIMUM_PROVIDER_IDENTIFIER_LENGTH = 512;
 const IDENTIFIER_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
 const PROVIDER_IDENTIFIER_PATTERN = /^[!-~]{1,512}$/;
+const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/;
 const ISO_UTC_MILLISECOND_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 const MAX_POSTGRES_BIGINT = '9223372036854775807';
+const AUTHORIZATION_SCOPE_FINGERPRINT_PREFIX =
+  'open-channel-hub/outbound-command-authorization-scope/v1\u0000';
 
 const COMMAND_COLUMNS_SQL = `
-  command_id::text AS command_id,
-  connection_id,
-  source_provider_event_id,
-  state,
-  to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at
+  outbound_command.command_id::text AS command_id,
+  outbound_command.connection_id,
+  outbound_command.source_provider_event_id,
+  outbound_command.state,
+  to_char(outbound_command.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at
 `;
 
 /**
@@ -37,11 +43,17 @@ const COMMAND_COLUMNS_SQL = `
 const FIND_IDEMPOTENCY_COMMAND_SQL = `
 SELECT
 ${COMMAND_COLUMNS_SQL},
-  message_text
-FROM ${POSTGRES_SCHEMA}.outbound_commands
-WHERE connection_id = $1
-  AND client_operation_id = $2
-  AND connection_id = ANY($3::text[])
+  outbound_command.message_text,
+  command_authorization.authorization_kind,
+  command_authorization.inbox_id,
+  command_authorization.dashboard_principal_id,
+  command_authorization.scope_fingerprint
+FROM ${POSTGRES_SCHEMA}.outbound_commands AS outbound_command
+LEFT JOIN ${POSTGRES_SCHEMA}.outbound_command_authorizations AS command_authorization
+  ON command_authorization.command_id = outbound_command.command_id
+WHERE outbound_command.connection_id = $1
+  AND outbound_command.client_operation_id = $2
+  AND outbound_command.connection_id = ANY($3::text[])
 `;
 
 /**
@@ -50,7 +62,7 @@ WHERE connection_id = $1
  * source-message id, or channel field that could be tampered with.
  */
 const INSERT_SOURCE_BOUND_COMMAND_SQL = `
-INSERT INTO ${POSTGRES_SCHEMA}.outbound_commands (
+INSERT INTO ${POSTGRES_SCHEMA}.outbound_commands AS outbound_command (
   connection_id,
   source_provider_event_id,
   client_operation_id,
@@ -78,15 +90,40 @@ RETURNING
 ${COMMAND_COLUMNS_SQL}
 `;
 
+const INSERT_OUTBOUND_COMMAND_AUTHORIZATION_SQL = `
+INSERT INTO ${POSTGRES_SCHEMA}.outbound_command_authorizations (
+  command_id,
+  authorization_kind,
+  inbox_id,
+  dashboard_principal_id,
+  scope_fingerprint
+)
+VALUES ($1::bigint, $2, $3, $4, $5)
+RETURNING
+  command_id::text AS command_id,
+  authorization_kind,
+  inbox_id,
+  dashboard_principal_id,
+  scope_fingerprint
+`;
+
 type ValidatedCreateInput = Readonly<{
   allowedConnectionIds: readonly string[];
+  authorization: OutboundReplyCommandAuthorization;
   clientOperationId: string;
+  scopeFingerprint: string;
   sourceConnectionId: string;
   sourceProviderEventId: string;
   text: string;
 }>;
 
+type StoredCommandAuthorization = Readonly<{
+  authorization: OutboundReplyCommandAuthorization;
+  scopeFingerprint: string;
+}>;
+
 type StoredIdempotencyCommand = Readonly<{
+  authorization: StoredCommandAuthorization | undefined;
   command: OutboundReplyCommand;
   messageText: string;
 }>;
@@ -180,8 +217,11 @@ export class PostgresOutboundReplyCommandStore implements OutboundReplyCommandSt
         throw new PostgresStorageError();
       }
 
+      const command = parsePublicCommand(row, input.sourceConnectionId);
+      await this.insertAuthorization(client, command, input);
+
       return Object.freeze({
-        command: parsePublicCommand(row, input.sourceConnectionId),
+        command,
         kind: 'created'
       });
     }
@@ -199,12 +239,33 @@ export class PostgresOutboundReplyCommandStore implements OutboundReplyCommandSt
       ? Object.freeze({ kind: 'source_unavailable' })
       : classifyExisting(existing, input);
   }
+
+  private async insertAuthorization(
+    client: SqlClient,
+    command: OutboundReplyCommand,
+    input: ValidatedCreateInput
+  ): Promise<void> {
+    const result = await client.query(INSERT_OUTBOUND_COMMAND_AUTHORIZATION_SQL, [
+      command.id,
+      input.authorization.kind,
+      input.authorization.inboxId,
+      input.authorization.kind === 'dashboard_principal'
+        ? input.authorization.dashboardPrincipalId
+        : null,
+      input.scopeFingerprint
+    ]);
+
+    assertInsertedAuthorization(result.rows, command.id, input);
+  }
 }
 
 const validateCreateInput = (input: OutboundReplyCommandCreateInput): ValidatedCreateInput => {
+  const authorization = isRecord(input) ? validateAuthorization(input.authorization) : undefined;
+
   if (
     !isRecord(input) ||
     !isSortedConnectionScope(input.allowedConnectionIds) ||
+    authorization === undefined ||
     !isOperationIdentifier(input.clientOperationId) ||
     !isConnectionIdentifier(input.sourceConnectionId) ||
     !isProviderIdentifier(input.sourceProviderEventId) ||
@@ -213,9 +274,13 @@ const validateCreateInput = (input: OutboundReplyCommandCreateInput): ValidatedC
     throw new PostgresStorageError();
   }
 
+  const allowedConnectionIds = Object.freeze([...input.allowedConnectionIds]);
+
   return Object.freeze({
-    allowedConnectionIds: Object.freeze([...input.allowedConnectionIds]),
+    allowedConnectionIds,
+    authorization,
     clientOperationId: input.clientOperationId,
+    scopeFingerprint: createScopeFingerprint(allowedConnectionIds),
     sourceConnectionId: input.sourceConnectionId,
     sourceProviderEventId: input.sourceProviderEventId,
     text: input.text
@@ -262,6 +327,7 @@ const parseOptionalStoredCommand = (
   }
 
   return Object.freeze({
+    authorization: parseStoredAuthorization(row),
     command: parsePublicCommand(row, expectedConnectionId),
     messageText: row.message_text
   });
@@ -302,18 +368,143 @@ const classifyExisting = (
   input: ValidatedCreateInput
 ): CreateOutboundReplyCommandResult =>
   existing.command.sourceProviderEventId === input.sourceProviderEventId &&
-  existing.messageText === input.text
+  existing.messageText === input.text &&
+  hasSameAuthorization(existing.authorization, input)
     ? Object.freeze({ command: existing.command, kind: 'idempotent_replay' })
     : Object.freeze({ kind: 'idempotency_conflict' });
 
+const assertInsertedAuthorization = (
+  rows: readonly Readonly<Record<string, unknown>>[],
+  expectedCommandId: string,
+  input: ValidatedCreateInput
+): void => {
+  if (rows.length !== 1) {
+    throw new PostgresStorageError();
+  }
+
+  const row = rows[0];
+
+  if (row === undefined || row.command_id !== expectedCommandId) {
+    throw new PostgresStorageError();
+  }
+
+  const authorization = parseStoredAuthorization(row);
+
+  if (authorization === undefined || !hasSameAuthorization(authorization, input)) {
+    throw new PostgresStorageError();
+  }
+};
+
+const parseStoredAuthorization = (
+  row: Readonly<Record<string, unknown>>
+): StoredCommandAuthorization | undefined => {
+  const kind = row.authorization_kind;
+  const inboxId = row.inbox_id;
+  const dashboardPrincipalId = row.dashboard_principal_id;
+  const scopeFingerprint = row.scope_fingerprint;
+
+  if (
+    kind === null &&
+    inboxId === null &&
+    dashboardPrincipalId === null &&
+    scopeFingerprint === null
+  ) {
+    return undefined;
+  }
+
+  if (!isAuthorizationIdentifier(inboxId) || !isSha256Hex(scopeFingerprint)) {
+    throw new PostgresStorageError();
+  }
+
+  if (kind === 'inbox_bearer' && dashboardPrincipalId === null) {
+    return Object.freeze({
+      authorization: Object.freeze({ inboxId, kind }),
+      scopeFingerprint
+    });
+  }
+
+  if (kind === 'dashboard_principal' && isAuthorizationIdentifier(dashboardPrincipalId)) {
+    return Object.freeze({
+      authorization: Object.freeze({ dashboardPrincipalId, inboxId, kind }),
+      scopeFingerprint
+    });
+  }
+
+  throw new PostgresStorageError();
+};
+
+const hasSameAuthorization = (
+  stored: StoredCommandAuthorization | undefined,
+  input: ValidatedCreateInput
+): boolean => {
+  if (
+    stored === undefined ||
+    stored.scopeFingerprint !== input.scopeFingerprint ||
+    stored.authorization.kind !== input.authorization.kind ||
+    stored.authorization.inboxId !== input.authorization.inboxId
+  ) {
+    return false;
+  }
+
+  return input.authorization.kind === 'inbox_bearer'
+    ? true
+    : stored.authorization.kind === 'dashboard_principal' &&
+        stored.authorization.dashboardPrincipalId === input.authorization.dashboardPrincipalId;
+};
+
+const validateAuthorization = (value: unknown): OutboundReplyCommandAuthorization | undefined => {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  if (
+    value.kind === 'inbox_bearer' &&
+    hasExactKeys(value, ['inboxId', 'kind']) &&
+    isAuthorizationIdentifier(value.inboxId)
+  ) {
+    return Object.freeze({ inboxId: value.inboxId, kind: value.kind });
+  }
+
+  if (
+    value.kind === 'dashboard_principal' &&
+    hasExactKeys(value, ['dashboardPrincipalId', 'inboxId', 'kind']) &&
+    isAuthorizationIdentifier(value.inboxId) &&
+    isAuthorizationIdentifier(value.dashboardPrincipalId)
+  ) {
+    return Object.freeze({
+      dashboardPrincipalId: value.dashboardPrincipalId,
+      inboxId: value.inboxId,
+      kind: value.kind
+    });
+  }
+
+  return undefined;
+};
+
+const createScopeFingerprint = (allowedConnectionIds: readonly string[]): string =>
+  createHash('sha256')
+    .update(AUTHORIZATION_SCOPE_FINGERPRINT_PREFIX)
+    .update(allowedConnectionIds.join('\u0000'))
+    .digest('hex');
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
+
+const hasExactKeys = (value: Record<string, unknown>, expectedKeys: readonly string[]): boolean => {
+  const keys = Object.keys(value);
+
+  return (
+    keys.length === expectedKeys.length && expectedKeys.every((key) => Object.hasOwn(value, key))
+  );
+};
 
 const isConnectionIdentifier = (value: unknown): value is string =>
   typeof value === 'string' && IDENTIFIER_PATTERN.test(value);
 
 const isOperationIdentifier = (value: unknown): value is string =>
   isConnectionIdentifier(value) && value !== '.' && value !== '..';
+
+const isAuthorizationIdentifier = (value: unknown): value is string => isOperationIdentifier(value);
 
 const isProviderIdentifier = (value: unknown): value is string =>
   typeof value === 'string' &&
@@ -325,6 +516,9 @@ const isMessageText = (value: unknown): value is string =>
   value.length >= 1 &&
   value.length <= MAXIMUM_MESSAGE_LENGTH &&
   value.trim().length > 0;
+
+const isSha256Hex = (value: unknown): value is string =>
+  typeof value === 'string' && SHA256_HEX_PATTERN.test(value);
 
 const isPostgresBigInt = (value: unknown): value is string =>
   typeof value === 'string' &&

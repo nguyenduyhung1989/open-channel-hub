@@ -83,6 +83,8 @@ describe('Inbox outbound-commands route', () => {
     });
     expect(response.body).not.toContain('operator text exactly');
     expect(response.body).not.toContain(SUPPORT_TOKEN);
+    expect(response.body).not.toContain('dashboardPrincipalId');
+    expect(response.body).not.toContain('"authorization"');
     expect(response.body).not.toContain('replyTargetId');
   });
 
@@ -199,7 +201,17 @@ describe('Inbox outbound-commands route', () => {
       { ...valid, sourceProviderEventId: ' contains-space' },
       { ...valid, text: '   ' },
       { ...valid, text: 'x'.repeat(2_001) },
-      { ...valid, recipientId: 'caller-selected-target' }
+      { ...valid, recipientId: 'caller-selected-target' },
+      {
+        ...valid,
+        allowedConnectionIds: ['telegram-bot-sales'],
+        authorization: {
+          dashboardPrincipalId: 'sales-agent',
+          inboxId: 'sales',
+          kind: 'dashboard_principal'
+        },
+        inboxId: 'sales'
+      }
     ]) {
       const response = await app.inject({
         headers: { authorization: `Bearer ${SUPPORT_TOKEN}` },
@@ -270,6 +282,9 @@ const createFeature = (
     );
   const feature: InboxFeature = Object.freeze({
     connectionIds: SUPPORT_CONNECTION_IDS,
+    createDashboardReplyIntentCapability: vi.fn(() =>
+      Object.freeze({ recordReplyIntent: createOutboundReplyCommand })
+    ),
     createOutboundReplyCommand,
     id: 'support',
     readInboundEvents: vi.fn(async (): Promise<InboundEventPage> => ({ events: [] })),

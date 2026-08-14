@@ -118,6 +118,40 @@ describe('PostgreSQL migrations', () => {
     expect(sql).toContain(
       'BEFORE UPDATE OR DELETE ON open_channel_hub.outbound_delivery_attempt_receipts'
     );
+    expect(sql).toContain('CREATE TABLE open_channel_hub.outbound_command_authorizations');
+    expect(sql).toContain('command_id bigint PRIMARY KEY');
+    expect(sql).toContain('authorization_kind text NOT NULL');
+    expect(sql).toContain('inbox_id text NOT NULL');
+    expect(sql).toContain('dashboard_principal_id text');
+    expect(sql).toContain('scope_fingerprint text NOT NULL');
+    expect(sql).toContain('recorded_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP');
+    expect(sql).toContain('outbound_command_authorizations_command_fk FOREIGN KEY (command_id)');
+    expect(sql).toContain('REFERENCES open_channel_hub.outbound_commands (command_id)');
+    expect(sql).toContain('outbound_command_authorizations_kind_known CHECK');
+    expect(sql).toContain("authorization_kind IN ('inbox_bearer', 'dashboard_principal')");
+    expect(sql).toContain('outbound_command_authorizations_inbox_id_format CHECK');
+    expect(sql).toContain('char_length(inbox_id) BETWEEN 1 AND 128');
+    expect(sql).toContain("inbox_id ~ '^[A-Za-z0-9._:-]{1,128}$'");
+    expect(sql).toContain("inbox_id NOT IN ('.', '..')");
+    expect(sql).toContain('outbound_command_authorizations_dashboard_principal_id_format CHECK');
+    expect(sql).toContain('char_length(dashboard_principal_id) BETWEEN 1 AND 128');
+    expect(sql).toContain("dashboard_principal_id ~ '^[A-Za-z0-9._:-]{1,128}$'");
+    expect(sql).toContain("dashboard_principal_id NOT IN ('.', '..')");
+    expect(sql).toContain('outbound_command_authorizations_principal_kind_match CHECK');
+    expect(sql).toContain("authorization_kind = 'inbox_bearer' AND dashboard_principal_id IS NULL");
+    expect(sql).toContain(
+      "authorization_kind = 'dashboard_principal'\n      AND dashboard_principal_id IS NOT NULL"
+    );
+    expect(sql).toContain('outbound_command_authorizations_scope_fingerprint_format CHECK');
+    expect(sql).toContain('char_length(scope_fingerprint) = 64');
+    expect(sql).toContain("scope_fingerprint ~ '^[a-f0-9]{64}$'");
+    expect(sql).toContain(
+      'CREATE FUNCTION open_channel_hub.reject_outbound_command_authorization_mutation()'
+    );
+    expect(sql).toContain('CREATE TRIGGER outbound_command_authorizations_immutable');
+    expect(sql).toContain(
+      'BEFORE UPDATE OR DELETE ON open_channel_hub.outbound_command_authorizations'
+    );
     const deliveryAttemptStart = sql.indexOf(
       'CREATE TABLE open_channel_hub.outbound_delivery_attempts'
     );
@@ -126,6 +160,10 @@ describe('PostgreSQL migrations', () => {
     );
     const deliveryAttemptSql = sql.slice(deliveryAttemptStart, deliveryReceiptStart);
     const deliveryReceiptSql = sql.slice(deliveryReceiptStart);
+    const commandAuthorizationStart = sql.indexOf(
+      'CREATE TABLE open_channel_hub.outbound_command_authorizations'
+    );
+    const commandAuthorizationSql = sql.slice(commandAuthorizationStart);
 
     for (const forbiddenField of [
       'reply_target_id',
@@ -139,6 +177,23 @@ describe('PostgreSQL migrations', () => {
     ]) {
       expect(deliveryAttemptSql).not.toContain(forbiddenField);
       expect(deliveryReceiptSql).not.toContain(forbiddenField);
+      expect(commandAuthorizationSql).not.toContain(forbiddenField);
+    }
+    for (const forbiddenAuthorizationField of [
+      'password',
+      'token',
+      'session',
+      'cookie',
+      'reply_target_id',
+      'source_message_id',
+      'message_text',
+      'provider_',
+      'attempt',
+      'delivery',
+      'retry',
+      'state'
+    ]) {
+      expect(commandAuthorizationSql).not.toContain(forbiddenAuthorizationField);
     }
     expect(sql).toContain('INSERT INTO open_channel_hub.schema_migrations');
     expect(sql).not.toContain('public.');
@@ -146,7 +201,7 @@ describe('PostgreSQL migrations', () => {
       .filter((query) => query.sql.includes('INSERT INTO open_channel_hub.schema_migrations'))
       .map((query) => query.values[0]);
 
-    expect(recordedMigrationIds).toHaveLength(10);
+    expect(recordedMigrationIds).toHaveLength(11);
     expect(recordedMigrationIds).toEqual([
       '0001_inbound_event_ledger',
       '0002_inbound_event_ledger_sequence',
@@ -157,7 +212,8 @@ describe('PostgreSQL migrations', () => {
       '0007_connection_registry_whatsapp_business_provider_identity',
       '0008_dashboard_sessions',
       '0009_outbound_reply_commands',
-      '0010_outbound_delivery_attempt_receipts'
+      '0010_outbound_delivery_attempt_receipts',
+      '0011_outbound_command_authorizations'
     ]);
     expect(pool.releaseCount).toBe(1);
   });
@@ -207,6 +263,13 @@ describe('PostgreSQL migrations', () => {
     expect(secondRunSql).not.toContain(
       'CREATE TRIGGER outbound_delivery_attempt_receipts_immutable'
     );
+    expect(secondRunSql).not.toContain(
+      'CREATE TABLE open_channel_hub.outbound_command_authorizations'
+    );
+    expect(secondRunSql).not.toContain(
+      'CREATE FUNCTION open_channel_hub.reject_outbound_command_authorization_mutation()'
+    );
+    expect(secondRunSql).not.toContain('CREATE TRIGGER outbound_command_authorizations_immutable');
     expect(secondRunSql).not.toContain('INSERT INTO open_channel_hub.schema_migrations');
     expect(pool.releaseCount).toBe(2);
   });

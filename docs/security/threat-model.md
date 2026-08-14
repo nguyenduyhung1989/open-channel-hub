@@ -1,6 +1,6 @@
-# Phase 0–4g threat model
+# Phase 0–4h threat model
 
-**Review date:** 2026-08-13
+**Review date:** 2026-08-14
 
 **Status:** GitHub CI and CodeQL succeeded for Phase 0 commit <code>8b80c3b</code>,
 Phase 1a candidate <code>7141949</code>, Phase 2a candidate <code>f106bb8</code>,
@@ -31,6 +31,9 @@ with zero high/medium findings, and those two GitHub checks. No live Telegram,
 Zalo, Meta, public TLS, provider send, or production flow has been used. Phase
 4g is a storage-only verified source; its evidence does not prove live provider
 I/O, provider acceptance, delivery, read status, or production deployment.
+Phase 4h is a candidate-only immutable authorization-provenance change. It has
+not yet received final local, independent, synthetic Compose, or GitHub
+verification and does not authorize provider I/O.
 
 ## Facts before plans
 
@@ -40,6 +43,7 @@ I/O, provider acceptance, delivery, read status, or production deployment.
 | PostgreSQL 18.4 on an internal Compose network; dedicated database/schema; non-superuser application role; forward migration ledger; connection registry; `NOT VALID` event foreign key; parameterized multi-connection feed and queued-command-history readers; optional HMAC-only dashboard-session store; immutable source-bound reply commands; and verified Phase 4g append-only attempt/receipt evidence tables.                                                                                                                                                                      | The Phase 4b Compose proof verified eight migrations, registry, role boundary, two business phones, one shared Facebook/WhatsApp App callback, and separate multi-account inbox scopes. The Phase 4c–4d proof at `160414e` verified the ninth migration, source-bound idempotency/target derivation, queued-history pagination, scope isolation, and safe projection. The Phase 4g smoke at `6444699` verified ten migrations and structural attempt/receipt evidence only. | Backups, restores, retention/deletion, password rotation, encryption-at-rest assurance, capacity policy, dispatch/receipt semantics, and production monitoring.              |
 | Runtime multi-connection JSON is parsed only from an absolute secret file. It accepts strict `telegram_bot`, `zalo_oa`, `facebook_page`, and `whatsapp_business` entries, optional `inboxes`, and optional `dashboard` principals with an exact public HTTPS origin and exact-profile Argon2id password hashes. Phase 4f adds optional principal `replyIntentInboxIds` as an explicit subset of readable inboxes.                                                                                                                                                                           | Configuration loader tests use synthetic documents and reject malformed/duplicate/unsafe input without leaking content. A Meta App used by both Facebook Page and WhatsApp requires matching credentials and one common declared `/v1/webhooks/meta` callback. Phase 4f checks passed at `74fca30`.                                                                                                                                                                         | Managed secret store, rotation procedure, host hardening, and audit logging.                                                                                                 |
 | Provider webhook routes resolve configured accounts internally; account bearers resolve one account; inbox bearers resolve one explicit connection set; dashboard sessions resolve one configured principal and then its configured inboxes. A configured inbox bearer can record a source-bound reply intent and read its queued history; the target remains private and history exposes recorded text only. Phase 4f requires an explicit principal write subset before a narrow dashboard closure can record the same intent. Zalo checks raw JSON hashing; Meta checks raw Buffer HMAC. | Route tests cover bearer scoping, wrong-secret/unknown-identity equivalence, raw-byte signature mismatch, Page/WABA batch isolation, Meta challenge handling, shared callback dispatch, inbox bearer/cursor scope rejection, canonical-only output, dashboard controls, and source-bound command/history controls with synthetic features. Phase 4f checks passed at `74fca30`.                                                                                             | Full user login/organization/RBAC model, distributed rate limit, audit trail, public connection administration, provider dispatch policy, and provider timing/load evidence. |
+| Candidate Phase 4h code creates one immutable authorization-provenance row alongside each new reply command. It stores only kind, configured inbox ID, optional dashboard principal ID, scope fingerprint, and time; old command rows are not backfilled.                                                                                                                                                                                                                                                                                                                                   | Verification is pending. The candidate has no public API field or browser field for provenance and no provider I/O.                                                                                                                                                                                                                                                                                                                                                         | A current authorization recheck, legacy-command policy, provider eligibility, dispatcher, retry policy, and production deployment.                                           |
 
 Do not treat a source fact, historical CI result, or synthetic proof as a
 production claim.
@@ -104,6 +108,33 @@ production claim.
   focused final local evidence and independent security audit APPROVE described
   above; it still does not prove public TLS, provider send, or production.
 
+## Phase 4h candidate authorization-provenance boundary
+
+- `0011_outbound_command_authorizations` has one row at most for a new command:
+  `command_id` is its primary key and its foreign key to the immutable command.
+  Its update/delete-rejection trigger makes it append-only.
+- The only accepted kinds are `inbox_bearer` and `dashboard_principal`. The
+  former requires no principal; the latter requires a valid principal. Both
+  record the configured inbox ID and a SHA-256 fingerprint of the sorted scope
+  evaluated by the server at creation. The table excludes bearer/session values,
+  password material, anti-forgery values, target, text, provider data,
+  delivery/receipt state, retry, and mutable state.
+- The inbox API can create only server-injected `inbox_bearer` provenance. The
+  dashboard can create only server-injected `dashboard_principal` provenance
+  through a closure materialized after the authenticated principal's explicit
+  `replyIntentInboxIds` grant. Its form carries an inbox ID already visible to
+  that principal, but the server treats it as untrusted and accepts it only if
+  the principal's pre-built writable capability resolves that exact inbox.
+  Authority kind, dashboard principal ID, and scope fingerprint are never
+  browser-supplied or returned.
+- A newly created command and provenance row are one transaction. Exact replay
+  requires matching source/text plus kind, inbox, optional principal, and
+  scope fingerprint. A mismatch fails rather than changing provenance.
+- Historic commands have no row. Phase 4h does not infer/backfill it, and a
+  provenance row is not current permission or a provider-send authorization.
+  No provider request, worker, queue, dispatcher, retry, browser send control,
+  delivery/read state, or live-provider test is in scope.
+
 ## Trust zones and data flow
 
 ### Zone A — external and untrusted
@@ -130,12 +161,18 @@ moving that bearer or a generic database capability into the browser. The
 verified Phase 4f source adds a distinct server-held intent-recording closure only
 after an explicit configured principal/inbox write grant; it still exposes no
 bearer, provider credential, recipient, or generic database capability.
+The Phase 4h candidate keeps the authority tuple server-side as well: the
+public inbox view has no dashboard factory, and a principal-specific dashboard
+closure exists only for an explicitly writable inbox. A dashboard form can
+submit its already-visible inbox ID, but it is untrusted and can select only a
+pre-built writable closure for that session principal; kind, principal, scope
+fingerprint, and the closure itself remain server-side.
 
 ### Zone C — durable PostgreSQL ledger
 
 This zone contains the Docker volume, database, schema, migration ledger,
 connection registry, dashboard session table, source-bound reply-command table,
-and canonical inbound events. The
+candidate authorization-provenance table, and canonical inbound events. The
 registry contains opaque internal connection ID, connector metadata, and — only
 for Zalo OA, Facebook Page, and WhatsApp Business — domain-separated SHA-256
 account-binding fingerprints. The dashboard-session table contains only
@@ -156,6 +193,12 @@ it adds no table, migration, or command-row mutation. The verified Phase 4f sour
 reuses the existing Phase 4c command transaction after server-side form,
 session, origin, anti-forgery, write-scope, and source checks. It adds no new
 database path, migration, or mutable command state.
+
+The Phase 4h candidate adds a separate append-only provenance table. It retains
+only the internal authority kind, configured inbox ID, optional dashboard
+principal ID, scope fingerprint, and time. The adapter derives this evidence
+from its server-owned scope and writes it atomically with a new command; it
+does not persist any credential or make current authorization/delivery claims.
 
 The intended path is:
 
@@ -187,6 +230,12 @@ The Phase 4f dashboard-intent path is:
 anti-forgery check → resolve explicit principal/inbox write grant → Phase 4c
 source-scope check and private target derivation → immutable queued command →
 303 queued-history view</code>.
+
+The Phase 4h candidate records provenance inside that final storage
+transaction. A caller can submit an untrusted inbox selection, but the server
+does not copy an authority tuple from that form/API input: it resolves the
+fixed principal-and-inbox closure, then supplies kind, principal, and scope
+fingerprint itself.
 
 Raw provider payloads, runtime credentials, and caller-chosen recipient IDs do
 not cross the storage boundary.
@@ -278,6 +327,11 @@ not cross the storage boundary.
   the server and existing source-bound store must enforce the actual scope and
   derived target. Its 20-attempt per-principal guard exists only in one process
   and is not evidence of a public distributed rate limit.
+- The Phase 4h candidate's authority kind, configured inbox ID, optional
+  dashboard principal ID, and scope fingerprint are sensitive operational
+  provenance. They are not credentials and do not prove current authorization.
+  A command without this row must remain a no-dispatch candidate; a command
+  with it still needs a fresh authorization and provider-eligibility recheck.
 - A liveness response does not prove database availability; only `/ready`
   checks expected migrations.
 - A green test, synthetic Docker proof, historical CI, or webhook registration
@@ -293,7 +347,8 @@ Update this model before a real Telegram, Zalo OA, Facebook Page, or WhatsApp
 Business test, public webhook/TLS exposure, dashboard public deployment,
 Phase 4e history-projection or scope-boundary change, any Phase 4f
 reply-intent authorization, form, source-binding, rate-limit, or projection
-change,
+change, any Phase 4h authorization-provenance schema, transaction, replay,
+scope-fingerprint, or projection change,
 inbox-scope/password/session-key rotation change, backup or retention work,
 foreign-key validation, new database access path or history projection,
 dispatch/attempt/retry work, full login/RBAC, AI feature, production deployment,

@@ -267,6 +267,12 @@ const createFeature = (
     vi.fn(async (): Promise<OutboundReplyCommandHistoryPage> => ({ commands: [] }));
   const feature: InboxFeature = Object.freeze({
     connectionIds: SUPPORT_CONNECTION_IDS,
+    createDashboardReplyIntentCapability: vi.fn(() =>
+      Object.freeze({
+        recordReplyIntent: async (): Promise<CreateOutboundReplyCommandResult> =>
+          Object.freeze({ kind: 'source_unavailable' })
+      })
+    ),
     createOutboundReplyCommand: vi.fn(async (): Promise<CreateOutboundReplyCommandResult> =>
       Object.freeze({ kind: 'source_unavailable' })
     ),

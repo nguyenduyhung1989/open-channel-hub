@@ -1,12 +1,14 @@
 import type {
   InboundEventFeedReader,
   OutboundReplyCommandHistoryReader,
+  OutboundReplyCommandAuthorization,
   OutboundReplyCommandStore
 } from '@open-channel-hub/domain';
 
 import type { RuntimeInbox } from '../connections/runtime-connection-configuration.js';
 import type {
   InboxFeature,
+  InboxDashboardReplyIntentCapability,
   InboxInboundEventListInput,
   InboxOutboundReplyCommandHistoryListInput,
   InboxOutboundReplyCommandInput
@@ -32,19 +34,46 @@ export const createRuntimeInboxFeatures = (
         input: InboxOutboundReplyCommandHistoryListInput
       ) =>
         outboundReplyCommandHistoryReader.list({ ...input, allowedConnectionIds: connectionIds });
-      const createOutboundReplyCommand = async (input: InboxOutboundReplyCommandInput) =>
+      const createCommand = async (
+        input: InboxOutboundReplyCommandInput,
+        authorization: OutboundReplyCommandAuthorization
+      ) =>
         outboundReplyCommandStore.create(
           Object.freeze({
             allowedConnectionIds: connectionIds,
+            authorization,
             clientOperationId: input.clientOperationId,
             sourceConnectionId: input.sourceConnectionId,
             sourceProviderEventId: input.sourceProviderEventId,
             text: input.text
           })
         );
+      const createOutboundReplyCommand = async (input: InboxOutboundReplyCommandInput) =>
+        createCommand(
+          input,
+          Object.freeze({
+            inboxId: inbox.id,
+            kind: 'inbox_bearer'
+          })
+        );
+      const createDashboardReplyIntentCapability = (
+        dashboardPrincipalId: string
+      ): InboxDashboardReplyIntentCapability =>
+        Object.freeze({
+          recordReplyIntent: async (input: InboxOutboundReplyCommandInput) =>
+            createCommand(
+              input,
+              Object.freeze({
+                dashboardPrincipalId,
+                inboxId: inbox.id,
+                kind: 'dashboard_principal'
+              })
+            )
+        });
 
       return Object.freeze({
         connectionIds,
+        createDashboardReplyIntentCapability,
         createOutboundReplyCommand,
         id: inbox.id,
         readInboundEvents,

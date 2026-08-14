@@ -603,7 +603,7 @@ assert_equal \
 migration_count="$(
   query_postgres "SELECT COUNT(*) FROM open_channel_hub.schema_migrations;"
 )"
-assert_equal '10' "$migration_count" 'immutable migration ledger entry count'
+assert_equal '11' "$migration_count" 'immutable migration ledger entry count'
 
 connection_registry_records="$(
   query_postgres "SELECT connection_id || ':' || connector_id || ':' || channel || ':' || tier FROM open_channel_hub.connection_registry ORDER BY connection_id;"
@@ -900,6 +900,14 @@ assert_equal \
   'present' \
   "$outbound_delivery_evidence_schema_guards" \
   'Phase 4g delivery-evidence tables, constraints, and immutable triggers'
+
+outbound_command_authorization_schema_guards="$(
+  query_postgres "SELECT CASE WHEN to_regclass('open_channel_hub.outbound_command_authorizations') IS NOT NULL AND (SELECT string_agg(column_name, ',' ORDER BY ordinal_position) FROM information_schema.columns WHERE table_schema = 'open_channel_hub' AND table_name = 'outbound_command_authorizations') = 'command_id,authorization_kind,inbox_id,dashboard_principal_id,scope_fingerprint,recorded_at' AND (SELECT string_agg(column_name || ':' || is_nullable, ',' ORDER BY ordinal_position) FROM information_schema.columns WHERE table_schema = 'open_channel_hub' AND table_name = 'outbound_command_authorizations') = 'command_id:NO,authorization_kind:NO,inbox_id:NO,dashboard_principal_id:YES,scope_fingerprint:NO,recorded_at:NO' AND (SELECT COUNT(*) FROM pg_constraint WHERE conrelid = 'open_channel_hub.outbound_command_authorizations'::regclass AND conname IN ('outbound_command_authorizations_command_fk', 'outbound_command_authorizations_kind_known', 'outbound_command_authorizations_inbox_id_format', 'outbound_command_authorizations_dashboard_principal_id_format', 'outbound_command_authorizations_principal_kind_match', 'outbound_command_authorizations_scope_fingerprint_format')) = 6 AND (SELECT COUNT(*) FROM pg_constraint WHERE conrelid = 'open_channel_hub.outbound_command_authorizations'::regclass AND contype = 'p' AND conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'open_channel_hub.outbound_command_authorizations'::regclass AND attname = 'command_id' AND NOT attisdropped)]) = 1 AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'open_channel_hub.outbound_command_authorizations'::regclass AND tgname = 'outbound_command_authorizations_immutable' AND NOT tgisinternal) THEN 'present' ELSE 'missing' END;"
+)"
+assert_equal \
+  'present' \
+  "$outbound_command_authorization_schema_guards" \
+  'Phase 4h authorization-provenance table, constraints, and immutable trigger'
 
 support_outbound_history_queued_rows="$(
   query_postgres "SELECT CASE WHEN COUNT(*) = 2 AND COUNT(*) FILTER (WHERE state = 'queued') = 2 THEN 'present' ELSE 'missing' END FROM open_channel_hub.outbound_commands WHERE connection_id = 'telegram-bot-support' AND client_operation_id IN ('${support_outbound_client_operation_id}', '${support_outbound_history_client_operation_id}');"

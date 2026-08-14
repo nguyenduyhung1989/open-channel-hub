@@ -478,6 +478,38 @@ deployment.
       proof with cleanup, and fresh GitHub CI/CodeQL for exact commit
       <code>6444699</code>.
 
+### 4h — immutable reply-command authorization provenance
+
+**Status: candidate source; verification is not complete.**
+
+- [x] Forward migration
+      <code>0011_outbound_command_authorizations</code> adds one immutable,
+      one-to-one authorization-provenance row per newly created command. Its
+      `command_id` is both primary key and foreign key to `outbound_commands`.
+- [x] A row records only `inbox_bearer` or `dashboard_principal`, one configured
+      inbox ID, an optional dashboard principal ID valid only for the latter,
+      a SHA-256 scope fingerprint, and recording time. It stores no bearer,
+      session, password/hash, anti-forgery value, target, text, provider data,
+      delivery result, retry, or mutable state.
+- [x] The PostgreSQL adapter derives the fingerprint from the sorted connection
+      scope and writes provenance in the same transaction as a new command.
+      Exact replay requires the same authority provenance; a mismatch conflicts
+      instead of filling or mutating a row.
+- [x] The runtime supplies provenance only server-side: an inbox bearer binds
+      its configured inbox; a dashboard form may carry an inbox ID already
+      visible to its authenticated principal, but the server treats it as
+      untrusted and resolves only that principal's explicitly writable inbox
+      capability. Authority kind, principal ID, and scope fingerprint are not
+      browser-supplied or returned.
+- [x] Commands predating `0011` remain provenance-free and are no-dispatch
+      candidates. The migration does not guess or backfill historical authority.
+- [x] No provider request, SDK, credential/OAuth storage, worker, queue,
+      dispatcher, retry, browser bearer, dashboard send control, command
+      mutation, delivery/read state, or live-provider test is introduced.
+- [ ] Freeze the exact source, run final local verification, complete
+      independent review, run the synthetic Compose proof, and verify GitHub
+      CI/CodeQL before calling this source verified.
+
 ### Later Phase 4 work
 
 - Full user accounts/organizations, tested RBAC, invitation/password-reset
@@ -487,8 +519,8 @@ deployment.
   assurance.
 - Provider-specific dispatch policy/capabilities, timeout uncertainty,
   delivery/read status, and retries only after official provider review and a
-  separate security boundary. Phase 4g evidence is not any of those delivery
-  capabilities.
+  separate security boundary. Phase 4g evidence and Phase 4h provenance are
+  not any of those delivery capabilities.
 
 ## Phase 5 — experimental connectors, only with evidence
 

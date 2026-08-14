@@ -25,10 +25,20 @@ describe('runtime dashboard feature', () => {
     const supportReplyIntent = vi.fn(async (): Promise<CreateOutboundReplyCommandResult> =>
       Object.freeze({ kind: 'source_unavailable' })
     );
+    const supportDashboardCapability = vi.fn(() =>
+      Object.freeze({ recordReplyIntent: supportReplyIntent })
+    );
     const dashboard = createRuntimeDashboardFeature(
       runtimeDashboard({ supportReplyIntentInboxIds: ['support-inbox'] }),
       [
-        inbox('support-inbox', SUPPORT_TOKEN, supportRead, supportHistoryRead, supportReplyIntent),
+        inbox(
+          'support-inbox',
+          SUPPORT_TOKEN,
+          supportRead,
+          supportHistoryRead,
+          supportReplyIntent,
+          supportDashboardCapability
+        ),
         inbox('sales-inbox', SALES_TOKEN)
       ],
       sessionStore()
@@ -61,6 +71,8 @@ describe('runtime dashboard feature', () => {
     });
     expect(JSON.stringify(replyIntentInbox)).not.toContain(SUPPORT_TOKEN);
     expect(replyIntentInbox).not.toHaveProperty('connectionIds');
+    expect(replyIntentInbox).not.toHaveProperty('createDashboardReplyIntentCapability');
+    expect(replyIntentInbox).not.toHaveProperty('createOutboundReplyCommand');
     expect(replyIntentInbox).not.toHaveProperty('readInboundEvents');
     expect(replyIntentInbox).not.toHaveProperty('readOutboundReplyCommandHistory');
     expect(replyIntentInbox).not.toHaveProperty('token');
@@ -76,6 +88,8 @@ describe('runtime dashboard feature', () => {
       text: 'Synthetic reply intent'
     });
 
+    expect(supportDashboardCapability).toHaveBeenCalledOnce();
+    expect(supportDashboardCapability).toHaveBeenCalledWith('support-agent');
     expect(supportReplyIntent).toHaveBeenCalledWith({
       clientOperationId: 'cf30a1d2-b7f2-4b55-afd5-1e1f6a5ef6de',
       sourceConnectionId: 'telegram-bot-support',
@@ -83,15 +97,32 @@ describe('runtime dashboard feature', () => {
       text: 'Synthetic reply intent'
     });
 
+    const readOnlyCapabilityFactory = vi.fn(() =>
+      Object.freeze({
+        recordReplyIntent: async (): Promise<CreateOutboundReplyCommandResult> =>
+          Object.freeze({ kind: 'source_unavailable' })
+      })
+    );
     const readOnlyDashboard = createRuntimeDashboardFeature(
       runtimeDashboard(),
-      [inbox('support-inbox', SUPPORT_TOKEN), inbox('sales-inbox', SALES_TOKEN)],
+      [
+        inbox(
+          'support-inbox',
+          SUPPORT_TOKEN,
+          undefined,
+          undefined,
+          undefined,
+          readOnlyCapabilityFactory
+        ),
+        inbox('sales-inbox', SALES_TOKEN)
+      ],
       sessionStore()
     );
 
     expect(
       readOnlyDashboard.findReplyIntentInbox('support-agent', 'support-inbox')
     ).toBeUndefined();
+    expect(readOnlyCapabilityFactory).not.toHaveBeenCalled();
   });
 
   it('refuses a direct composition graph with duplicated or unavailable inboxes', () => {
@@ -156,10 +187,13 @@ const inbox = (
     commands: []
   }),
   createOutboundReplyCommand: InboxFeature['createOutboundReplyCommand'] = async (): Promise<CreateOutboundReplyCommandResult> =>
-    Object.freeze({ kind: 'source_unavailable' })
+    Object.freeze({ kind: 'source_unavailable' }),
+  createDashboardReplyIntentCapability: InboxFeature['createDashboardReplyIntentCapability'] = () =>
+    Object.freeze({ recordReplyIntent: createOutboundReplyCommand })
 ): InboxFeature =>
   Object.freeze({
     connectionIds: Object.freeze(['telegram-bot-support']),
+    createDashboardReplyIntentCapability,
     createOutboundReplyCommand,
     id,
     readInboundEvents,

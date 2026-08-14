@@ -88,10 +88,39 @@ describe('createRuntimeInboxFeatures', () => {
 
     expect(create).toHaveBeenCalledWith({
       allowedConnectionIds: RUNTIME_INBOX.connectionIds,
+      authorization: {
+        inboxId: 'support',
+        kind: 'inbox_bearer'
+      },
       clientOperationId: 'operator-command-20260813-0001',
       sourceConnectionId: 'telegram-bot-support',
       sourceProviderEventId: '9001',
       text: '  Preserve the operator text exactly.  '
+    });
+
+    const dashboardCapability = feature?.createDashboardReplyIntentCapability('support-agent');
+
+    expect(dashboardCapability).toBeDefined();
+    expect(Object.isFrozen(dashboardCapability)).toBe(true);
+
+    await dashboardCapability?.recordReplyIntent({
+      clientOperationId: 'operator-command-20260813-0002',
+      sourceConnectionId: 'telegram-bot-support',
+      sourceProviderEventId: '9002',
+      text: 'A server-bound dashboard reply intent.'
+    });
+
+    expect(create).toHaveBeenLastCalledWith({
+      allowedConnectionIds: RUNTIME_INBOX.connectionIds,
+      authorization: {
+        dashboardPrincipalId: 'support-agent',
+        inboxId: 'support',
+        kind: 'dashboard_principal'
+      },
+      clientOperationId: 'operator-command-20260813-0002',
+      sourceConnectionId: 'telegram-bot-support',
+      sourceProviderEventId: '9002',
+      text: 'A server-bound dashboard reply intent.'
     });
   });
 });

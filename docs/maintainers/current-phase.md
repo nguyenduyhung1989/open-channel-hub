@@ -1,4 +1,4 @@
-# Public checkpoint: Phase 4a–4g verified source
+# Public checkpoint: Phase 4a–4g verified source; Phase 4h candidate
 
 **Verified scope:** Phase 4a is a configured, read-only aggregate feed across
 an explicit set of existing official connections. It builds on the Telegram
@@ -69,6 +69,39 @@ GitHub checks <code>Verify Node 24.18.1</code> and
 synthetic local evidence only; it does not prove public TLS, live provider I/O,
 provider acceptance, delivery, read status, or production deployment.
 
+## Phase 4h candidate source
+
+Phase 4h is not verified yet. It adds one forward-only PostgreSQL migration,
+`0011_outbound_command_authorizations`, for immutable historical provenance of
+new reply commands. A command can have at most one row because `command_id` is
+both the primary key and foreign key to `outbound_commands`.
+
+The row says only whether the server recorded a command through the
+`inbox_bearer` path or through a `dashboard_principal` write closure, which
+configured inbox was evaluated, which dashboard principal was involved when
+applicable, and a non-secret SHA-256 fingerprint of the sorted allowed
+connection scope. It does not store an inbox bearer, browser session,
+password/hash, anti-forgery value, reply target, text, provider credential, raw
+provider response, delivery result, retry state, or mutable command state.
+
+The runtime creates bearer provenance only inside the configured inbox feature.
+It creates dashboard provenance only after the server has selected an
+authenticated configured principal and an explicitly writable inbox. The
+dashboard form carries an inbox ID already visible to that principal, but the
+server treats it as untrusted and accepts it only when the fixed writable
+capability for that principal resolves it. Authority kind, principal ID, and
+scope fingerprint are not browser-supplied or returned. The PostgreSQL adapter
+writes the command and provenance row in the same transaction; exact replay
+must prove the same source, text, kind, inbox, optional principal, and scope
+fingerprint or returns a conflict.
+
+The migration does not invent provenance for historic commands. Any command
+without its row remains provenance-free and must be excluded from a future
+dispatch candidate set until separately reviewed policy says otherwise. A new
+provenance row also is not current authorization and never authorizes provider
+I/O. Phase 4h adds no provider request, worker, queue, dispatcher, retry,
+browser send control, delivery/read state, or live-provider test.
+
 ## Exact verified history
 
 - GitHub CI and CodeQL succeeded for the Phase 0 commit <code>8b80c3b</code>,
@@ -105,7 +138,8 @@ provider acceptance, delivery, read status, or production deployment.
   cleanup, and fresh GitHub checks for exact commit <code>6444699</code>.
 - Historical evidence proves only those exact revisions. It does not verify any
   live provider account, provider send, public TLS endpoint, production
-  deployment, or any Phase 4g provider result beyond its exact verified commit.
+  deployment, any Phase 4g provider result beyond its exact verified commit, or
+  the Phase 4h candidate.
 
 ## Verified Phase 4g source
 
@@ -381,10 +415,11 @@ public TLS, a real provider send, or production deployment.
 - No dispatch queue/worker, retry or timeout policy, delivery/read status,
   template, media, OAuth, provider access-token storage, Graph API request,
   Facebook User, Zalo User, or WhatsApp User surface exists. Phase 4g has only
-  append-only delivery evidence and is not a delivery engine. Phase 4c has an
-  immutable intent ledger, Phase 4d has scoped history, Phase 4e renders that
-  history, and the verified Phase 4f source can record the same source-bound
-  intent through an explicit dashboard write grant.
+  append-only delivery evidence and is not a delivery engine. Phase 4h has only
+  historical authorization provenance and is not current send permission.
+  Phase 4c has an immutable intent ledger, Phase 4d has scoped history, Phase
+  4e renders that history, and the verified Phase 4f source can record the same
+  source-bound intent through an explicit dashboard write grant.
 - A `200` from the local synthetic feed or a green test/GitHub check does not
   prove a TLS endpoint, provider eligibility, live message operation, or a
   production-ready access model.
@@ -392,9 +427,11 @@ public TLS, a real provider send, or production deployment.
 ## Next authorized work
 
 Keep the verified Phase 4e, Phase 4f, and Phase 4g evidence frozen at
-<code>465186e</code>, <code>74fca30</code>, and <code>6444699</code>. Keep all
-live provider use separate: require explicit owner authorization before
-connecting a real account or exposing public TLS. Any later full
-user/organization authorization, conversation model, dispatcher, retry policy,
-or dashboard deployment must start with its own bounded design,
-migration/security review, and verification criteria.
+<code>465186e</code>, <code>74fca30</code>, and <code>6444699</code>. First
+close Phase 4h with its frozen candidate, final local checks, independent
+review, synthetic Compose proof, and exact GitHub CI/CodeQL. Keep all live
+provider use separate: require explicit owner authorization before connecting a
+real account or exposing public TLS. Any later full user/organization
+authorization, conversation model, dispatcher, retry policy, or dashboard
+deployment must start with its own bounded design, migration/security review,
+and verification criteria.
