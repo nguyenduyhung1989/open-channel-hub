@@ -184,6 +184,13 @@ canonical inbound event still retains the group conversation identifier in
 `inbound_events.conversation_id`; migration `0014` does not add a second
 group-target copy, and only an operator-bearer event reader can return it.
 
+The optional linked dashboard Google sign-in adds forward migration
+<code>0015_dashboard_google_identities</code>. It stores one immutable,
+domain-separated HMAC of a verified Google subject for one configured dashboard
+principal and its binding time. It does not store a raw subject, email, Google
+token, browser session, inbox bearer, or provider credential. See the
+[linked Google sign-in guide](dashboard-google-sign-in.md).
+
 ## Configure without exposing passwords
 
 Copy <code>.env.example</code> to <code>.env</code> and edit it locally. Do not

@@ -1,5 +1,6 @@
 import type {
   CreateOutboundReplyCommandResult,
+  DashboardGoogleIdentityStore,
   DashboardSessionStore,
   InboundEventPage,
   OutboundReplyCommandHistoryPage
@@ -8,6 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { RuntimeDashboard } from '../connections/runtime-connection-configuration.js';
 import type { InboxFeature } from '../inbox/inbox-feature.js';
+import type { DashboardGoogleAuthentication } from './dashboard-feature.js';
 import {
   createRuntimeDashboardFeature,
   RuntimeDashboardFeatureError
@@ -206,6 +208,34 @@ describe('runtime dashboard feature', () => {
         sessionStore()
       )
     ).toThrow(RuntimeDashboardFeatureError);
+  });
+
+  it('keeps the optional Google identity boundary server-only and separate from every inbox capability', () => {
+    const googleIdentityStore: DashboardGoogleIdentityStore = Object.freeze({
+      bind: async () => Object.freeze({ kind: 'created' as const }),
+      findPrincipalId: async () => 'support-agent'
+    });
+    const googleAuthentication: DashboardGoogleAuthentication = Object.freeze({
+      client: Object.freeze({
+        createAuthorizationUrl: () => 'https://accounts.example.test/authorize',
+        exchangeAuthorizationCode: async () => Object.freeze({ subject: 'synthetic-subject' }),
+        subjectHmac: () => 'a'.repeat(64)
+      }),
+      identityStore: googleIdentityStore
+    });
+    const dashboard = createRuntimeDashboardFeature(
+      runtimeDashboard(),
+      [inbox('support-inbox', SUPPORT_TOKEN), inbox('sales-inbox', SALES_TOKEN)],
+      sessionStore(),
+      { googleAuthentication }
+    );
+
+    expect(dashboard.googleAuthentication).toEqual(googleAuthentication);
+    expect(JSON.stringify(dashboard.googleAuthentication)).not.toContain(SUPPORT_TOKEN);
+    expect(dashboard.findInbox('support-agent', 'support-inbox')).not.toHaveProperty(
+      'googleAuthentication'
+    );
+    expect(dashboard.findReplyIntentInbox('support-agent', 'support-inbox')).toBeUndefined();
   });
 });
 

@@ -29,6 +29,15 @@ WhatsApp Business, and the experimental Zalo User bridge can appear through
 that one server-owned scope. The final step is visibly paused: this does not add
 provider sending, a worker, retry, delivery/read status, or browser credential.
 
+**Candidate dashboard authentication extension:** the current working tree adds
+optional linked Google sign-in for an existing configured dashboard principal.
+It uses a server-side authorization-code PKCE flow, exact redirect URI,
+state/nonce, a short-lived opaque transaction cookie, and one immutable
+HMAC-only identity link per principal. It does not auto-provision an account,
+retain Google tokens/profile data, create provider OAuth, or change inbox/write
+scope. It remains candidate-only until the frozen local checks, Compose proof,
+independent audit, commit, and GitHub checks complete.
+
 **Verified scope:** Phase 4a is a configured, read-only aggregate feed across
 an explicit set of existing official connections. It builds on the Telegram
 Bot, Zalo OA, Facebook Page, and WhatsApp Business runtime configuration and
@@ -329,10 +338,11 @@ the browser:
   caller-selected connection scope. The server uses the Phase 4a inbox reader
   only after it authenticates and scopes the configured principal.
 - Session cookies are signed `__Host-` cookies with `Secure`, `HttpOnly`,
-  `SameSite=Strict`, and `Path=/`. Login/logout require an exact `Origin` and a
-  hidden anti-forgery token. Sessions use a 30-minute idle limit, an eight-hour
-  absolute limit, server-side revocation, and a bounded in-process failed-login
-  throttle.
+  `SameSite=Lax`, and `Path=/`. Lax is required only for the optional top-level
+  Google callback; login/logout and every other dashboard write still require
+  an exact `Origin` and hidden anti-forgery token. Sessions use a 30-minute
+  idle limit, an eight-hour absolute limit, server-side revocation, and a
+  bounded in-process failed-login throttle.
 - `0008_dashboard_sessions` retains only HMACs of random browser session and
   anti-forgery tokens plus principal ID and lifecycle timestamps. It contains
   no raw token, password, password hash, inbox bearer, provider credential, or

@@ -37,7 +37,7 @@ document already configures inboxes and PostgreSQL is available.
   `m=19456,t=2,p=1` profile, and an explicit allow-list of configured inbox
   IDs. Its password hash is verified only on the server.
 - Browser state uses signed `__Host-` cookies with `Secure`, `HttpOnly`,
-  `SameSite=Strict`, and `Path=/`; no `Domain` attribute is set. One or two
+  `SameSite=Lax`, and `Path=/`; no `Domain` attribute is set. One or two
   configured signing keys allow a current key and a short overlap during key
   rotation. The browser cookie contains random session and anti-forgery token
   values, never a password, provider credential, or inbox bearer.
@@ -54,6 +54,11 @@ document already configures inboxes and PostgreSQL is available.
   and a hidden anti-forgery token. The login route adds a bounded in-process
   failure throttle; a real proxy must still enforce rate limits across
   processes and instances.
+
+ADR-0021 later narrowed the cookie change from `Strict` to `Lax` so an
+optional top-level Google authorization callback can return to the dashboard.
+All dashboard writes retain the exact-Origin and anti-forgery checks above;
+the cookie change does not make a cross-site write valid.
 
 ## Options considered
 

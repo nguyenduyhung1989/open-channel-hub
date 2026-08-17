@@ -304,13 +304,50 @@ describe('PostgreSQL migrations', () => {
         forbiddenTelegramDeliveryAuthorizationField
       );
     }
+    const dashboardGoogleIdentityStart = sql.indexOf(
+      'CREATE TABLE open_channel_hub.dashboard_google_identities'
+    );
+    const dashboardGoogleIdentityEnd = sql.indexOf(
+      'INSERT INTO open_channel_hub.schema_migrations',
+      dashboardGoogleIdentityStart
+    );
+    const dashboardGoogleIdentitySql = sql.slice(
+      dashboardGoogleIdentityStart,
+      dashboardGoogleIdentityEnd
+    );
+
+    expect(dashboardGoogleIdentitySql).toContain(
+      'CREATE TABLE open_channel_hub.dashboard_google_identities'
+    );
+    expect(dashboardGoogleIdentitySql).toContain('subject_hmac text PRIMARY KEY');
+    expect(dashboardGoogleIdentitySql).toContain('principal_id text NOT NULL UNIQUE');
+    expect(dashboardGoogleIdentitySql).toContain('bound_at timestamptz NOT NULL');
+    expect(dashboardGoogleIdentitySql).toContain("subject_hmac ~ '^[a-f0-9]{64}$'");
+    expect(dashboardGoogleIdentitySql).toContain("principal_id NOT IN ('.', '..')");
+    expect(dashboardGoogleIdentitySql).toContain(
+      'CREATE TRIGGER dashboard_google_identities_immutable'
+    );
+    expect(dashboardGoogleIdentitySql).toContain(
+      'BEFORE UPDATE OR DELETE ON open_channel_hub.dashboard_google_identities'
+    );
+    for (const forbiddenGoogleIdentityField of [
+      'email',
+      'access_token',
+      'refresh_token',
+      'id_token',
+      'password',
+      'session',
+      'cookie'
+    ]) {
+      expect(dashboardGoogleIdentitySql).not.toContain(forbiddenGoogleIdentityField);
+    }
     expect(sql).toContain('INSERT INTO open_channel_hub.schema_migrations');
     expect(sql).not.toContain('public.');
     const recordedMigrationIds = pool.queries
       .filter((query) => query.sql.includes('INSERT INTO open_channel_hub.schema_migrations'))
       .map((query) => query.values[0]);
 
-    expect(recordedMigrationIds).toHaveLength(14);
+    expect(recordedMigrationIds).toHaveLength(15);
     expect(recordedMigrationIds).toEqual([
       '0001_inbound_event_ledger',
       '0002_inbound_event_ledger_sequence',
@@ -325,7 +362,8 @@ describe('PostgreSQL migrations', () => {
       '0011_outbound_command_authorizations',
       '0012_telegram_private_reply_eligibility',
       '0013_outbound_telegram_delivery_authorizations',
-      '0014_zalo_user_thread_type_and_provider_identity'
+      '0014_zalo_user_thread_type_and_provider_identity',
+      '0015_dashboard_google_identities'
     ]);
     expect(pool.releaseCount).toBe(1);
   });

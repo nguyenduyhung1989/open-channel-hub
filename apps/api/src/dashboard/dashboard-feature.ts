@@ -1,12 +1,15 @@
 import type {
   CreateOutboundReplyCommandResult,
   CreateOutboundTelegramDeliveryAuthorizationResult,
+  DashboardGoogleIdentityStore,
   DashboardSessionStore,
   InboundEventPage,
   InboundEventPageCursor,
   OutboundReplyCommandHistoryPage,
   OutboundReplyCommandHistoryPageCursor
 } from '@open-channel-hub/domain';
+
+import type { DashboardGoogleOAuthClient } from './dashboard-google-oauth.js';
 
 /** A server-side-only principal selected after password authentication. */
 export interface DashboardPrincipal {
@@ -86,6 +89,8 @@ export interface DashboardOutboundCommandHistoryReadInput {
  * bearer to HTML or client-side code.
  */
 export interface DashboardFeature {
+  /** Optional server-only Google sign-in/linking boundary. */
+  readonly googleAuthentication?: DashboardGoogleAuthentication;
   readonly publicOrigin: string;
   readonly sessionCookieSigningKeys: readonly string[];
   readonly sessionIdPepper: string;
@@ -101,4 +106,13 @@ export interface DashboardFeature {
   ) => DashboardTelegramDeliveryAuthorizationInbox | undefined;
   findPrincipal: (principalId: string) => DashboardPrincipal | undefined;
   listInboxes: (principalId: string) => readonly DashboardInbox[];
+}
+
+/**
+ * This graph reaches neither a browser bearer token nor a provider account.
+ * The identity store receives only a domain-separated HMAC of Google `sub`.
+ */
+export interface DashboardGoogleAuthentication {
+  readonly client: DashboardGoogleOAuthClient;
+  readonly identityStore: DashboardGoogleIdentityStore;
 }

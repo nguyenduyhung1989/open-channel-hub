@@ -28,6 +28,9 @@
 - [Phase 4b operator dashboard](operations/operator-dashboard-4b.md): optional
   server-rendered dashboard, TLS-only deployment boundary, and local-principal
   session operation.
+- [Linked Google dashboard sign-in](operations/dashboard-google-sign-in.md):
+  optional pre-linked Google sign-in, exact callback registration, and the
+  HMAC-only identity boundary.
 - [Phase 4c durable reply commands](operations/outbound-reply-commands-4c.md):
   source-bound immutable reply-intent ledger, idempotency, and the explicit
   no-dispatch boundary.

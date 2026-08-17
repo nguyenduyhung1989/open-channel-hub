@@ -19,10 +19,15 @@ import {
   createDashboardSessionManager,
   type DashboardSessionManager
 } from './dashboard-session-manager.js';
+import {
+  createDashboardGoogleOAuthTransactionManager,
+  type DashboardGoogleOAuthTransactionManager
+} from './dashboard-google-oauth.js';
 import { createDashboardReplyIntentThrottle } from './dashboard-reply-intent-throttle.js';
 import { dashboardStyle } from './dashboard-style.js';
 
 const DASHBOARD_LOGIN_CSRF_COOKIE = '__Host-och_dashboard_login_csrf';
+const DASHBOARD_GOOGLE_OAUTH_TRANSACTION_COOKIE = '__Host-och_dashboard_google_oauth';
 const DASHBOARD_SESSION_COOKIE = '__Host-och_dashboard_session';
 const DEFAULT_PAGE_SIZE = 50;
 const FORM_BODY_LIMIT = 32 * 1_024;
@@ -85,17 +90,38 @@ const telegramDeliveryAuthorizationFormSchema = z
   })
   .strict();
 
-const signedCookieOptions = Object.freeze({
+const signedLoginCsrfCookieOptions = Object.freeze({
   httpOnly: true,
   path: '/',
   sameSite: 'strict' as const,
   secure: true,
   signed: true
 });
-const clearCookieOptions = Object.freeze({
+const signedSessionCookieOptions = Object.freeze({
+  httpOnly: true,
+  path: '/',
+  sameSite: 'lax' as const,
+  secure: true,
+  signed: true
+});
+const signedGoogleTransactionCookieOptions = Object.freeze({
+  httpOnly: true,
+  maxAge: 10 * 60,
+  path: '/',
+  sameSite: 'lax' as const,
+  secure: true,
+  signed: true
+});
+const clearLoginCsrfCookieOptions = Object.freeze({
   httpOnly: true,
   path: '/',
   sameSite: 'strict' as const,
+  secure: true
+});
+const clearSessionCookieOptions = Object.freeze({
+  httpOnly: true,
+  path: '/',
+  sameSite: 'lax' as const,
   secure: true
 });
 
@@ -124,6 +150,9 @@ export const registerDashboardRoutes = async (
   const manager = createDashboardSessionManager(feature.sessionStore, feature.sessionIdPepper);
   const throttle = createDashboardLoginThrottle();
   const replyIntentThrottle = createDashboardReplyIntentThrottle();
+  const googleAuthentication = feature.googleAuthentication;
+  const googleTransactions =
+    googleAuthentication === undefined ? undefined : createDashboardGoogleOAuthTransactionManager();
 
   app.addContentTypeParser(
     'application/x-www-form-urlencoded',
@@ -157,12 +186,17 @@ export const registerDashboardRoutes = async (
   app.get('/operator/login', async (request, reply) => {
     const query = loginQuerySchema.safeParse(request.query);
 
-    return sendLoginPage(reply, manager, query.success ? query.data.error : undefined);
+    return sendLoginPage(
+      reply,
+      manager,
+      query.success ? query.data.error : undefined,
+      googleAuthentication !== undefined
+    );
   });
 
   app.post<{ Body: string }>('/operator/session', async (request, reply) => {
     if (!hasExpectedOrigin(request, feature.publicOrigin)) {
-      return sendLoginPage(reply.code(403), manager, 'invalid');
+      return sendLoginPage(reply.code(403), manager, 'invalid', googleAuthentication !== undefined);
     }
 
     const form = parseForm(request.body, loginFormSchema);
@@ -174,14 +208,19 @@ export const registerDashboardRoutes = async (
       !matchesSecret(form.csrf, loginCsrfToken)
     ) {
       clearLoginCsrfCookie(reply);
-      return sendLoginPage(reply.code(403), manager, 'invalid');
+      return sendLoginPage(reply.code(403), manager, 'invalid', googleAuthentication !== undefined);
     }
 
     const verification = throttle.reserveVerification();
 
     if (verification === undefined) {
       clearLoginCsrfCookie(reply);
-      return sendLoginPage(reply.code(429), manager, 'throttled');
+      return sendLoginPage(
+        reply.code(429),
+        manager,
+        'throttled',
+        googleAuthentication !== undefined
+      );
     }
 
     const principal = feature.findPrincipal(form.principal);
@@ -195,7 +234,7 @@ export const registerDashboardRoutes = async (
 
     if (!passwordMatches || principal === undefined) {
       clearLoginCsrfCookie(reply);
-      return sendLoginPage(reply.code(401), manager, 'invalid');
+      return sendLoginPage(reply.code(401), manager, 'invalid', googleAuthentication !== undefined);
     }
 
     const issued = await manager.createSession(principal.id);
@@ -203,15 +242,158 @@ export const registerDashboardRoutes = async (
     reply.setCookie(
       DASHBOARD_SESSION_COOKIE,
       `${issued.sessionToken}.${issued.csrfToken}`,
-      signedCookieOptions
+      signedSessionCookieOptions
     );
 
     return redirectDashboard(reply, '/operator');
   });
 
+  if (googleAuthentication !== undefined && googleTransactions !== undefined) {
+    app.get('/operator/auth/google/login', async (_request, reply) =>
+      startGoogleAuthorization(reply, feature, googleTransactions, Object.freeze({ mode: 'login' }))
+    );
+
+    app.post<{ Body: string }>('/operator/auth/google/link', async (request, reply) => {
+      if (!hasExpectedOrigin(request, feature.publicOrigin)) {
+        return sendDashboardFailure(reply.code(403));
+      }
+
+      const form = parseForm(request.body, logoutFormSchema);
+      let authenticated: AuthenticatedDashboardSession | undefined;
+
+      try {
+        authenticated = await readDashboardSession(request, manager);
+      } catch {
+        return sendDashboardFailure(reply.code(500));
+      }
+
+      if (
+        form === undefined ||
+        authenticated === undefined ||
+        !matchesSecret(form.csrf, authenticated.csrfToken) ||
+        !manager.matchesCsrf(authenticated.session, form.csrf)
+      ) {
+        clearSessionCookie(reply);
+        return redirectDashboard(reply, '/operator/login?error=invalid');
+      }
+
+      return startGoogleAuthorization(
+        reply,
+        feature,
+        googleTransactions,
+        Object.freeze({ mode: 'link', principalId: authenticated.session.principalId })
+      );
+    });
+
+    app.get('/operator/auth/google/callback', async (request, reply) => {
+      const callback = parseGoogleCallback(request.query);
+      const transactionId = readSignedCookie(request, DASHBOARD_GOOGLE_OAUTH_TRANSACTION_COOKIE);
+      clearGoogleTransactionCookie(reply);
+
+      if (callback === undefined || transactionId === undefined) {
+        return redirectDashboard(reply, '/operator/login?error=invalid');
+      }
+
+      const transaction = googleTransactions.consume({
+        id: transactionId,
+        state: callback.state
+      });
+
+      if (transaction === undefined) {
+        return redirectDashboard(reply, '/operator/login?error=invalid');
+      }
+
+      if (transaction.mode === 'link') {
+        let authenticated: AuthenticatedDashboardSession | undefined;
+
+        try {
+          authenticated = await touchDashboardSession(request, reply, manager);
+        } catch {
+          return sendDashboardFailure(reply.code(500));
+        }
+
+        if (
+          authenticated === undefined ||
+          transaction.principalId === undefined ||
+          authenticated.session.principalId !== transaction.principalId
+        ) {
+          clearSessionCookie(reply);
+          return redirectDashboard(reply, '/operator/login?error=invalid');
+        }
+      }
+
+      let identity: Awaited<
+        ReturnType<typeof googleAuthentication.client.exchangeAuthorizationCode>
+      >;
+
+      try {
+        identity = await googleAuthentication.client.exchangeAuthorizationCode({
+          code: callback.code,
+          codeVerifier: transaction.codeVerifier,
+          nonce: transaction.nonce
+        });
+      } catch {
+        return redirectDashboard(reply, '/operator/login?error=invalid');
+      }
+
+      if (identity === undefined) {
+        return redirectDashboard(reply, '/operator/login?error=invalid');
+      }
+
+      let subjectHmac: string;
+
+      try {
+        subjectHmac = googleAuthentication.client.subjectHmac(identity.subject);
+      } catch {
+        return redirectDashboard(reply, '/operator/login?error=invalid');
+      }
+
+      if (transaction.mode === 'login') {
+        try {
+          const principalId = await googleAuthentication.identityStore.findPrincipalId({
+            subjectHmac
+          });
+
+          if (principalId === undefined || feature.findPrincipal(principalId) === undefined) {
+            return redirectDashboard(reply, '/operator/login?error=invalid');
+          }
+
+          const issued = await manager.createSession(principalId);
+          reply.setCookie(
+            DASHBOARD_SESSION_COOKIE,
+            `${issued.sessionToken}.${issued.csrfToken}`,
+            signedSessionCookieOptions
+          );
+          return redirectDashboard(reply, '/operator');
+        } catch {
+          return sendDashboardFailure(reply.code(500));
+        }
+      }
+
+      if (transaction.principalId === undefined) {
+        return redirectDashboard(reply, '/operator/login?error=invalid');
+      }
+
+      try {
+        const result = await googleAuthentication.identityStore.bind({
+          principalId: transaction.principalId,
+          subjectHmac
+        });
+
+        if (result.kind === 'created' || result.kind === 'idempotent_replay') {
+          return redirectDashboard(reply, '/operator');
+        }
+
+        return sendDashboardFailure(reply.code(409));
+      } catch {
+        return sendDashboardFailure(reply.code(500));
+      }
+    });
+  }
+
   app.post<{ Body: string }>('/operator/logout', async (request, reply) => {
     if (!hasExpectedOrigin(request, feature.publicOrigin)) {
-      return sendLoginPage(reply.code(403), manager, 'invalid');
+      return sendLoginPage(reply.code(403), manager, 'invalid', googleAuthentication !== undefined);
     }
 
     const form = parseForm(request.body, logoutFormSchema);
@@ -397,6 +579,7 @@ export const registerDashboardRoutes = async (
           connectionIds: context.selectedInbox.connectionIds,
           csrfToken: context.authenticated.csrfToken,
           events: page.events,
+          googleAuthenticationEnabled: googleAuthentication !== undefined,
           inboxes: context.availableInboxes,
           ...(page.nextCursor === undefined
             ? {}
@@ -442,6 +625,7 @@ export const registerDashboardRoutes = async (
           commands: page.commands,
           connectionIds: context.selectedInbox.connectionIds,
           csrfToken: context.authenticated.csrfToken,
+          googleAuthenticationEnabled: googleAuthentication !== undefined,
           inboxes: context.availableInboxes,
           ...(page.nextCursor === undefined
             ? {}
@@ -517,14 +701,19 @@ const resolveDashboardPageRequest = async (
 const sendLoginPage = (
   reply: FastifyReply,
   manager: DashboardSessionManager,
-  message: 'invalid' | 'throttled' | undefined
+  message: 'invalid' | 'throttled' | undefined,
+  googleAuthenticationEnabled: boolean
 ): FastifyReply => {
   const csrfToken = manager.createLoginCsrfToken();
 
-  reply.setCookie(DASHBOARD_LOGIN_CSRF_COOKIE, csrfToken, signedCookieOptions);
+  reply.setCookie(DASHBOARD_LOGIN_CSRF_COOKIE, csrfToken, signedLoginCsrfCookieOptions);
   return sendDashboardHtml(
     reply,
-    renderDashboardLoginPage({ csrfToken, ...(message === undefined ? {} : { message }) })
+    renderDashboardLoginPage({
+      csrfToken,
+      googleAuthenticationEnabled,
+      ...(message === undefined ? {} : { message })
+    })
   );
 };
 
@@ -541,11 +730,15 @@ const redirectDashboard = (reply: FastifyReply, location: string): FastifyReply 
   reply.header('Cache-Control', 'no-store').redirect(location, 303);
 
 const clearLoginCsrfCookie = (reply: FastifyReply): void => {
-  reply.clearCookie(DASHBOARD_LOGIN_CSRF_COOKIE, clearCookieOptions);
+  reply.clearCookie(DASHBOARD_LOGIN_CSRF_COOKIE, clearLoginCsrfCookieOptions);
 };
 
 const clearSessionCookie = (reply: FastifyReply): void => {
-  reply.clearCookie(DASHBOARD_SESSION_COOKIE, clearCookieOptions);
+  reply.clearCookie(DASHBOARD_SESSION_COOKIE, clearSessionCookieOptions);
+};
+
+const clearGoogleTransactionCookie = (reply: FastifyReply): void => {
+  reply.clearCookie(DASHBOARD_GOOGLE_OAUTH_TRANSACTION_COOKIE, clearSessionCookieOptions);
 };
 
 const hasExpectedOrigin = (request: FastifyRequest, publicOrigin: string): boolean =>
@@ -616,7 +809,7 @@ const touchDashboardSession = async (
   const shouldRenewCookie = shouldRenewSignedCookie(request, DASHBOARD_SESSION_COOKIE);
 
   if (shouldRenewCookie) {
-    reply.setCookie(DASHBOARD_SESSION_COOKIE, sessionCookieValue, signedCookieOptions);
+    reply.setCookie(DASHBOARD_SESSION_COOKIE, sessionCookieValue, signedSessionCookieOptions);
   }
 
   return Object.freeze({
@@ -676,4 +869,59 @@ const parseForm = <Output>(body: unknown, schema: z.ZodType<Output>): Output | u
   const parsed = schema.safeParse(object);
 
   return parsed.success ? parsed.data : undefined;
+};
+
+const startGoogleAuthorization = (
+  reply: FastifyReply,
+  feature: DashboardFeature,
+  transactions: DashboardGoogleOAuthTransactionManager,
+  input: Readonly<{ mode: 'login' | 'link'; principalId?: string }>
+): FastifyReply => {
+  const googleAuthentication = feature.googleAuthentication;
+
+  if (googleAuthentication === undefined) {
+    return sendDashboardFailure(reply.code(404));
+  }
+
+  try {
+    const transaction = transactions.create(input);
+    const location = googleAuthentication.client.createAuthorizationUrl({
+      codeChallenge: transaction.codeChallenge,
+      nonce: transaction.nonce,
+      state: transaction.state
+    });
+
+    reply.setCookie(
+      DASHBOARD_GOOGLE_OAUTH_TRANSACTION_COOKIE,
+      transaction.id,
+      signedGoogleTransactionCookieOptions
+    );
+    return reply.header('Cache-Control', 'no-store').redirect(location, 302);
+  } catch {
+    clearGoogleTransactionCookie(reply);
+    return redirectDashboard(reply, '/operator/login?error=invalid');
+  }
+};
+
+const parseGoogleCallback = (
+  query: unknown
+): Readonly<{ code: string; state: string }> | undefined => {
+  if (typeof query !== 'object' || query === null) {
+    return undefined;
+  }
+
+  const candidate = query as Readonly<Record<string, unknown>>;
+  const code = candidate.code;
+  const state = candidate.state;
+
+  if (
+    typeof code !== 'string' ||
+    !/^[!-~]{1,2048}$/.test(code) ||
+    typeof state !== 'string' ||
+    !OPAQUE_TOKEN_PATTERN.test(state)
+  ) {
+    return undefined;
+  }
+
+  return Object.freeze({ code, state });
 };

@@ -5,6 +5,7 @@ import type { OutboundReplyCommandHistoryEntry } from '@open-channel-hub/domain'
 
 export interface DashboardLoginPageInput {
   readonly csrfToken: string;
+  readonly googleAuthenticationEnabled: boolean;
   readonly message?: 'invalid' | 'throttled';
 }
 
@@ -12,6 +13,7 @@ export interface DashboardPageInput {
   readonly connectionIds: readonly string[];
   readonly csrfToken: string;
   readonly events: readonly CanonicalEvent[];
+  readonly googleAuthenticationEnabled: boolean;
   readonly inboxes: readonly Readonly<{ id: string }>[];
   readonly nextCursor?: string;
   readonly principalId: string;
@@ -23,6 +25,7 @@ export interface DashboardOutboundCommandHistoryPageInput {
   readonly commands: readonly OutboundReplyCommandHistoryEntry[];
   readonly connectionIds: readonly string[];
   readonly csrfToken: string;
+  readonly googleAuthenticationEnabled: boolean;
   readonly inboxes: readonly Readonly<{ id: string }>[];
   readonly nextCursor?: string;
   readonly principalId: string;
@@ -60,6 +63,12 @@ export const renderDashboardLoginPage = (input: DashboardLoginPageInput): string
             </label>
             <button type="submit">Mở bảng tín hiệu</button>
           </form>
+          ${
+            input.googleAuthenticationEnabled
+              ? `<p class="login-separator" aria-hidden="true">hoặc</p>
+                 <a class="google-sign-in" href="/operator/auth/google/login">Đăng nhập bằng Google</a>`
+              : ''
+          }
         </section>
       </main>`
   });
@@ -99,6 +108,14 @@ export const renderDashboardPage = (input: DashboardPageInput): string => {
             <input type="hidden" name="csrf" value="${escapeAttribute(input.csrfToken)}">
             <button class="quiet-button" type="submit">Đăng xuất</button>
           </form>
+          ${
+            input.googleAuthenticationEnabled
+              ? `<form action="/operator/auth/google/link" method="post">
+                   <input type="hidden" name="csrf" value="${escapeAttribute(input.csrfToken)}">
+                   <button class="quiet-button" type="submit">Liên kết Google</button>
+                 </form>`
+              : ''
+          }
         </header>
         <section class="scope-bar" aria-label="Phạm vi hộp thư">
           <form action="/operator" method="get">
@@ -164,6 +181,14 @@ export const renderDashboardOutboundCommandHistoryPage = (
             <input type="hidden" name="csrf" value="${escapeAttribute(input.csrfToken)}">
             <button class="quiet-button" type="submit">Đăng xuất</button>
           </form>
+          ${
+            input.googleAuthenticationEnabled
+              ? `<form action="/operator/auth/google/link" method="post">
+                   <input type="hidden" name="csrf" value="${escapeAttribute(input.csrfToken)}">
+                   <button class="quiet-button" type="submit">Liên kết Google</button>
+                 </form>`
+              : ''
+          }
         </header>
         <section class="scope-bar" aria-label="Phạm vi hộp thư">
           <nav class="scope-links" aria-label="Chọn hộp thư">

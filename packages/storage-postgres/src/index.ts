@@ -2,6 +2,7 @@ export { createPostgresDatabase } from './postgres-database.js';
 export type { PostgresDatabase, PostgresDatabaseOptions } from './postgres-database.js';
 export { PostgresStorageError } from './postgres-error.js';
 export { PostgresConnectionRegistry } from './postgres-connection-registry.js';
+export { PostgresDashboardGoogleIdentityStore } from './postgres-dashboard-google-identity-store.js';
 export { PostgresDashboardSessionStore } from './postgres-dashboard-session-store.js';
 export { PostgresInboundEventFeedReader } from './postgres-inbound-event-feed-reader.js';
 export { PostgresInboundEventReader } from './postgres-inbound-event-reader.js';

@@ -7,6 +7,7 @@ import { createRuntimeInboxFeatures } from './inbox/create-runtime-inbox-feature
 import type { InboxFeature } from './inbox/inbox-feature.js';
 import { createRuntimeDashboardFeature } from './dashboard/create-runtime-dashboard-feature.js';
 import type { DashboardFeature } from './dashboard/dashboard-feature.js';
+import { loadDashboardGoogleOAuthClient } from './dashboard/dashboard-google-oauth.js';
 import { createTelegramBotFeature } from './telegram-bot/create-telegram-bot-feature.js';
 import {
   loadTelegramBotConnectionConfigurations,
@@ -194,16 +195,49 @@ try {
         const dashboardConfiguration = configuredConnectionConfiguration?.dashboard;
 
         if (dashboardConfiguration !== undefined) {
+          const dashboardGoogleIdentityStore = postgres?.dashboardGoogleIdentityStore;
           const dashboardSessionStore = postgres?.dashboardSessionStore;
 
           if (dashboardSessionStore === undefined) {
             throw new EnvironmentConfigurationError();
           }
 
+          if (
+            environment.dashboardGoogleOAuth !== undefined &&
+            dashboardGoogleIdentityStore === undefined
+          ) {
+            throw new EnvironmentConfigurationError();
+          }
+
+          let googleAuthentication:
+            | Readonly<{
+                client: Awaited<ReturnType<typeof loadDashboardGoogleOAuthClient>>;
+                identityStore: NonNullable<typeof dashboardGoogleIdentityStore>;
+              }>
+            | undefined;
+
+          if (environment.dashboardGoogleOAuth !== undefined) {
+            const identityStore = dashboardGoogleIdentityStore;
+
+            if (identityStore === undefined) {
+              throw new EnvironmentConfigurationError();
+            }
+
+            googleAuthentication = Object.freeze({
+              client: await loadDashboardGoogleOAuthClient({
+                clientIdFile: environment.dashboardGoogleOAuth.clientIdFile,
+                clientSecretFile: environment.dashboardGoogleOAuth.clientSecretFile,
+                redirectUri: `${dashboardConfiguration.publicOrigin}/operator/auth/google/callback`
+              }),
+              identityStore
+            });
+          }
+
           dashboard = createRuntimeDashboardFeature(
             dashboardConfiguration,
             inboxes,
-            dashboardSessionStore
+            dashboardSessionStore,
+            googleAuthentication === undefined ? {} : { googleAuthentication }
           );
         }
       }
@@ -216,6 +250,9 @@ try {
 
       telegramBot = feature;
     }
+  }
+  if (environment.dashboardGoogleOAuth !== undefined && dashboard === undefined) {
+    throw new EnvironmentConfigurationError();
   }
   const app = await buildApp({
     ...(postgres === undefined

@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { Pool } from 'pg';
 import type {
   ConnectionRegistry,
+  DashboardGoogleIdentityStore,
   DashboardSessionStore,
   InboundEventFeedReader,
   InboundEventReader,
@@ -13,6 +14,7 @@ import type {
 } from '@open-channel-hub/domain';
 
 import { PostgresConnectionRegistry } from './postgres-connection-registry.js';
+import { PostgresDashboardGoogleIdentityStore } from './postgres-dashboard-google-identity-store.js';
 import { PostgresDashboardSessionStore } from './postgres-dashboard-session-store.js';
 import { PostgresStorageError } from './postgres-error.js';
 import { PostgresInboundEventFeedReader } from './postgres-inbound-event-feed-reader.js';
@@ -34,6 +36,7 @@ export interface PostgresDatabaseOptions {
 
 export interface PostgresDatabase {
   readonly connectionRegistry: ConnectionRegistry;
+  readonly dashboardGoogleIdentityStore: DashboardGoogleIdentityStore;
   readonly dashboardSessionStore: DashboardSessionStore;
   readonly inboundEventFeedReader: InboundEventFeedReader;
   readonly inboundEventReader: InboundEventReader;
@@ -74,6 +77,7 @@ export const createPostgresDatabase = async (
 
   const sqlPool = toSqlPool(pool);
   const connectionRegistry = new PostgresConnectionRegistry(sqlPool);
+  const dashboardGoogleIdentityStore = new PostgresDashboardGoogleIdentityStore(sqlPool);
   const dashboardSessionStore = new PostgresDashboardSessionStore(sqlPool);
   const inboundEventFeedReader = new PostgresInboundEventFeedReader(sqlPool);
   const inboundEventReader = new PostgresInboundEventReader(sqlPool);
@@ -85,6 +89,7 @@ export const createPostgresDatabase = async (
 
   return Object.freeze({
     connectionRegistry,
+    dashboardGoogleIdentityStore,
     dashboardSessionStore,
     inboundEventFeedReader,
     inboundEventReader,

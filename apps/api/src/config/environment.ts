@@ -11,6 +11,8 @@ const environmentSchema = z.object({
   DATABASE_USER: z.string().optional(),
   CONNECTIONS_CONFIG_BASE64_FILE: z.string().optional(),
   CONNECTIONS_CONFIG_FILE: z.string().optional(),
+  GOOGLE_OAUTH_CLIENT_ID_FILE: z.string().optional(),
+  GOOGLE_OAUTH_CLIENT_SECRET_FILE: z.string().optional(),
   HOST: z.string().min(1).default('127.0.0.1'),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   OPERATOR_API_TOKEN: z.string().optional(),
@@ -68,6 +70,12 @@ export interface PostgresEnvironment {
   readonly user: 'open_channel_hub';
 }
 
+/** File-only OAuth material shared with another approved local service. */
+export interface DashboardGoogleOAuthEnvironment {
+  readonly clientIdFile: string;
+  readonly clientSecretFile: string;
+}
+
 export interface AppEnvironment {
   readonly HOST: string;
   readonly NODE_ENV: 'development' | 'test' | 'production';
@@ -75,6 +83,7 @@ export interface AppEnvironment {
   readonly postgres?: PostgresEnvironment;
   readonly sourceOfferUrl: string;
   readonly connectorRuntime: ConnectorRuntimeEnvironment;
+  readonly dashboardGoogleOAuth?: DashboardGoogleOAuthEnvironment;
 }
 
 export class EnvironmentConfigurationError extends Error {
@@ -94,6 +103,7 @@ export const parseEnvironment = (environment: NodeJS.ProcessEnv): AppEnvironment
   const configuration = result.data;
   const sourceOfferUrl = sourceOfferUrlFor(configuration.SOURCE_OFFER_URL);
   const postgres = postgresEnvironmentFor(configuration);
+  const dashboardGoogleOAuth = dashboardGoogleOAuthEnvironmentFor(configuration);
 
   if (
     (configuration.SOURCE_OFFER_URL !== undefined &&
@@ -126,6 +136,7 @@ export const parseEnvironment = (environment: NodeJS.ProcessEnv): AppEnvironment
       PORT: configuration.PORT,
       postgres,
       sourceOfferUrl: resolvedSourceOfferUrl,
+      ...(dashboardGoogleOAuth === undefined ? {} : { dashboardGoogleOAuth }),
       connectorRuntime: Object.freeze({
         configurationEncoding: base64ConfigurationFile === undefined ? 'json' : 'base64url',
         configurationFile: configuredConnectionFile,
@@ -141,6 +152,7 @@ export const parseEnvironment = (environment: NodeJS.ProcessEnv): AppEnvironment
       PORT: configuration.PORT,
       ...(postgres === undefined ? {} : { postgres }),
       sourceOfferUrl: resolvedSourceOfferUrl,
+      ...(dashboardGoogleOAuth === undefined ? {} : { dashboardGoogleOAuth }),
       connectorRuntime: Object.freeze({ enabled: false })
     });
   }
@@ -175,6 +187,7 @@ export const parseEnvironment = (environment: NodeJS.ProcessEnv): AppEnvironment
     PORT: configuration.PORT,
     ...(postgres === undefined ? {} : { postgres }),
     sourceOfferUrl: resolvedSourceOfferUrl,
+    ...(dashboardGoogleOAuth === undefined ? {} : { dashboardGoogleOAuth }),
     connectorRuntime: Object.freeze({
       botToken,
       connectionId: configuration.TELEGRAM_CONNECTION_ID,
@@ -260,6 +273,32 @@ const optionalNonBlank = (value: string | undefined): string | undefined => {
 
 const isAbsoluteFilePath = (value: string): boolean =>
   value.startsWith('/') && value.length <= 1_024 && !value.includes('\u0000');
+
+const dashboardGoogleOAuthEnvironmentFor = (
+  configuration: Readonly<{
+    GOOGLE_OAUTH_CLIENT_ID_FILE?: string | undefined;
+    GOOGLE_OAUTH_CLIENT_SECRET_FILE?: string | undefined;
+  }>
+): DashboardGoogleOAuthEnvironment | undefined => {
+  const clientIdFile = optionalNonBlank(configuration.GOOGLE_OAUTH_CLIENT_ID_FILE);
+  const clientSecretFile = optionalNonBlank(configuration.GOOGLE_OAUTH_CLIENT_SECRET_FILE);
+
+  if (clientIdFile === undefined && clientSecretFile === undefined) {
+    return undefined;
+  }
+
+  if (
+    clientIdFile === undefined ||
+    clientSecretFile === undefined ||
+    clientIdFile === clientSecretFile ||
+    !isAbsoluteFilePath(clientIdFile) ||
+    !isAbsoluteFilePath(clientSecretFile)
+  ) {
+    throw new EnvironmentConfigurationError();
+  }
+
+  return Object.freeze({ clientIdFile, clientSecretFile });
+};
 
 const hasLegacyTelegramConfiguration = (
   configuration: Readonly<{

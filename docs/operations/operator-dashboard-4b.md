@@ -17,6 +17,8 @@ real external HTTPS origin and `Secure` cookies.
 Before enabling it, all of the following must already be true:
 
 - PostgreSQL is configured and migration `0008_dashboard_sessions` has run.
+  If linked Google sign-in is enabled, migration
+  `0015_dashboard_google_identities` must also have run.
 - The version-1 runtime secret document contains configured `connections` and
   at least one configured `inboxes` entry. Dashboard principals may select only
   those inbox IDs; they never select a connection ID or bearer token.
@@ -132,8 +134,17 @@ environment variable, commit, issue, screenshot, or log value.
 
 Open `https://your-host/operator/login`. The login form asks for one configured
 principal ID and its password. On success the server issues a signed,
-`Secure`, `HttpOnly`, `SameSite=Strict` `__Host-och_dashboard_session` cookie
+`Secure`, `HttpOnly`, `SameSite=Lax` `__Host-och_dashboard_session` cookie
 and redirects to `/operator`.
+
+When both file-backed Google OAuth values are configured, the same page also
+shows **Đăng nhập bằng Google**. Google does not create a principal: an
+already authenticated local principal must first select **Liên kết Google**.
+The callback, identity retention, exact redirect URI, and recovery procedure
+are documented in the [linked Google sign-in guide](dashboard-google-sign-in.md).
+`SameSite=Lax` is limited to the top-level Google callback; every state-changing
+dashboard form still requires the exact configured Origin and a matching
+anti-forgery token.
 
 The first authorized inbox is shown by default. The page can switch only among
 the signed-in principal's configured inboxes. It uses the same server-owned

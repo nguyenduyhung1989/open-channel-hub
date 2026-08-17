@@ -2,6 +2,7 @@ import argon2 from 'argon2';
 import type {
   CreateOutboundReplyCommandResult,
   CreateOutboundTelegramDeliveryAuthorizationResult,
+  DashboardGoogleIdentityStore,
   DashboardSession,
   DashboardSessionCreateInput,
   DashboardSessionReadInput,
@@ -17,6 +18,7 @@ import { afterEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { buildApp } from '../app.js';
 import type {
   DashboardFeature,
+  DashboardGoogleAuthentication,
   DashboardInbox,
   DashboardPrincipal,
   DashboardReplyIntentInput,
@@ -47,6 +49,189 @@ describe('dashboard routes', () => {
     const response = await app.inject({ method: 'GET', url: '/operator/login' });
 
     expect(response.statusCode).toBe(404);
+  });
+
+  it('uses a one-time signed PKCE transaction before issuing a dashboard session for a linked Google identity', async () => {
+    const googleExchange = vi.fn(async () =>
+      Object.freeze({ subject: 'synthetic-google-subject-101' })
+    );
+    const subjectHmac = vi.fn(() => 'a'.repeat(64));
+    const findPrincipalId = vi.fn(async () => 'support-agent');
+    const googleIdentityStore: DashboardGoogleIdentityStore = Object.freeze({
+      bind: vi.fn(async () => Object.freeze({ kind: 'created' as const })),
+      findPrincipalId
+    });
+    const googleAuthentication: DashboardGoogleAuthentication = Object.freeze({
+      client: Object.freeze({
+        createAuthorizationUrl: ({ state }: Readonly<{ state: string }>) =>
+          `https://accounts.example.test/authorize?state=${encodeURIComponent(state)}`,
+        exchangeAuthorizationCode: googleExchange,
+        subjectHmac
+      }),
+      identityStore: googleIdentityStore
+    });
+    const harness = await createHarness({ googleAuthentication });
+    applications.push(harness.app);
+
+    const login = await harness.app.inject({ method: 'GET', url: '/operator/login' });
+
+    expect(login.statusCode).toBe(200);
+    expect(login.body).toContain('Đăng nhập bằng Google');
+    expect(login.body).not.toContain('synthetic-google-subject-101');
+
+    const start = await harness.app.inject({ method: 'GET', url: '/operator/auth/google/login' });
+    const transactionCookie = cookieFrom(start, '__Host-och_dashboard_google_oauth');
+    const state = new URL(
+      start.headers.location ?? 'https://invalid.example.test'
+    ).searchParams.get('state');
+
+    expect(start.statusCode).toBe(302);
+    expect(start.headers['cache-control']).toBe('no-store');
+    expect(transactionCookie).toContain('HttpOnly');
+    expect(transactionCookie).toContain('Secure');
+    expect(transactionCookie).toContain('SameSite=Lax');
+    expect(transactionCookie).not.toContain('synthetic-google-subject-101');
+    expect(state).toMatch(/^[A-Za-z0-9_-]{43}$/);
+
+    const callback = await harness.app.inject({
+      headers: { cookie: cookiePair(transactionCookie) },
+      method: 'GET',
+      url: `/operator/auth/google/callback?code=synthetic-google-code&state=${state}`
+    });
+
+    expect(callback.statusCode).toBe(303);
+    expect(callback.headers.location).toBe('/operator');
+    const callbackCookies = cookieHeaderValues(callback).join('\n');
+    expect(callbackCookies).toContain('__Host-och_dashboard_session=');
+    expect(callbackCookies).toContain('SameSite=Lax');
+    expect(callbackCookies).toContain('__Host-och_dashboard_google_oauth=;');
+    expect(googleExchange).toHaveBeenCalledWith({
+      code: 'synthetic-google-code',
+      codeVerifier: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/),
+      nonce: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/)
+    });
+    expect(subjectHmac).toHaveBeenCalledWith('synthetic-google-subject-101');
+    expect(findPrincipalId).toHaveBeenCalledWith({
+      subjectHmac: expect.stringMatching(/^[a-f0-9]{64}$/)
+    });
+    expect(JSON.stringify(findPrincipalId.mock.calls)).not.toContain(
+      'synthetic-google-subject-101'
+    );
+
+    const replay = await harness.app.inject({
+      headers: { cookie: cookiePair(transactionCookie) },
+      method: 'GET',
+      url: `/operator/auth/google/callback?code=synthetic-google-code&state=${state}`
+    });
+
+    expect(replay.statusCode).toBe(303);
+    expect(replay.headers.location).toBe('/operator/login?error=invalid');
+    expect(googleExchange).toHaveBeenCalledOnce();
+  });
+
+  it('does not create a dashboard account or session for an unlinked verified Google identity', async () => {
+    const googleAuthentication: DashboardGoogleAuthentication = Object.freeze({
+      client: Object.freeze({
+        createAuthorizationUrl: ({ state }: Readonly<{ state: string }>) =>
+          `https://accounts.example.test/authorize?state=${encodeURIComponent(state)}`,
+        exchangeAuthorizationCode: async () =>
+          Object.freeze({ subject: 'unlinked-google-subject' }),
+        subjectHmac: () => 'b'.repeat(64)
+      }),
+      identityStore: Object.freeze({
+        bind: vi.fn(async () => Object.freeze({ kind: 'created' as const })),
+        findPrincipalId: vi.fn(async () => undefined)
+      })
+    });
+    const harness = await createHarness({ googleAuthentication });
+    applications.push(harness.app);
+
+    const start = await harness.app.inject({ method: 'GET', url: '/operator/auth/google/login' });
+    const transactionCookie = cookieFrom(start, '__Host-och_dashboard_google_oauth');
+    const state = new URL(
+      start.headers.location ?? 'https://invalid.example.test'
+    ).searchParams.get('state');
+
+    const callback = await harness.app.inject({
+      headers: { cookie: cookiePair(transactionCookie) },
+      method: 'GET',
+      url: `/operator/auth/google/callback?code=synthetic-google-code&state=${state}`
+    });
+
+    expect(callback.statusCode).toBe(303);
+    expect(callback.headers.location).toBe('/operator/login?error=invalid');
+    expect(cookieHeaderValues(callback).join('\n')).not.toContain('__Host-och_dashboard_session=');
+  });
+
+  it('links Google only from an active same-principal dashboard session with origin and CSRF checks', async () => {
+    const googleExchange = vi.fn(async () =>
+      Object.freeze({ subject: 'synthetic-google-subject-link' })
+    );
+    const bind = vi.fn(async () => Object.freeze({ kind: 'created' as const }));
+    const googleAuthentication: DashboardGoogleAuthentication = Object.freeze({
+      client: Object.freeze({
+        createAuthorizationUrl: ({ state }: Readonly<{ state: string }>) =>
+          `https://accounts.example.test/authorize?state=${encodeURIComponent(state)}`,
+        exchangeAuthorizationCode: googleExchange,
+        subjectHmac: () => 'c'.repeat(64)
+      }),
+      identityStore: Object.freeze({ bind, findPrincipalId: vi.fn(async () => undefined) })
+    });
+    const harness = await createHarness({ googleAuthentication });
+    applications.push(harness.app);
+    const sessionCookie = await loginAndGetSessionCookie(harness.app);
+    const page = await harness.app.inject({
+      headers: { cookie: cookiePair(sessionCookie) },
+      method: 'GET',
+      url: '/operator'
+    });
+    const csrf = hiddenCsrf(page.body);
+
+    expect(page.body).toContain('action="/operator/auth/google/link"');
+
+    const originFailure = await harness.app.inject({
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        cookie: cookiePair(sessionCookie),
+        origin: 'https://attacker.example.test'
+      },
+      method: 'POST',
+      payload: new URLSearchParams({ csrf }).toString(),
+      url: '/operator/auth/google/link'
+    });
+    expect(originFailure.statusCode).toBe(403);
+
+    const start = await harness.app.inject({
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        cookie: cookiePair(sessionCookie),
+        origin: PUBLIC_ORIGIN
+      },
+      method: 'POST',
+      payload: new URLSearchParams({ csrf }).toString(),
+      url: '/operator/auth/google/link'
+    });
+    const transactionCookie = cookieFrom(start, '__Host-och_dashboard_google_oauth');
+    const state = new URL(
+      start.headers.location ?? 'https://invalid.example.test'
+    ).searchParams.get('state');
+
+    expect(start.statusCode).toBe(302);
+    expect(state).toMatch(/^[A-Za-z0-9_-]{43}$/);
+
+    const callback = await harness.app.inject({
+      headers: { cookie: `${cookiePair(sessionCookie)}; ${cookiePair(transactionCookie)}` },
+      method: 'GET',
+      url: `/operator/auth/google/callback?code=synthetic-google-code&state=${state}`
+    });
+
+    expect(callback.statusCode).toBe(303);
+    expect(callback.headers.location).toBe('/operator');
+    expect(bind).toHaveBeenCalledWith({
+      principalId: 'support-agent',
+      subjectHmac: expect.stringMatching(/^[a-f0-9]{64}$/)
+    });
+    expect(googleExchange).toHaveBeenCalledOnce();
   });
 
   it('renders only escaped safe queued-command history through the signed dashboard session', async () => {
@@ -467,7 +652,7 @@ describe('dashboard routes', () => {
     expect(session.headers.location).toBe('/operator');
     expect(sessionCookie).toContain('HttpOnly');
     expect(sessionCookie).toContain('Secure');
-    expect(sessionCookie).toContain('SameSite=Strict');
+    expect(sessionCookie).toContain('SameSite=Lax');
     expect(sessionCookie).toContain('Path=/');
     expect(sessionCookie).not.toContain(SUPPORT_INBOX_TOKEN);
     expect(harness.store.create).toHaveBeenCalledOnce();
@@ -1142,6 +1327,7 @@ describe('dashboard routes', () => {
 
 const createHarness = async (
   options: Readonly<{
+    googleAuthentication?: DashboardGoogleAuthentication;
     historyRead?: ReturnType<typeof vi.fn>;
     replyIntentInboxIds?: readonly string[];
     replyIntentRecord?: ReplyIntentRecord;
@@ -1243,6 +1429,9 @@ const createHarness = async (
       principalId === principal.id ? principal : undefined,
     listInboxes: (principalId: string): readonly DashboardInbox[] =>
       principalId === principal.id ? Object.freeze([supportInbox]) : Object.freeze([]),
+    ...(options.googleAuthentication === undefined
+      ? {}
+      : { googleAuthentication: options.googleAuthentication }),
     publicOrigin: PUBLIC_ORIGIN,
     sessionCookieSigningKeys: Object.freeze([
       'synthetic_dashboard_cookie_signing_key_current_012345678'
@@ -1404,8 +1593,7 @@ const cookieFrom = (
   response: Awaited<ReturnType<Awaited<ReturnType<typeof buildApp>>['inject']>>,
   name: string
 ): string => {
-  const header = response.headers['set-cookie'];
-  const values = header === undefined ? [] : Array.isArray(header) ? header : [header];
+  const values = cookieHeaderValues(response);
   const cookie = values.find((value) => value.startsWith(`${name}=`));
 
   if (cookie === undefined) {
@@ -1413,6 +1601,14 @@ const cookieFrom = (
   }
 
   return cookie;
+};
+
+const cookieHeaderValues = (
+  response: Awaited<ReturnType<Awaited<ReturnType<typeof buildApp>>['inject']>>
+): readonly string[] => {
+  const header = response.headers['set-cookie'];
+
+  return header === undefined ? [] : Array.isArray(header) ? header : [header];
 };
 
 const cookiePair = (cookie: string): string => cookie.split(';', 1)[0] ?? '';

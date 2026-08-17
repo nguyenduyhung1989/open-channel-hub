@@ -7,6 +7,9 @@ name: open-channel-hub
 # TELEGRAM_WEBHOOK_URL may be blank. When set, it must be a public absolute HTTPS URL with no userinfo, query, fragment, or secret.
 # CONNECTIONS_CONFIG_BASE64 may be blank. When non-blank, Compose writes its unpadded base64url value only to the
 # runtime_connections_base64 Docker secret and points the API at its 0400 secret file; it is never an API environment value.
+# GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET are optional Compose secret sources for dashboard Google sign-in.
+# When both are supplied, Compose mounts each at a separate 0400 file. Neither value becomes an API environment variable
+# or enters the runtime connection JSON document.
 # It encodes (but does not encrypt) one or more official Telegram Bot, Zalo OA, Facebook Page, and/or WhatsApp Business connections and must not be mixed with temporary legacy Telegram variables.
 # PostgreSQL is initialized for this hub only: database `open_channel_hub`, schema `open_channel_hub`, and a non-superuser
 # application role. The migration service applies idempotent schema changes before the API starts. This stack still does not provide
@@ -95,6 +98,8 @@ services:
       SOURCE_OFFER_URL: '${SOURCE_OFFER_URL:-}'
       # An empty or unset base64url value leaves multi-connection mode disabled while the harmless empty secret remains mounted.
       CONNECTIONS_CONFIG_BASE64_FILE: '${CONNECTIONS_CONFIG_BASE64:+/run/secrets/runtime_connections_base64}'
+      GOOGLE_OAUTH_CLIENT_ID_FILE: '${GOOGLE_OAUTH_CLIENT_ID:+/run/secrets/google_oauth_client_id}'
+      GOOGLE_OAUTH_CLIENT_SECRET_FILE: '${GOOGLE_OAUTH_CLIENT_SECRET:+/run/secrets/google_oauth_client_secret}'
       TELEGRAM_BOT_ENABLED: '${TELEGRAM_BOT_ENABLED:-false}'
       TELEGRAM_BOT_TOKEN: '${TELEGRAM_BOT_TOKEN:-}'
       OPERATOR_API_TOKEN: '${OPERATOR_API_TOKEN:-}'
@@ -115,6 +120,16 @@ services:
         mode: 0400
       - source: runtime_connections_base64
         target: runtime_connections_base64
+        uid: '10001'
+        gid: '10001'
+        mode: 0400
+      - source: google_oauth_client_id
+        target: google_oauth_client_id
+        uid: '10001'
+        gid: '10001'
+        mode: 0400
+      - source: google_oauth_client_secret
+        target: google_oauth_client_secret
         uid: '10001'
         gid: '10001'
         mode: 0400
@@ -139,6 +154,10 @@ secrets:
     environment: POSTGRES_PASSWORD
   runtime_connections_base64:
     environment: CONNECTIONS_CONFIG_BASE64
+  google_oauth_client_id:
+    environment: GOOGLE_OAUTH_CLIENT_ID
+  google_oauth_client_secret:
+    environment: GOOGLE_OAUTH_CLIENT_SECRET
 
 volumes:
   postgres-data: {}

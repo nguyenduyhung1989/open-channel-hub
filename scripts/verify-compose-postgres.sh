@@ -43,6 +43,8 @@ readonly dashboard_principal_a='support-approver-a'
 readonly dashboard_principal_b='support-approver-b'
 readonly dashboard_session_cookie_signing_key='synthetic_dashboard_cookie_signing_key_01234567890123456789'
 readonly dashboard_session_id_pepper='synthetic_dashboard_session_id_pepper_01234567890123456789'
+readonly dashboard_google_oauth_client_id='synthetic-dashboard-client.apps.googleusercontent.com'
+readonly dashboard_google_oauth_client_secret='synthetic-dashboard-client-secret-012345678901234567890'
 readonly legacy_authorization_client_operation_id='synthetic-legacy-authorization-0001'
 readonly drifted_authorization_client_operation_id='synthetic-drifted-authorization-0001'
 readonly non_private_authorization_client_operation_id='synthetic-non-private-authorization-0001'
@@ -348,6 +350,21 @@ dashboard_response_status() {
   printf '%s\n' "$response" \
     | tr -d '\r' \
     | sed -n 's/^HTTP\/[^ ]* \([0-9][0-9][0-9]\).*/\1/p'
+}
+
+dashboard_response_header() {
+  local response=$1
+  local name=$2
+
+  printf '%s\n' "$response" \
+    | tr -d '\r' \
+    | awk -v name="$name" '
+      tolower($0) ~ "^" tolower(name) ":" {
+        sub(/^[^:]*:[[:space:]]*/, "")
+        print
+        exit
+      }
+    '
 }
 
 dashboard_cookie_pair() {
@@ -660,6 +677,8 @@ if ! validate_synthetic_runtime_configuration; then
 fi
 export CONNECTIONS_CONFIG_BASE64="$(printf '%s' "$runtime_connections_configuration_with_dashboard" | base64 | tr '+/' '-_' | tr -d '=\n')"
 export DATABASE_PASSWORD='synthetic_database_password_0123456789'
+export GOOGLE_OAUTH_CLIENT_ID="$dashboard_google_oauth_client_id"
+export GOOGLE_OAUTH_CLIENT_SECRET="$dashboard_google_oauth_client_secret"
 export POSTGRES_PASSWORD='synthetic_postgres_password_0123456789'
 export SOURCE_OFFER_URL="$source_offer_url"
 export TELEGRAM_BOT_ENABLED='false'
@@ -675,6 +694,37 @@ unset TELEGRAM_WEBHOOK_URL
 "${compose[@]}" down --volumes --remove-orphans >&2 || true
 "${compose[@]}" up --build --detach
 wait_for_readiness
+
+# This exercises only local configuration and PKCE transaction creation. It
+# must not follow the redirect or contact Google, and no synthetic OAuth value
+# is ever printed by this script.
+dashboard_google_login_response="$(
+  curl --include --silent --show-error --connect-timeout 3 --max-time 10 \
+    "http://127.0.0.1:${api_host_port}/operator/login"
+)"
+dashboard_google_start_response="$(
+  curl --include --silent --show-error --connect-timeout 3 --max-time 10 \
+    "http://127.0.0.1:${api_host_port}/operator/auth/google/login"
+)"
+dashboard_google_transaction_cookie="$(
+  dashboard_cookie_pair "$dashboard_google_start_response" '__Host-och_dashboard_google_oauth'
+)"
+dashboard_google_start_location="$(
+  dashboard_response_header "$dashboard_google_start_response" 'location'
+)"
+if [[ \
+  "$(dashboard_response_status "$dashboard_google_login_response")" != '200' || \
+  "$(dashboard_response_body "$dashboard_google_login_response")" != *'href="/operator/auth/google/login"'* || \
+  "$(dashboard_response_status "$dashboard_google_start_response")" != '302' || \
+  -z "$dashboard_google_transaction_cookie" || \
+  "$dashboard_google_start_location" != https://accounts.google.com/* || \
+  "$dashboard_google_start_response" != *'HttpOnly'* || \
+  "$dashboard_google_start_response" != *'Secure'* || \
+  "$dashboard_google_start_response" != *'SameSite=Lax'* \
+]]; then
+  printf 'The synthetic Google dashboard login boundary did not issue the expected local PKCE redirect.\n' >&2
+  exit 1
+fi
 
 # Re-running a completed migration must be safe before live traffic is exercised.
 "${compose[@]}" run --rm --no-deps migrate
@@ -768,7 +818,7 @@ assert_equal \
 migration_count="$(
   query_postgres "SELECT COUNT(*) FROM open_channel_hub.schema_migrations;"
 )"
-assert_equal '14' "$migration_count" 'immutable migration ledger entry count'
+assert_equal '15' "$migration_count" 'immutable migration ledger entry count'
 
 connection_registry_records="$(
   query_postgres "SELECT connection_id || ':' || connector_id || ':' || channel || ':' || tier FROM open_channel_hub.connection_registry ORDER BY connection_id;"
@@ -1118,6 +1168,14 @@ assert_equal \
   'present' \
   "$outbound_telegram_delivery_authorization_schema_guards" \
   'Telegram delivery-authorization table, constraints, and immutable trigger'
+
+dashboard_google_identity_schema_guards="$(
+  query_postgres "SELECT CASE WHEN to_regclass('open_channel_hub.dashboard_google_identities') IS NOT NULL AND (SELECT string_agg(column_name, ',' ORDER BY ordinal_position) FROM information_schema.columns WHERE table_schema = 'open_channel_hub' AND table_name = 'dashboard_google_identities') = 'subject_hmac,principal_id,bound_at' AND (SELECT COUNT(*) FROM pg_constraint WHERE conrelid = 'open_channel_hub.dashboard_google_identities'::regclass AND conname IN ('dashboard_google_identities_subject_hmac_format', 'dashboard_google_identities_principal_id_format')) = 2 AND (SELECT COUNT(*) FROM pg_constraint WHERE conrelid = 'open_channel_hub.dashboard_google_identities'::regclass AND contype = 'p' AND conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'open_channel_hub.dashboard_google_identities'::regclass AND attname = 'subject_hmac' AND NOT attisdropped)]) = 1 AND (SELECT COUNT(*) FROM pg_constraint WHERE conrelid = 'open_channel_hub.dashboard_google_identities'::regclass AND contype = 'u' AND conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'open_channel_hub.dashboard_google_identities'::regclass AND attname = 'principal_id' AND NOT attisdropped)]) = 1 AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'open_channel_hub.dashboard_google_identities'::regclass AND tgname = 'dashboard_google_identities_immutable' AND NOT tgisinternal) THEN 'present' ELSE 'missing' END;"
+)"
+assert_equal \
+  'present' \
+  "$dashboard_google_identity_schema_guards" \
+  'HMAC-only immutable Google dashboard identity table'
 
 support_outbound_telegram_eligibility="$(
   query_postgres "SELECT CASE WHEN COUNT(*) = 2 AND COUNT(*) FILTER (WHERE eligibility.source_chat_type = 'private' AND eligibility.bot_identity_fingerprint ~ '^[a-f0-9]{64}$') = 2 THEN 'present' ELSE 'missing' END FROM open_channel_hub.outbound_telegram_command_eligibility eligibility JOIN open_channel_hub.outbound_commands command ON command.command_id = eligibility.command_id WHERE command.connection_id = 'telegram-bot-support' AND command.client_operation_id IN ('${support_outbound_client_operation_id}', '${support_outbound_history_client_operation_id}');"

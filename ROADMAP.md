@@ -292,9 +292,11 @@ independent review, and GitHub CI/CodeQL evidence are complete for exact commit
 - [x] Server-rendered, no-JavaScript `/operator` pages with no browser bearer,
       provider credential, connection selector, or client-side inbox API.
 - [x] Exact-profile Argon2id (`m=19456,t=2,p=1`) password verification,
-      signed `Secure` `HttpOnly` `SameSite=Strict` cookies, same-origin forms,
+      signed `Secure` `HttpOnly` `SameSite=Lax` cookies, same-origin forms,
       anti-forgery tokens, a 30-minute idle timeout, eight-hour absolute
       timeout, server-side revocation, and a bounded in-process login throttle.
+      Lax also permits the optional Phase 4k top-level Google callback; every
+      state-changing dashboard form keeps exact-Origin and anti-forgery checks.
 - [x] Forward-only PostgreSQL migration
       <code>0008_dashboard_sessions</code> that stores only HMACs of random
       browser tokens and session metadata, never raw token/password/provider
@@ -577,6 +579,15 @@ deployment.
       production claim.
 
 ### Later Phase 4 work
+
+#### 4k — linked Google dashboard sign-in (candidate)
+
+- [x] Add an optional authorization-code PKCE boundary that can sign in only a
+      pre-linked configured dashboard principal.
+- [x] Persist only an immutable HMAC of the verified Google subject, never a
+      raw profile field, browser session, access token, or refresh token.
+- [ ] Freeze verification, synthetic Docker proof, independent audit, and
+      GitHub checks. This is not public account registration or provider OAuth.
 
 - Full user accounts/organizations, tested RBAC, invitation/password-reset
   flow, audit trail, live session administration, and managed secret rotation.

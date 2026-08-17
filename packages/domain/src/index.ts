@@ -7,6 +7,12 @@ export type {
   DashboardSessionStore,
   DashboardSessionTouchInput
 } from './ports/dashboard-session-store.js';
+export type {
+  DashboardGoogleIdentityBindInput,
+  DashboardGoogleIdentityBindResult,
+  DashboardGoogleIdentityLookupInput,
+  DashboardGoogleIdentityStore
+} from './ports/dashboard-google-identity-store.js';
 export type { InboundEventStore } from './ports/inbound-event-store.js';
 export type {
   InboundEventFeedListInput,

@@ -202,6 +202,35 @@ describe('parseEnvironment', () => {
     });
   });
 
+  it('accepts Google OAuth only as a pair of distinct absolute secret files', () => {
+    expect(
+      parseEnvironment({
+        ...POSTGRES_ENVIRONMENT,
+        CONNECTIONS_CONFIG_FILE: '/run/secrets/runtime_connections',
+        GOOGLE_OAUTH_CLIENT_ID_FILE: '/run/secrets/google_oauth_client_id',
+        GOOGLE_OAUTH_CLIENT_SECRET_FILE: '/run/secrets/google_oauth_client_secret'
+      }).dashboardGoogleOAuth
+    ).toEqual({
+      clientIdFile: '/run/secrets/google_oauth_client_id',
+      clientSecretFile: '/run/secrets/google_oauth_client_secret'
+    });
+
+    for (const invalidEnvironment of [
+      { GOOGLE_OAUTH_CLIENT_ID_FILE: '/run/secrets/google_oauth_client_id' },
+      { GOOGLE_OAUTH_CLIENT_SECRET_FILE: '/run/secrets/google_oauth_client_secret' },
+      {
+        GOOGLE_OAUTH_CLIENT_ID_FILE: '/run/secrets/google_oauth_client_id',
+        GOOGLE_OAUTH_CLIENT_SECRET_FILE: '/run/secrets/google_oauth_client_id'
+      },
+      {
+        GOOGLE_OAUTH_CLIENT_ID_FILE: 'relative-client-id',
+        GOOGLE_OAUTH_CLIENT_SECRET_FILE: '/run/secrets/google_oauth_client_secret'
+      }
+    ]) {
+      expect(() => parseEnvironment(invalidEnvironment)).toThrow(EnvironmentConfigurationError);
+    }
+  });
+
   it('rejects partial, unsafe, or differently named PostgreSQL configuration', () => {
     expect(() => parseEnvironment({ DATABASE_HOST: 'postgres' })).toThrow(
       EnvironmentConfigurationError

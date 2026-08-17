@@ -231,9 +231,11 @@ dispatch permission, or a browser credential.
 
 Dashboard configuration creates no browser bearer. It enables only
 server-rendered `/operator` routes with signed `Secure` `HttpOnly`
-`SameSite=Strict` cookies and server-selected inbox scope. The supplied Compose
-runner is loopback HTTP and intentionally omits `dashboard`; a browser login
-must be deployed behind a real TLS proxy. Follow the
+`SameSite=Lax` cookies and server-selected inbox scope. Lax permits an optional
+top-level Google callback; dashboard writes still require the exact configured
+Origin and an anti-forgery token. The supplied Compose runner is loopback HTTP
+and intentionally omits `dashboard`; a browser login must be deployed behind a
+real TLS proxy. Follow the
 [Phase 4b operator dashboard guide](operator-dashboard-4b.md) for password
 hashing, proxy controls, session rotation, and limits. The Phase 4e source
 adds no configuration field: it uses the same signed session to render one

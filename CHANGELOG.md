@@ -8,6 +8,14 @@ follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Phase 4k candidate: optional linked Google sign-in for an already configured
+  dashboard principal. It uses authorization-code PKCE with state and nonce,
+  HMAC-only immutable Google-subject links, and file-backed OAuth client
+  secrets. Unknown Google accounts cannot provision or claim a principal.
+- Phase 4k candidate: forward migration
+  <code>0015_dashboard_google_identities</code>, an immutable one-to-one
+  HMAC-subject-to-principal table with no raw Google profile or token data.
+
 - Phase 5a: an opt-in experimental Zalo User group bridge outside the API
   container and Compose stack. It retains only canonical non-self group text,
   binds one opaque connection ID to an account fingerprint, and keeps QR

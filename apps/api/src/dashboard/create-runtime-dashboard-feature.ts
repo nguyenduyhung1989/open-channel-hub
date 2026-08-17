@@ -1,4 +1,4 @@
-import type { DashboardSessionStore } from '@open-channel-hub/domain';
+import type { DashboardGoogleIdentityStore, DashboardSessionStore } from '@open-channel-hub/domain';
 
 import type {
   RuntimeDashboard,
@@ -6,6 +6,7 @@ import type {
 } from '../connections/runtime-connection-configuration.js';
 import type { InboxFeature } from '../inbox/inbox-feature.js';
 import type {
+  DashboardGoogleAuthentication,
   DashboardFeature,
   DashboardInbox,
   DashboardPrincipal,
@@ -14,6 +15,7 @@ import type {
   DashboardTelegramDeliveryAuthorizationInbox,
   DashboardTelegramDeliveryAuthorizationInput
 } from './dashboard-feature.js';
+import type { DashboardGoogleOAuthClient } from './dashboard-google-oauth.js';
 
 /** A non-diagnostic composition failure for an invalid server-only dashboard graph. */
 export class RuntimeDashboardFeatureError extends Error {
@@ -31,7 +33,8 @@ export class RuntimeDashboardFeatureError extends Error {
 export const createRuntimeDashboardFeature = (
   configuration: RuntimeDashboard,
   inboxes: readonly InboxFeature[],
-  sessionStore: DashboardSessionStore
+  sessionStore: DashboardSessionStore,
+  options: Readonly<{ googleAuthentication?: DashboardGoogleAuthentication }> = {}
 ): DashboardFeature => {
   const inboxById = toInboxSnapshot(inboxes);
   const principalById = toPrincipalSnapshot(configuration.principals, inboxById);
@@ -76,12 +79,38 @@ export const createRuntimeDashboardFeature = (
       principalById.get(principalId),
     listInboxes: (principalId: string): readonly DashboardInbox[] =>
       inboxesByPrincipal.get(principalId) ?? Object.freeze([]),
+    ...(options.googleAuthentication === undefined
+      ? {}
+      : { googleAuthentication: toGoogleAuthenticationSnapshot(options.googleAuthentication) }),
     publicOrigin: configuration.publicOrigin,
     sessionCookieSigningKeys: Object.freeze([...configuration.sessionCookieSigningKeys]),
     sessionIdPepper: configuration.sessionIdPepper,
     sessionStore
   });
 };
+
+const toGoogleAuthenticationSnapshot = (
+  value: DashboardGoogleAuthentication
+): DashboardGoogleAuthentication => {
+  if (!isGoogleOAuthClient(value.client) || !isGoogleIdentityStore(value.identityStore)) {
+    throw new RuntimeDashboardFeatureError();
+  }
+
+  return Object.freeze({ client: value.client, identityStore: value.identityStore });
+};
+
+const isGoogleOAuthClient = (value: unknown): value is DashboardGoogleOAuthClient =>
+  typeof value === 'object' &&
+  value !== null &&
+  typeof (value as DashboardGoogleOAuthClient).createAuthorizationUrl === 'function' &&
+  typeof (value as DashboardGoogleOAuthClient).exchangeAuthorizationCode === 'function' &&
+  typeof (value as DashboardGoogleOAuthClient).subjectHmac === 'function';
+
+const isGoogleIdentityStore = (value: unknown): value is DashboardGoogleIdentityStore =>
+  typeof value === 'object' &&
+  value !== null &&
+  typeof (value as DashboardGoogleIdentityStore).bind === 'function' &&
+  typeof (value as DashboardGoogleIdentityStore).findPrincipalId === 'function';
 
 const toInboxSnapshot = (inboxes: readonly InboxFeature[]): ReadonlyMap<string, DashboardInbox> => {
   const inboxById = new Map<string, DashboardInbox>();

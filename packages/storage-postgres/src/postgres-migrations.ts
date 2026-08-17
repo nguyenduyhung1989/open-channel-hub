@@ -638,6 +638,47 @@ ALTER TABLE ${POSTGRES_SCHEMA}.connection_registry
 `
 ]);
 
+/**
+ * Google dashboard authentication stores only an application-HMACed Google
+ * subject. Each identity and dashboard principal can be linked exactly once;
+ * the immutable row deliberately excludes email, ID/access/refresh tokens,
+ * and any browser session material.
+ */
+const DASHBOARD_GOOGLE_IDENTITIES_ID = '0015_dashboard_google_identities';
+
+const DASHBOARD_GOOGLE_IDENTITIES_STATEMENTS = Object.freeze([
+  `
+CREATE TABLE ${POSTGRES_SCHEMA}.dashboard_google_identities (
+  subject_hmac text PRIMARY KEY,
+  principal_id text NOT NULL UNIQUE,
+  bound_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT dashboard_google_identities_subject_hmac_format CHECK (
+    subject_hmac ~ '^[a-f0-9]{64}$'
+  ),
+  CONSTRAINT dashboard_google_identities_principal_id_format CHECK (
+    principal_id ~ '^[A-Za-z0-9._:-]{1,128}$'
+    AND principal_id NOT IN ('.', '..')
+  )
+)
+`,
+  `
+CREATE FUNCTION ${POSTGRES_SCHEMA}.reject_dashboard_google_identity_mutation()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RAISE EXCEPTION 'Dashboard Google identities are immutable.';
+END;
+$$
+`,
+  `
+CREATE TRIGGER dashboard_google_identities_immutable
+BEFORE UPDATE OR DELETE ON ${POSTGRES_SCHEMA}.dashboard_google_identities
+FOR EACH ROW
+EXECUTE FUNCTION ${POSTGRES_SCHEMA}.reject_dashboard_google_identity_mutation()
+  `
+]);
+
 const MIGRATIONS = Object.freeze([
   Object.freeze({
     id: INBOUND_EVENT_LEDGER_ID,
@@ -738,6 +779,11 @@ const MIGRATIONS = Object.freeze([
       ZALO_USER_THREAD_TYPE_AND_PROVIDER_IDENTITY_STATEMENTS
     ),
     statements: ZALO_USER_THREAD_TYPE_AND_PROVIDER_IDENTITY_STATEMENTS
+  }),
+  Object.freeze({
+    id: DASHBOARD_GOOGLE_IDENTITIES_ID,
+    checksum: checksumFor(DASHBOARD_GOOGLE_IDENTITIES_ID, DASHBOARD_GOOGLE_IDENTITIES_STATEMENTS),
+    statements: DASHBOARD_GOOGLE_IDENTITIES_STATEMENTS
   })
 ]);
 

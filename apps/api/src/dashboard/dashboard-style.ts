@@ -47,7 +47,7 @@ body {
 }
 
 button, input, select, textarea { font: inherit; }
-button, .quiet-link, .scope-link, .next-page { -webkit-tap-highlight-color: transparent; }
+button, .google-sign-in, .quiet-link, .scope-link, .next-page { -webkit-tap-highlight-color: transparent; }
 button {
   background: var(--signal);
   border: 1px solid transparent;
@@ -61,7 +61,7 @@ button {
 }
 button:hover { box-shadow: 0 0 0 0.2rem oklch(83% 0.16 162 / 0.12); }
 button:active { transform: scale(0.98); }
-button:focus-visible, .quiet-link:focus-visible, .scope-link:focus-visible, .next-page:focus-visible,
+button:focus-visible, .google-sign-in:focus-visible, .quiet-link:focus-visible, .scope-link:focus-visible, .next-page:focus-visible,
 input:focus-visible, select:focus-visible, textarea:focus-visible {
   outline: 0.18rem solid oklch(91% 0.09 200);
   outline-offset: 0.16rem;
@@ -117,6 +117,27 @@ textarea { min-height: 7.5rem; resize: vertical; }
   margin: var(--space-4) 0 0;
   padding: var(--space-3);
 }
+.login-separator {
+  color: var(--muted);
+  font-family: var(--font-display);
+  font-size: 0.76rem;
+  margin: var(--space-4) 0;
+  text-align: center;
+}
+.google-sign-in {
+  align-items: center;
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-small);
+  color: var(--ink);
+  display: flex;
+  font-weight: 780;
+  justify-content: center;
+  min-height: 2.75rem;
+  padding: 0.7rem 1rem;
+  text-decoration: none;
+}
+.google-sign-in:hover { background: oklch(31% 0.05 235 / 0.45); }
 
 .dashboard-header {
   align-items: flex-start;
