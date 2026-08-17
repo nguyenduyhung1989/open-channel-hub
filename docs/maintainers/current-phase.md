@@ -1,6 +1,6 @@
-# Public checkpoint: Phase 4a–4j verified source; Phase 5a candidate
+# Public checkpoint: Phase 4a–4j verified source; Phase 5a locally verified experimental source
 
-**Current candidate:** Phase 5a is an opt-in, host-local experimental Zalo User
+**Current safe stop:** Phase 5a is an opt-in, host-local experimental Zalo User
 group bridge. It admits only non-self group text through a separately
 authenticated bridge boundary, and a different loopback-only control bearer can
 explicitly send text or one checked JPEG/PNG/WebP image only to a group observed
@@ -9,10 +9,19 @@ UI shows QR/reconnect state and current group cards, then exposes a one-at-a-tim
 text/image form only for admitted groups through opaque per-session references.
 It has no official Zalo status, live-account proof, bulk recipient list,
 direct-message path, automatic reply, session persistence, provider retry,
-delivery claim, or production claim. Its source and synthetic checks are still
-pending final frozen verification.
+delivery claim, or production claim. Its source and synthetic checks are
+verified at exact commit <code>9b6795b</code>: `npm run check` (68 test files /
+504 tests and build), zero-finding dependency audit, Gitleaks, synthetic
+Compose/PostgreSQL proof, and GitHub CI/CodeQL. This does not prove a real
+Zalo QR session, group receive, send, reconnect, public TLS, or production.
 
-**Current dashboard assembly:** the source candidate renders one
+**Next owner-authorized operation:** use one real Zalo account to scan the QR,
+receive one non-self group text, explicitly send one text and image to that
+observed group, then observe the bounded reconnect path. Keep the account,
+session, message, and tokens out of commands and logs. It is a live-provider
+acceptance step, not a source-code phase.
+
+**Current dashboard assembly:** the current source renders one
 connection-agnostic operator flow for every account assigned to the selected
 inbox: canonical inbound cards, bounded reply-intent controls where configured,
 queued history, and immutable evidence. Telegram Bot, Zalo OA, Facebook Page,

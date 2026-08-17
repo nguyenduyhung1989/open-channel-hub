@@ -24,6 +24,11 @@ follows [Semantic Versioning](https://semver.org/).
   <code>0014_zalo_user_thread_type_and_provider_identity</code> to retain the
   internal Zalo User group/thread marker and require an opaque provider identity
   fingerprint for new Zalo User registry bindings.
+- Phase 5a: final local source verification at exact commit
+  <code>9b6795b</code>: `npm run check` (68 test files / 504 tests and build),
+  zero-finding dependency audit, Gitleaks, a synthetic Compose/PostgreSQL
+  proof, and GitHub CI/CodeQL. It is not a real Zalo account, provider, TLS, or
+  production verification.
 
 - The public Phase 0 foundation for Open Channel Hub.
 - The original mocked Telegram Bot vertical slice, connector contracts, and

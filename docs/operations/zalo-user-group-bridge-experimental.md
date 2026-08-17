@@ -1,8 +1,11 @@
 # Experimental Zalo User group bridge
 
-**Status: local experimental source candidate.** This guide describes the
-source and synthetic tests only. It is not evidence that Zalo accepts a real
-account session, message, image, reconnect, or production deployment.
+**Status: locally verified experimental source at exact commit
+<code>9b6795b</code>.** The frozen source passed `npm run check` (68 test files
+/ 504 tests and build), a zero-finding dependency audit, Gitleaks, the
+repository's synthetic Compose/PostgreSQL proof, and GitHub CI/CodeQL. Those
+checks do not start a Zalo account or prove that Zalo accepts a real account
+session, message, image, reconnect, or production deployment.
 
 The bridge is for one narrow owner-operated task:
 

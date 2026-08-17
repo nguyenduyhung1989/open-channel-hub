@@ -2,8 +2,8 @@
 
 > A self-hosted, official-first multichannel messaging hub.
 
-**Status: Phase 4j alpha source verified; Phase 5a is an experimental source
-candidate.** The repository contains a durable
+**Status: Phase 4j alpha source verified; Phase 5a is a locally verified
+experimental source.** The repository contains a durable
 PostgreSQL inbound-event ledger, account-scoped operator read APIs, a
 configured multi-connection inbox API, an optional server-rendered operator
 dashboard, a durable source-bound reply-command ledger, a scoped
@@ -119,7 +119,11 @@ storage, outbound Zalo message, attachment, Zalo User, live provider call, or
 automatic webhook registration.
 
 An experimental Zalo User group bridge is present in the working source but is
-not an official connector or a production claim. It runs separately from
+not an official connector or a production claim. Its frozen source passed
+`npm run check` (68 test files / 504 tests and build), a zero-finding dependency
+audit, Gitleaks, the repository's synthetic Compose/PostgreSQL proof, and
+GitHub CI/CodeQL at exact commit <code>9b6795b</code>. That proof does not run
+a Zalo account. The bridge runs separately from
 Compose with a fresh local QR session, accepts only non-self group text, and
 offers an optional separately authenticated loopback browser UI for QR state,
 reconnect state, and one-at-a-time text/image sending to a group successfully

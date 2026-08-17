@@ -378,7 +378,7 @@ prefix or token, and refuses to add a first fingerprint to a Telegram connection
 ID that already has durable inbound history. Use a new connection ID for that
 Bot rather than manually editing or backfilling PostgreSQL.
 
-The Phase 5a candidate migration
+The Phase 5a locally verified source migration
 <code>0014_zalo_user_thread_type_and_provider_identity</code> stores an
 internal `user`/`group` thread classification only for `zalo_user` inbound
 rows and requires the same opaque SHA-256 account-binding fingerprint in every

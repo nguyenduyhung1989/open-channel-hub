@@ -97,7 +97,7 @@ The page deliberately omits the command ID, provider event ID, private reply
 target, source message ID, source channel, client operation ID, raw provider
 payload, credential, raw attempt/receipt data, and delivery/read state.
 
-The current source candidate adds a dashboard-only workflow rail and a bounded
+The current source adds a dashboard-only workflow rail and a bounded
 evidence panel beside this history: it may show whether a durable attempt fact,
 receipt outcome, command-authority provenance, Telegram private-chat evidence,
 or Telegram delivery-authorization fact is recorded. These are local ledger

@@ -37,16 +37,20 @@ proof, GitHub Continuous Integration, and CodeQL. Phase 4i adds only internal
 Telegram private-chat and Bot-identity evidence; Phase 4j adds only immutable
 dashboard-principal Telegram authorization evidence. None adds a sender.
 
-Phase 5a is an unverified experimental source candidate for one Zalo User
-group bridge. It is isolated from Compose and provider webhook routes: a fresh
-QR session runs on an owner-controlled host, forwards only canonical non-self
-group text to a strict Hub ingress, and exposes a different bearer on
+Phase 5a is a locally verified experimental source for one Zalo User group
+bridge at exact commit <code>9b6795b</code>: `npm run check` (68 test files /
+504 tests and build), a zero-finding dependency audit, Gitleaks, the
+repository's synthetic Compose/PostgreSQL proof, and GitHub CI/CodeQL passed.
+It is isolated from Compose and provider webhook routes: a fresh QR session
+runs on an owner-controlled host, forwards only canonical non-self group text
+to a strict Hub ingress, and exposes a different bearer on
 `127.0.0.1` for explicit bounded group text/image sends. An optional distinct
 local browser UI shows QR/reconnect state and group cards, but uses opaque
 per-session references and enables forms only for groups admitted in that
 running bridge. It has no official provider status, real-account proof,
 bulk list, direct-message path, automatic reply, persistence of QR/session
-material, provider retry, delivery claim, or production claim.
+material, provider retry, delivery claim, or production claim. No Zalo account,
+provider request, QR scan, or public-TLS flow was used in that verification.
 
 ## Facts before plans
 
@@ -198,7 +202,7 @@ production claim.
 - No provider HTTP request, worker, dispatcher, attempt/receipt writer, retry,
   command mutation, delivery/read state, or live-provider test is in scope.
 
-## Phase 5a candidate Zalo User group-bridge boundary
+## Phase 5a locally verified Zalo User group-bridge boundary
 
 - The Hub accepts a bridge event only after the connection ID resolves to a
   configured `zalo_user` entry and its dedicated bridge bearer matches. The

@@ -78,7 +78,7 @@ organization has accepted the project.
   provider message, retain a Telegram token/Bot
   ID, backfills historic rows, or establishes production eligibility.
 
-## Candidate work
+## Locally verified experimental source
 
 - Phase 5a is an opt-in, local experimental Zalo User group bridge. It keeps QR
   session material out of Compose and the API runtime document, admits only
@@ -89,8 +89,11 @@ organization has accepted the project.
   references and enables forms only for groups admitted in that running bridge.
   It is deliberately not an official Zalo connector, bulk sender,
   direct-message tool, session-persistence system, automatic-retry system,
-  delivery claim, or production claim. Final frozen-source verification and a
-  real owner-operated account test remain separate work.
+  delivery claim, or production claim. Exact commit <code>9b6795b</code> passed
+  `npm run check` (68 test files / 504 tests and build), a zero-finding
+  dependency audit, Gitleaks, the repository's synthetic Compose/PostgreSQL
+  proof, and GitHub CI/CodeQL. A real owner-operated account test remains
+  separate work.
 
 ## Verified Phase 4e source
 

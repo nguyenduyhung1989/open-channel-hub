@@ -598,8 +598,9 @@ fingerprints, evade CAPTCHA, or send bulk spam.
 
 ### 5a — experimental Zalo User group bridge
 
-**Status: source candidate.** This is an opt-in local bridge, not an official
-Zalo integration or a live-account claim.
+**Status: locally verified experimental source at exact commit
+<code>9b6795b</code>.** This is an opt-in local bridge, not an official Zalo
+integration or a live-account claim.
 
 - [x] Keep QR/session material outside API/Compose/runtime JSON; validate an
       opaque account binding and register only its SHA-256 fingerprint.
@@ -614,9 +615,14 @@ Zalo integration or a live-account claim.
       per-session group references and never exposes raw group IDs in HTML.
 - [x] Reconnect only abnormal listener close `1006` at 1 s, 5 s, and 30 s;
       duplicate/kick/other closure requires manual restart and new QR.
-- [ ] Run final frozen local checks, a disposable PostgreSQL migration/Compose
-      proof, dependency audit, secret scan, local commit, push, and GitHub
-      verification. A real account test remains owner-operated and separate.
+- [x] Run final frozen local checks (`npm run check`: 68 test files / 504
+      tests and build), dependency audit, Gitleaks, a disposable synthetic
+      Compose/PostgreSQL proof, local checkpoints, push, and GitHub CI/CodeQL
+      at exact commit <code>9b6795b</code>. This verifies the frozen source and
+      synthetic local infrastructure, not a Zalo account.
+- [ ] Owner-authorized real-account QR, group receive, text/image send, and
+      bounded reconnect verification without exposing a session, message, or
+      token. This remains owner-operated and separate.
 - [ ] Do not add direct messages, bulk sending, raw group-ID disclosure,
       automatic reply, endpoint rotation, CAPTCHA/fingerprint evasion, retry
       worker, session persistence, delivery/read claim, or public control

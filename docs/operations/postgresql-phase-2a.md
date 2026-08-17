@@ -12,7 +12,8 @@ verified Telegram delivery-authorization evidence. The combined source passed
 final local checks, independent audit, synthetic Compose/PostgreSQL proof,
 GitHub CI, and CodeQL at exact commit <code>52608e0</code>; it remains no
 provider-dispatch claim.
-The Phase 5a experimental Zalo User bridge is a source candidate. Its additive
+The Phase 5a experimental Zalo User bridge is a locally verified source at
+exact commit <code>9b6795b</code>. Its additive
 fourteenth migration stores only an internal group/user classification and an
 opaque account-binding fingerprint; it stores no QR/session material, group
 target, bridge bearer, local-control bearer, or provider result. It has no
@@ -172,7 +173,7 @@ rechecks. It is append-only, never backfills historic commands, and does not
 authorize provider I/O. See the verified
 [Phase 4j delivery-authorization guide](telegram-delivery-authorization-4j.md).
 
-The Phase 5a candidate adds forward migration
+The Phase 5a locally verified source adds forward migration
 <code>0014_zalo_user_thread_type_and_provider_identity</code>. It appends
 `zalo_user_thread_type` to `inbound_events` with a channel-matching constraint:
 only `zalo_user` rows may contain `user` or `group`; all other channels remain
@@ -328,7 +329,7 @@ The combined Phase 4h–4j source is verified at exact commit <code>52608e0</cod
 after final local checks, independent audit, the synthetic Compose/PostgreSQL
 proof, GitHub CI, and CodeQL.
 
-The Phase 5a candidate advances the expected migration count to fourteen. Its
+The Phase 5a locally verified source advances the expected migration count to fourteen. Its
 disposable Compose extension checks the exact new inbound column and the two
 named `NOT VALID` constraints structurally. The bridge itself is deliberately
 not started by Compose, so this is not a QR login, Zalo User send, reconnect,
