@@ -14,8 +14,12 @@ follows [Semantic Versioning](https://semver.org/).
   session material out of Hub runtime configuration and persistence.
 - Phase 5a: a loopback-only separately authenticated local control service for
   one explicit group text or JPEG/PNG/WebP send after that group was durably
-  observed in the running bridge. It has no direct-message target, group list,
-  bulk recipient surface, provider retry, or session persistence.
+  observed in the running bridge.
+- Phase 5a: an optional authenticated loopback browser UI for QR and reconnect
+  state, current group cards, and one-at-a-time text/image forms. It uses
+  opaque per-session group references rather than raw IDs, and has no
+  direct-message target, bulk recipient surface, provider retry, or session
+  persistence.
 - Phase 5a: forward migration
   <code>0014_zalo_user_thread_type_and_provider_identity</code> to retain the
   internal Zalo User group/thread marker and require an opaque provider identity

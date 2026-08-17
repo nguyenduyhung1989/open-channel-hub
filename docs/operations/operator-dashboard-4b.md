@@ -65,7 +65,8 @@ following is a shape example, not usable configuration:
         "id": "support-agent",
         "passwordHash": "<Argon2id PHC value>",
         "inboxIds": ["support-inbox"],
-        "replyIntentInboxIds": ["support-inbox"]
+        "replyIntentInboxIds": ["support-inbox"],
+        "telegramDeliveryAuthorizationInboxIds": ["support-inbox"]
       }
     ]
   }
@@ -92,6 +93,11 @@ The validator requires the following:
   unique existing inbox IDs, and every value must already appear in the same
   principal's `inboxIds`. If it is omitted, the principal has no dashboard
   reply-intent write grant and remains read-only.
+- `telegramDeliveryAuthorizationInboxIds` is another optional, independent
+  zero-to-one-hundred unique subset of the same principal's `inboxIds`. It can
+  record one immutable Telegram approval fact for an already eligible queued
+  command. It neither creates a reply intent nor gives the browser a sender,
+  credential, retry, or provider-call capability.
 - `passwordHash` is an Argon2id PHC version-19 value using exactly
   `m=19456,t=2,p=1`. The supplied password command creates this required
   profile; hashes with another cost profile are rejected.
@@ -156,6 +162,15 @@ is the only browser evidence of a durable record. This is not a recipient
 picker, provider send, retry, or delivery control. Follow the dedicated
 [Phase 4f reply-intent guide](operator-dashboard-reply-intents-4f.md) before
 enabling this write grant.
+
+The current dashboard also makes the already-implemented workflow visible in
+one place: inbound event, durable reply intent, queued history, immutable
+evidence, then a clearly paused provider-send step. A card may show bounded
+facts such as recorded provenance, private-Telegram eligibility, delivery
+authorization, or the local attempt/receipt label. Those facts never expose a
+target, provider message ID, raw response, fingerprint, or credential. A
+`provider_accepted` label still means only that a receipt fact was recorded;
+it is not delivered/read status and does not turn the dashboard into a sender.
 
 Use the dashboard's **Log out** form when leaving the workstation. It revokes
 the server-side session and clears the cookie. Sessions also expire after 30

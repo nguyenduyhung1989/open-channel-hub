@@ -506,9 +506,7 @@ const toGroups = (
     );
   }
 
-  return Object.freeze(
-    groups.sort((left, right) => left.id.localeCompare(right.id))
-  );
+  return Object.freeze(groups.sort((left, right) => left.id.localeCompare(right.id)));
 };
 
 const toGroupName = (value: unknown): string | undefined =>

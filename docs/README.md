@@ -13,8 +13,9 @@
 - [Phase 3a Zalo OA inbound text](operations/zalo-oa-3a.md): official signed
   raw-JSON ingress, account isolation, and intentionally excluded Zalo surface.
 - [Experimental Zalo User group bridge](operations/zalo-user-group-bridge-experimental.md):
-  isolated local QR session, group-only text/image control, bounded reconnect,
-  and explicit account-risk boundary.
+  isolated local QR session, optional authenticated loopback QR/group UI,
+  group-only text/image control, bounded reconnect, and explicit account-risk
+  boundary.
 - [Phase 3b Facebook Page inbound text](operations/facebook-page-3b.md):
   official GET verification, raw-byte HMAC ingress, Page isolation, and the
   intentionally excluded Meta surface.
@@ -35,7 +36,8 @@
   cursor boundary.
 - [Phase 4e dashboard queued-command history](operations/operator-dashboard-queued-history-4e.md):
   a server-rendered, principal-scoped queued-history view with no browser
-  bearer or outbound action.
+  bearer; later bounded evidence/Telegram-approval controls still do not send
+  through a provider.
 - [Phase 4f dashboard reply intents](operations/operator-dashboard-reply-intents-4f.md):
   verified opt-in, source-bound durable intent recording through a
   server-rendered form; no provider send or browser bearer.

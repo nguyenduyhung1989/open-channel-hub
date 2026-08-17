@@ -87,17 +87,62 @@ The bridge prints the path of a temporary owner-only QR image. Scan that QR
 once from the intended Zalo account. It deletes the QR directory on exit; it
 does not save QR session material for a later restart.
 
+## Optional local browser UI
+
+The bridge can also serve an authenticated owner-only browser UI on the same
+host. It is still outside Compose and the Hub API image. Set all three values
+below, or leave all three absent to keep the UI disabled:
+
+```text
+ZALO_USER_BRIDGE_UI_PASSWORD_HASH_FILE=/absolute/private/path/zalo-user-ui-password-hash
+ZALO_USER_BRIDGE_UI_SESSION_PEPPER_FILE=/absolute/private/path/zalo-user-ui-session-pepper
+ZALO_USER_BRIDGE_UI_PORT=9473
+```
+
+Both files must be regular `0600` files outside the repository. The password
+file contains one Argon2id PHC value using exactly `m=19456,t=2,p=1`; create it
+privately with the existing command below, then write only its output into the
+file:
+
+```bash
+npm run dashboard:password:hash:dev
+```
+
+The command reads the password from standard input. Do not put a password or
+hash on a command line. The session-pepper file contains a distinct printable
+32–512-character secret. It must differ from both bridge control secrets.
+
+After startup, open:
+
+```text
+http://127.0.0.1:9473/operator/login
+```
+
+The UI uses a signed `HttpOnly`, `SameSite=Strict` local session, a per-session
+anti-forgery value, exact local origin checks, a bounded login verifier, and
+no browser JavaScript. It shows QR/reconnect state and group names returned by
+`zca-js`. It never sends raw group IDs, QR session material, bridge credentials,
+or the local-control bearer to HTML. Each browser session gets opaque group
+references instead.
+
 ## Sending to an observed group
 
 First let the group produce a plain-text message while the bridge is connected.
 The Hub must return `204`. The bridge then remembers that group only for this
 running process. Read the group's canonical event through the authenticated
 Zalo User inbound reader to obtain its `conversationId`; that value is the
-local control path segment.
+legacy local-control path segment.
 
-The local service does not enumerate groups. It accepts at most 20 explicit
-sends across the bridge in a rolling minute. A rejected/ambiguous provider
-request is returned once and is never automatically sent again.
+The legacy local-control API does not enumerate groups. The optional browser UI
+does list group names from the current `zca-js` session, but it renders text and
+image forms only for groups that this running bridge has durably observed and
+admitted. It accepts at most 20 explicit sends across the bridge in a rolling
+minute. A rejected/ambiguous provider request is returned once and is never
+automatically sent again.
+
+In the browser UI, sign in, scan the QR if needed, then use **Gửi chữ** or
+**Gửi ảnh** on an eligible group card. A successful page notice means one Zalo
+send call returned successfully; it is not a delivery or read receipt.
 
 ### Send plain text
 
@@ -147,8 +192,10 @@ until a new listener reaches `connected`.
 ## Boundaries and residual risk
 
 - No direct-message send or receive is exposed by this bridge route.
-- No bulk recipient list, group enumeration, scheduled job, automatic reply,
-  delivery receipt, retry worker, or browser send surface exists.
+- No bulk recipient list, raw group-ID browser disclosure, scheduled job,
+  automatic reply, delivery receipt, or retry worker exists. The optional
+  loopback browser UI is an explicit one-group-at-a-time text/image control
+  surface, not a bulk sender.
 - The bridge keeps the group allow-list only in memory. A process restart
   requires a new inbound group text before that group is send-eligible again.
 - The local control service is not public. Do not reverse-proxy it, bind it to

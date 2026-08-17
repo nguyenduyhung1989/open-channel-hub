@@ -95,7 +95,15 @@ separate data-handling decision.
 
 The page deliberately omits the command ID, provider event ID, private reply
 target, source message ID, source channel, client operation ID, raw provider
-payload, credential, attempt data, receipt, and delivery/read state.
+payload, credential, raw attempt/receipt data, and delivery/read state.
+
+The current source candidate adds a dashboard-only workflow rail and a bounded
+evidence panel beside this history: it may show whether a durable attempt fact,
+receipt outcome, command-authority provenance, Telegram private-chat evidence,
+or Telegram delivery-authorization fact is recorded. These are local ledger
+facts only. In particular, `provider_accepted` does not mean delivered or read,
+and the page keeps provider sending paused: it has no browser send action,
+worker, retry, or provider credential.
 
 ## Stable continuation
 
@@ -113,12 +121,15 @@ command history.
 
 ## Explicit boundary
 
-This page has no browser JavaScript or API bearer, no command creation form,
-and no provider network operation. The normal dashboard logout form remains a
-session-management control; it is not an outbound action. Phase 4f's verified
-form is a separate `/operator` event-card control, available only after an
-explicit per-principal inbox grant and still bounded to the existing durable
-intent store.
+This page has no browser JavaScript or API bearer, no generic command-creation
+form, and no provider network operation. A separately scoped Phase 4j
+Telegram-authorization form can appear only for an eligible queued command and
+an explicitly authorized dashboard principal; it writes an immutable approval
+fact, not a provider request or delivery result. The normal dashboard logout
+form remains a session-management control. Phase 4f's verified form is a
+separate `/operator` event-card control, available only after an explicit
+per-principal inbox grant and still bounded to the existing durable intent
+store.
 
 Phase 4e does not change `outbound_commands`, the immutable-row trigger, the
 Phase 4d reader, or the provider boundary. The only ordinary write while

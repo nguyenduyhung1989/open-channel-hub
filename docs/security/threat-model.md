@@ -41,10 +41,12 @@ Phase 5a is an unverified experimental source candidate for one Zalo User
 group bridge. It is isolated from Compose and provider webhook routes: a fresh
 QR session runs on an owner-controlled host, forwards only canonical non-self
 group text to a strict Hub ingress, and exposes a different bearer on
-`127.0.0.1` for explicit bounded group text/image sends. It has no official
-provider status, real-account proof, bulk list, direct-message path, automatic
-reply, persistence of QR/session material, provider retry, delivery claim, or
-production claim.
+`127.0.0.1` for explicit bounded group text/image sends. An optional distinct
+local browser UI shows QR/reconnect state and group cards, but uses opaque
+per-session references and enables forms only for groups admitted in that
+running bridge. It has no official provider status, real-account proof,
+bulk list, direct-message path, automatic reply, persistence of QR/session
+material, provider retry, delivery claim, or production claim.
 
 ## Facts before plans
 
@@ -202,9 +204,12 @@ production claim.
   configured `zalo_user` entry and its dedicated bridge bearer matches. The
   route authenticates before JSON parsing, accepts only a strict canonical
   non-self `group` text envelope, and returns `204` only after durable append.
-- The separately run bridge binds its local control server to `127.0.0.1`, uses
-  a different bearer, admits a group to its in-memory send set only after the
-  Hub accepted that group event, and accepts no group enumeration endpoint.
+- The separately run bridge binds its local control server and optional browser
+  UI to `127.0.0.1`, uses separate local credentials, and admits a group to its
+  in-memory send set only after the Hub accepted that group event. The legacy
+  control API has no group-list endpoint. The browser UI can show current group
+  names but uses opaque per-session references and renders send forms only for
+  admitted groups; it never exposes raw group IDs to HTML.
 - A direct explicit text/image request is limited to 20 sends per rolling
   minute. Images must be one checked JPEG/PNG/WebP buffer with matching magic
   bytes and extension and a 1 byte–10 MiB decoded size. An ambiguous or failed Zalo
@@ -217,7 +222,8 @@ production claim.
   it is exposed only through an operator-bearer reader.
 - The `zca-js` dependency is unofficial and therefore account-compatible
   operation is unproven. No control path is exposed through Compose, a public
-  reverse proxy, browser, inbox bearer, or dashboard.
+  reverse proxy, inbox bearer, or the central dashboard. The separate loopback
+  browser UI remains local-host-only and is not a public deployment claim.
 
 ## Trust zones and data flow
 

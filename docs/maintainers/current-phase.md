@@ -4,10 +4,21 @@
 group bridge. It admits only non-self group text through a separately
 authenticated bridge boundary, and a different loopback-only control bearer can
 explicitly send text or one checked JPEG/PNG/WebP image only to a group observed
-by that running bridge. It has no official Zalo status, live-account proof,
-bulk recipient list, direct-message path, automatic reply, session persistence,
-provider retry, delivery claim, or production claim. Its source and synthetic
-checks are still pending final frozen verification.
+by that running bridge. An optional separately authenticated loopback browser
+UI shows QR/reconnect state and current group cards, then exposes a one-at-a-time
+text/image form only for admitted groups through opaque per-session references.
+It has no official Zalo status, live-account proof, bulk recipient list,
+direct-message path, automatic reply, session persistence, provider retry,
+delivery claim, or production claim. Its source and synthetic checks are still
+pending final frozen verification.
+
+**Current dashboard assembly:** the source candidate renders one
+connection-agnostic operator flow for every account assigned to the selected
+inbox: canonical inbound cards, bounded reply-intent controls where configured,
+queued history, and immutable evidence. Telegram Bot, Zalo OA, Facebook Page,
+WhatsApp Business, and the experimental Zalo User bridge can appear through
+that one server-owned scope. The final step is visibly paused: this does not add
+provider sending, a worker, retry, delivery/read status, or browser credential.
 
 **Verified scope:** Phase 4a is a configured, read-only aggregate feed across
 an explicit set of existing official connections. It builds on the Telegram

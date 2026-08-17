@@ -203,7 +203,8 @@ The root document may additionally include `dashboard`, but only when
         "id": "support-agent",
         "passwordHash": "<Argon2id PHC value>",
         "inboxIds": ["support-inbox"],
-        "replyIntentInboxIds": ["support-inbox"]
+        "replyIntentInboxIds": ["support-inbox"],
+        "telegramDeliveryAuthorizationInboxIds": ["support-inbox"]
       }
     ]
   }
@@ -221,6 +222,12 @@ exact `m=19456,t=2,p=1` profile, and one to one hundred unique existing inbox
 IDs. Its optional `replyIntentInboxIds` field is a unique subset of those
 already readable inbox IDs. When omitted, it becomes an empty immutable set and
 does not grant dashboard intent recording.
+
+Its separate optional `telegramDeliveryAuthorizationInboxIds` field is also a
+unique subset of those already readable inbox IDs. When omitted, it becomes an
+empty immutable set and does not grant Telegram-authorization recording. This
+is an immutable local approval fact only; it is not provider configuration,
+dispatch permission, or a browser credential.
 
 Dashboard configuration creates no browser bearer. It enables only
 server-rendered `/operator` routes with signed `Secure` `HttpOnly`

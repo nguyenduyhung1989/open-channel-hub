@@ -5,8 +5,8 @@
 **Status: Phase 4j alpha source verified; Phase 5a is an experimental source
 candidate.** The repository contains a durable
 PostgreSQL inbound-event ledger, account-scoped operator read APIs, a
-configured multi-connection inbox API, an optional server-rendered read-only
-operator dashboard, a durable source-bound reply-command ledger, a scoped
+configured multi-connection inbox API, an optional server-rendered operator
+dashboard, a durable source-bound reply-command ledger, a scoped
 queued-command history API, a verified server-rendered queued-command history
 page, a verified opt-in server-rendered reply-intent form, secret-backed
 runtime configuration for official accounts, verified immutable
@@ -121,11 +121,13 @@ automatic webhook registration.
 An experimental Zalo User group bridge is present in the working source but is
 not an official connector or a production claim. It runs separately from
 Compose with a fresh local QR session, accepts only non-self group text, and
-offers a loopback-only, separately authenticated text/image control endpoint
-only for a group successfully observed in that running session. It deliberately
-does not persist session material, enumerate groups, accept direct-message
-targets, send in bulk, or retry provider sends automatically. See the
-[experimental Zalo User group bridge guide](docs/operations/zalo-user-group-bridge-experimental.md).
+offers an optional separately authenticated loopback browser UI for QR state,
+reconnect state, and one-at-a-time text/image sending to a group successfully
+observed in that running session. The UI uses opaque per-session group
+references rather than exposing raw IDs. The bridge deliberately does not
+persist session material, accept direct-message targets, send in bulk, or retry
+provider sends automatically. See the [experimental Zalo User group bridge
+guide](docs/operations/zalo-user-group-bridge-experimental.md).
 
 For Zalo OA, Facebook Page, and WhatsApp Business, the registry also stores a domain-separated SHA-256
 fingerprint of the configured <code>(appId, oaId)</code> pair. It is not the
@@ -330,12 +332,22 @@ CAPTCHA bypass, fingerprint spoofing, session theft, or bulk-spam capabilities.
   read canonical inbound events and queued reply-command history, and record a
   source-bound reply intent, but cannot choose an arbitrary recipient or
   dispatch a provider message.
-- An optional server-rendered, no-JavaScript, read-only operator dashboard.
-  It uses local configured password principals and browser session cookies;
-  it never exposes an inbox bearer or provider credential to the browser. The
-  verified Phase 4e source adds a principal-scoped queued-command history page.
-  The verified Phase 4f source adds a source-bound intent form only for an explicit
+- An optional server-rendered, no-JavaScript operator dashboard. It uses local
+  configured password principals and browser session cookies; it never exposes
+  an inbox bearer or provider credential to the browser. It renders the inbox,
+  source-bound intent, queued-history, and immutable delivery-evidence steps as
+  one workflow, while clearly marking provider sending as paused. The verified
+  Phase 4f source adds a source-bound intent form only for an explicit
   per-principal, per-inbox write allow-list; it is not a send action.
+- That dashboard is connection-agnostic inside its configured inbox: Telegram
+  Bot, Zalo OA, Facebook Page, WhatsApp Business, and the experimental Zalo User
+  bridge all use the same server-owned inbox scope and canonical event cards
+  when they are configured there. The UI does not invent connector features
+  absent from the source; official Meta/Zalo OA paths remain inbound-only.
+- An optional host-local Zalo User browser UI for QR/reconnect state, current
+  group cards, and bounded text or image sends to only groups admitted by the
+  running bridge. It is not part of the Docker API service and has no bulk or
+  direct-message path.
 - Dynamic multi-connection webhook ingress that resolves the account server
   side, uses a separate webhook secret, and gives unknown account IDs and wrong
   secrets the same <code>401</code> response.

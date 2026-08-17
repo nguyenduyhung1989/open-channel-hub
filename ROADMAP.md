@@ -608,14 +608,19 @@ Zalo integration or a live-account claim.
 - [x] Expose a `127.0.0.1`-only control service with a different bearer token,
       allowing one explicit bounded text or JPEG/PNG/WebP buffer send only to a
       group observed in the same running bridge session.
+- [x] Offer an optional separately authenticated loopback browser UI for QR and
+      reconnect state, current group cards, and one-at-a-time text/image forms
+      only for groups admitted by that running bridge. It uses opaque
+      per-session group references and never exposes raw group IDs in HTML.
 - [x] Reconnect only abnormal listener close `1006` at 1 s, 5 s, and 30 s;
       duplicate/kick/other closure requires manual restart and new QR.
 - [ ] Run final frozen local checks, a disposable PostgreSQL migration/Compose
       proof, dependency audit, secret scan, local commit, push, and GitHub
       verification. A real account test remains owner-operated and separate.
-- [ ] Do not add direct messages, bulk sending, group enumeration, automatic
-      reply, endpoint rotation, CAPTCHA/fingerprint evasion, retry worker,
-      session persistence, delivery/read claim, or public control endpoint.
+- [ ] Do not add direct messages, bulk sending, raw group-ID disclosure,
+      automatic reply, endpoint rotation, CAPTCHA/fingerprint evasion, retry
+      worker, session persistence, delivery/read claim, or public control
+      endpoint.
 
 ## Explicitly out of scope
 

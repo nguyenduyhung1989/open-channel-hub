@@ -83,11 +83,14 @@ organization has accepted the project.
 - Phase 5a is an opt-in, local experimental Zalo User group bridge. It keeps QR
   session material out of Compose and the API runtime document, admits only
   non-self group text through a separately authenticated Hub route, and exposes
-  a distinct `127.0.0.1`-only control bearer for explicit bounded group text or
-  checked image sends. It is deliberately not an official Zalo connector, bulk
-  sender, direct-message tool, session-persistence system, automatic-retry
-  system, delivery claim, or production claim. Final frozen-source verification
-  and a real owner-operated account test remain separate work.
+  a distinct `127.0.0.1`-only control bearer plus an optional separately
+  authenticated local browser UI for QR/reconnect state and explicit bounded
+  group text or checked image sends. The UI uses opaque per-session group
+  references and enables forms only for groups admitted in that running bridge.
+  It is deliberately not an official Zalo connector, bulk sender,
+  direct-message tool, session-persistence system, automatic-retry system,
+  delivery claim, or production claim. Final frozen-source verification and a
+  real owner-operated account test remain separate work.
 
 ## Verified Phase 4e source
 
