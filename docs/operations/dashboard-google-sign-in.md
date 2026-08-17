@@ -9,7 +9,9 @@ or provider credential.
 
 - The Phase 4b dashboard is already configured with a public HTTPS
   `dashboard.publicOrigin`, configured inboxes, a configured principal, and
-  PostgreSQL.
+  PostgreSQL. For a loopback-only Docker demonstration, the one deliberate
+  exception is an exact `http://localhost:<port>` origin; raw IP addresses and
+  every other plain-HTTP hostname remain invalid.
 - Migration `0015_dashboard_google_identities` has run. Compose starts the
   migrator before the API.
 - An owner-approved Google OAuth client exists. It may be the same client used
@@ -29,11 +31,11 @@ For the local Docker demonstration currently running on this machine, the
 exact callback to add is:
 
 ```text
-https://och.127.0.0.1.nip.io:3443/operator/auth/google/callback
+http://localhost:3460/operator/auth/google/callback
 ```
 
-That loopback-backed URL is a local demonstration only. It is not a public TLS
-or production endpoint.
+That localhost URL is a local demonstration only. It is not a public TLS or
+production endpoint.
 
 ## Configure Docker Compose
 
@@ -63,9 +65,9 @@ startup fail safely rather than leaving a half-enabled login path.
    **Đăng nhập bằng Google**.
 
 The initial link has three independent checks: the current signed dashboard
-session, the exact configured HTTPS Origin, and the dashboard anti-forgery
-token. The callback additionally consumes one short-lived state/PKCE/nonce
-transaction and must return to the same linking principal.
+session, the exact configured Origin, and the dashboard anti-forgery token.
+The callback additionally consumes one short-lived state/PKCE/nonce transaction
+and must return to the same linking principal.
 
 ## What is retained
 

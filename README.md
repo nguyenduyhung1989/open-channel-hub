@@ -195,8 +195,9 @@ is available, and a matching `inboxes` array already exists, `/operator/login`
 and `/operator` use configured local principals, Argon2id password hashes, and
 signed `Secure` `HttpOnly` session cookies. The browser never receives an inbox
 bearer or provider credential. It is deliberately absent from the supplied
-loopback HTTP Compose configuration because browser authentication requires an
-external HTTPS origin and a TLS reverse proxy.
+standard loopback Compose configuration. A separately configured local Docker
+demonstration may use exact `http://localhost:<port>` only; deployment still
+requires an external HTTPS origin and TLS reverse proxy.
 
 Phase 4c adds <code>POST /v1/inbox/outbound-commands</code> for a configured
 inbox bearer. It records an immutable <code>queued</code> reply intent against
@@ -601,10 +602,11 @@ for the exact response and operational boundary.
 
 The dashboard is configured inside the same secret document as connections and
 inboxes, not by a browser token or `DASHBOARD_*` environment variable. It is
-absent by default. A valid configuration needs an exact public HTTPS origin,
-one or two unique cookie-signing keys, a separate session HMAC pepper, and one
-or more configured principals scoped to existing inboxes. Password values are
-stored only as exact-profile Argon2id PHC hashes.
+absent by default. A valid configuration normally needs an exact public HTTPS
+origin; exact `http://localhost:<port>` is the loopback Docker-demo exception.
+It also needs one or two unique cookie-signing keys, a separate session HMAC
+pepper, and one or more configured principals scoped to existing inboxes.
+Password values are stored only as exact-profile Argon2id PHC hashes.
 
 Its read-only HTML pages are `/operator/login` and `/operator`; Phase 4e also
 adds `/operator/outbound-commands` for queued command history. Phase 4f adds

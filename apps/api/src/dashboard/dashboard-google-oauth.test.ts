@@ -77,6 +77,32 @@ describe('dashboard Google OAuth boundary', () => {
     expect(url.searchParams.get('state')).toBe('s'.repeat(43));
   });
 
+  it('permits an exact HTTP localhost callback but rejects an unsecured non-local callback', () => {
+    const client = createDashboardGoogleOAuthClient({
+      clientId: 'synthetic-client.apps.googleusercontent.com',
+      clientSecret: 'synthetic-client-secret-012345678901234567890',
+      redirectUri: 'http://localhost:3460/operator/auth/google/callback'
+    });
+    const url = new URL(
+      client.createAuthorizationUrl({
+        codeChallenge: 'c'.repeat(43),
+        nonce: 'n'.repeat(43),
+        state: 's'.repeat(43)
+      })
+    );
+
+    expect(url.searchParams.get('redirect_uri')).toBe(
+      'http://localhost:3460/operator/auth/google/callback'
+    );
+    expect(() =>
+      createDashboardGoogleOAuthClient({
+        clientId: 'synthetic-client.apps.googleusercontent.com',
+        clientSecret: 'synthetic-client-secret-012345678901234567890',
+        redirectUri: 'http://dashboard.example.test/operator/auth/google/callback'
+      })
+    ).toThrow(DashboardGoogleOAuthError);
+  });
+
   it('HMACs a Google subject with a separate domain and never returns the raw subject', () => {
     const first = dashboardGoogleSubjectHmac(IDENTITY_KEY, '110012345678901234567');
     const second = dashboardGoogleSubjectHmac(IDENTITY_KEY, '110012345678901234568');

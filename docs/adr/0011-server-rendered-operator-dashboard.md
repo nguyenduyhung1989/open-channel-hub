@@ -28,10 +28,11 @@ document already configures inboxes and PostgreSQL is available.
   has no browser bearer token, browser API request, client-side JavaScript, or
   connection-listing API. The server resolves the signed-in principal and then
   resolves only that principal's configured inboxes.
-- `dashboard.publicOrigin` is an exact external HTTPS origin. Configuration
-  rejects IP addresses, localhost, local/private hostnames, credentials,
-  query strings, fragments, and paths other than `/`. The local loopback HTTP
-  Compose runner deliberately has no dashboard configuration.
+- `dashboard.publicOrigin` is normally an exact external HTTPS origin.
+  Configuration rejects IP addresses, local/private hostnames, credentials,
+  query strings, fragments, and paths other than `/`. The sole local exception
+  is exact `http://localhost:<port>` for a loopback Docker demonstration; the
+  standard loopback Compose runner deliberately has no dashboard configuration.
 - A principal is deployment-local configuration, not a durable user record.
   It has a safe opaque ID, an Argon2id PHC password hash using the exact
   `m=19456,t=2,p=1` profile, and an explicit allow-list of configured inbox

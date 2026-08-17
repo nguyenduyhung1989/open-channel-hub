@@ -182,6 +182,18 @@ describe('loadRuntimeConnectionConfiguration', () => {
     }).toThrow(TypeError);
   });
 
+  it('permits exact localhost dashboard origins for a local Docker operator session only', async () => {
+    for (const publicOrigin of ['http://localhost:3460/', 'https://localhost:3443/']) {
+      const configuration = validDashboardConfiguration();
+      configuration.dashboard.publicOrigin = publicOrigin;
+      readFileMock.mockResolvedValueOnce(JSON.stringify(configuration));
+
+      await expect(loadRuntimeConnectionConfiguration(CONFIGURATION_PATH)).resolves.toMatchObject({
+        dashboard: { publicOrigin: publicOrigin.slice(0, -1) }
+      });
+    }
+  });
+
   it('loads a canonical dashboard reply-intent allow-list while omitted scopes stay read-only', async () => {
     const configuration = validDashboardConfiguration();
     configuration.dashboard.principals[0]!.replyIntentInboxIds = ['support-inbox', 'sales-inbox'];
@@ -247,7 +259,10 @@ describe('loadRuntimeConnectionConfiguration', () => {
       'https://dashboard.example.test/inbox',
       'https://127.0.0.1/',
       'https://[2606:4700:4700::1111]/',
-      'https://localhost/',
+      'http://localhost/inbox',
+      'http://localhost/?next=synthetic',
+      'http://127.0.0.1/',
+      'https://localhost./',
       'https://dashboard.local/',
       'https://dashboard.internal/',
       'https://dashboard.private/'

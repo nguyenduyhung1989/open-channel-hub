@@ -598,13 +598,12 @@ const parseDashboardPublicOrigin = (value: unknown): string => {
     const url = new URL(value);
 
     if (
-      url.protocol !== 'https:' ||
       url.username !== '' ||
       url.password !== '' ||
       url.search !== '' ||
       url.hash !== '' ||
       url.pathname !== '/' ||
-      !isDashboardPublicHostname(url.hostname)
+      !isAllowedDashboardOrigin(url)
     ) {
       throw new RuntimeConnectionConfigurationError();
     }
@@ -613,6 +612,27 @@ const parseDashboardPublicOrigin = (value: unknown): string => {
   } catch {
     throw new RuntimeConnectionConfigurationError();
   }
+};
+
+/**
+ * Dashboard sessions normally require a public HTTPS origin. The sole local
+ * development exception is an exact `localhost` origin, which browsers and
+ * Google's OAuth rules treat as loopback-only. Raw IPs and every other HTTP
+ * hostname remain rejected.
+ */
+const isAllowedDashboardOrigin = (url: URL): boolean =>
+  (url.protocol === 'https:' && isDashboardPublicHostname(url.hostname)) ||
+  ((url.protocol === 'http:' || url.protocol === 'https:') &&
+    url.hostname === 'localhost' &&
+    isValidPort(url.port));
+
+const isValidPort = (value: string): boolean => {
+  if (value === '') {
+    return true;
+  }
+
+  const port = Number(value);
+  return Number.isInteger(port) && port >= 1 && port <= 65_535;
 };
 
 const parseDashboardSecrets = (

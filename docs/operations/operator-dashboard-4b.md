@@ -8,9 +8,10 @@ intent form. This document describes the implemented boundaries, not a
 claim that a TLS proxy or production deployment has been verified.
 
 The dashboard is absent when the `dashboard` object is absent from the runtime
-configuration. The supplied local Compose runner intentionally leaves it
-absent: it publishes HTTP only on loopback, while this dashboard requires a
-real external HTTPS origin and `Secure` cookies.
+configuration. The supplied standard local Compose runner intentionally leaves
+it absent. A separate loopback-only Docker demonstration may use an exact
+`http://localhost:<port>` origin; that exception is not public TLS or a
+production configuration.
 
 ## Prerequisites
 
@@ -22,9 +23,10 @@ Before enabling it, all of the following must already be true:
 - The version-1 runtime secret document contains configured `connections` and
   at least one configured `inboxes` entry. Dashboard principals may select only
   those inbox IDs; they never select a connection ID or bearer token.
-- A TLS reverse proxy exposes one public HTTPS hostname. Its exact origin is
-  the `publicOrigin` below. The hostname must not be an IP address,
-  `localhost`, or a local/private hostname.
+- For deployment, a TLS reverse proxy exposes one public HTTPS hostname. Its
+  exact origin is the `publicOrigin` below; the hostname must not be an IP
+  address or a local/private hostname. The only local exception is exact
+  `http://localhost:<port>` for a loopback Docker demonstration.
 - The proxy preserves `Origin`, `Cookie`, and `Set-Cookie`, does not log
   passwords or cookies, and rate-limits `POST /operator/session`. The
   application's small in-process login throttle is a supplement, not a
@@ -35,8 +37,8 @@ Before enabling it, all of the following must already be true:
   application compares the browser `Origin` to `publicOrigin` exactly.
 
 Do not point a browser at `http://127.0.0.1:3000/operator` and call that a
-dashboard test. The configured origin cannot be loopback HTTP, and a conforming
-browser will not return a `Secure` session cookie over that connection.
+dashboard test. Raw IP loopback remains invalid. Use only the explicit
+`http://localhost:<port>` Docker-demo exception, or a real public HTTPS proxy.
 
 ## Add the optional runtime configuration
 

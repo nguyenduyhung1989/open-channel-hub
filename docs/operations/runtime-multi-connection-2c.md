@@ -211,9 +211,11 @@ The root document may additionally include `dashboard`, but only when
 }
 ```
 
-`publicOrigin` is an exact public HTTPS origin with `/` as its only path. It
-cannot use an IP address, local/private hostname, credentials, query, or
-fragment. `sessionCookieSigningKeys` has one or two unique printable
+`publicOrigin` is normally an exact public HTTPS origin with `/` as its only
+path. It cannot use an IP address, local/private hostname, credentials, query,
+or fragment. The sole loopback demonstration exception is exact
+`http://localhost:<port>`; no other plain-HTTP host is accepted.
+`sessionCookieSigningKeys` has one or two unique printable
 32–512-character values; the current signing key is first. `sessionIdPepper`
 is a different printable 32–512-character value. These secrets must not collide
 with each other or any connection/inbox credential. Each of one to one hundred

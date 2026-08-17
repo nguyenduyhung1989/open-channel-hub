@@ -286,9 +286,10 @@ independent review, and GitHub CI/CodeQL evidence are complete for exact commit
 <code>7672be9</code>. Public TLS/proxy and production evidence remain open.**
 
 - [x] An optional strict `dashboard` object in the version-1 runtime secret.
-      It requires configured inboxes, an exact external HTTPS origin, one or
-      two unique signing keys, a separate session HMAC pepper, and configured
-      local principals scoped only to existing inbox IDs.
+      It requires configured inboxes, an exact external HTTPS origin (or exact
+      `http://localhost:<port>` only for a loopback Docker demonstration), one
+      or two unique signing keys, a separate session HMAC pepper, and
+      configured local principals scoped only to existing inbox IDs.
 - [x] Server-rendered, no-JavaScript `/operator` pages with no browser bearer,
       provider credential, connection selector, or client-side inbox API.
 - [x] Exact-profile Argon2id (`m=19456,t=2,p=1`) password verification,

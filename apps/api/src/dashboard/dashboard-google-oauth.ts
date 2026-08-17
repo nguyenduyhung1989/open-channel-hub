@@ -122,7 +122,7 @@ export const createDashboardGoogleOAuthClient = (
   if (
     !isSafeGoogleCredential(configuration.clientId) ||
     !isSafeGoogleCredential(configuration.clientSecret) ||
-    !isAbsoluteHttpsUrl(configuration.redirectUri)
+    !isAllowedGoogleRedirectUri(configuration.redirectUri)
   ) {
     throw new DashboardGoogleOAuthError();
   }
@@ -297,7 +297,7 @@ const validateFileConfiguration = (
     !isAbsoluteFilePath(value.clientIdFile) ||
     !isAbsoluteFilePath(value.clientSecretFile) ||
     value.clientIdFile === value.clientSecretFile ||
-    !isAbsoluteHttpsUrl(value.redirectUri)
+    !isAllowedGoogleRedirectUri(value.redirectUri)
   ) {
     throw new DashboardGoogleOAuthError();
   }
@@ -427,7 +427,12 @@ const isAbsoluteFilePath = (value: unknown): value is string =>
   value.length <= 1_024 &&
   !value.includes('\u0000');
 
-const isAbsoluteHttpsUrl = (value: unknown): value is string => {
+/**
+ * Google permits plain HTTP only for an exact localhost redirect URI. External
+ * dashboard callbacks stay HTTPS-only, so a configuration typo cannot turn a
+ * public OAuth callback into cleartext transport.
+ */
+const isAllowedGoogleRedirectUri = (value: unknown): value is string => {
   if (typeof value !== 'string') {
     return false;
   }
@@ -435,8 +440,10 @@ const isAbsoluteHttpsUrl = (value: unknown): value is string => {
   try {
     const url = new URL(value);
 
+    const isLocalhost = url.hostname === 'localhost';
+
     return (
-      url.protocol === 'https:' &&
+      (url.protocol === 'https:' || (url.protocol === 'http:' && isLocalhost)) &&
       url.username === '' &&
       url.password === '' &&
       url.search === '' &&
