@@ -218,7 +218,8 @@ describe('runtime dashboard feature', () => {
     const googleAuthentication: DashboardGoogleAuthentication = Object.freeze({
       client: Object.freeze({
         createAuthorizationUrl: () => 'https://accounts.example.test/authorize',
-        exchangeAuthorizationCode: async () => Object.freeze({ subject: 'synthetic-subject' }),
+        exchangeAuthorizationCode: async () =>
+          Object.freeze({ email: 'support@example.test', subject: 'synthetic-subject' }),
         subjectHmac: () => 'a'.repeat(64)
       }),
       identityStore: googleIdentityStore
@@ -237,14 +238,40 @@ describe('runtime dashboard feature', () => {
     );
     expect(dashboard.findReplyIntentInbox('support-agent', 'support-inbox')).toBeUndefined();
   });
+
+  it('exposes only a principal id for the one configured Google bootstrap allow-list entry', () => {
+    const dashboard = createRuntimeDashboardFeature(
+      runtimeDashboard({
+        googleBootstrap: {
+          email: 'SUPPORT@EXAMPLE.TEST',
+          principalId: 'support-agent'
+        }
+      }),
+      [inbox('support-inbox', SUPPORT_TOKEN), inbox('sales-inbox', SALES_TOKEN)],
+      sessionStore()
+    );
+
+    expect(dashboard.findGoogleBootstrapPrincipal('support@example.test')).toEqual({
+      id: 'support-agent'
+    });
+    expect(dashboard.findGoogleBootstrapPrincipal('SUPPORT@EXAMPLE.TEST')).toEqual({
+      id: 'support-agent'
+    });
+    expect(dashboard.findGoogleBootstrapPrincipal('other@example.test')).toBeUndefined();
+    expect(
+      JSON.stringify(dashboard.findGoogleBootstrapPrincipal('support@example.test'))
+    ).not.toContain('support@example.test');
+  });
 });
 
 const runtimeDashboard = (
   options: Readonly<{
+    googleBootstrap?: Readonly<{ email: string; principalId: string }>;
     supportReplyIntentInboxIds?: readonly string[];
     supportTelegramDeliveryAuthorizationInboxIds?: readonly string[];
   }> = {}
 ): RuntimeDashboard => ({
+  ...(options.googleBootstrap === undefined ? {} : { googleBootstrap: options.googleBootstrap }),
   principals: [
     {
       id: 'support-agent',

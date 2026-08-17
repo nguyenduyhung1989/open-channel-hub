@@ -194,6 +194,46 @@ describe('loadRuntimeConnectionConfiguration', () => {
     }
   });
 
+  it('allows one canonical verified-Google bootstrap only for an existing dashboard principal', async () => {
+    const configuration = validDashboardConfiguration();
+    configuration.dashboard.googleBootstrap = {
+      email: 'OWNER@EXAMPLE.TEST',
+      principalId: 'support-agent'
+    };
+    readFileMock.mockResolvedValueOnce(JSON.stringify(configuration));
+
+    await expect(loadRuntimeConnectionConfiguration(CONFIGURATION_PATH)).resolves.toMatchObject({
+      dashboard: {
+        googleBootstrap: {
+          email: 'owner@example.test',
+          principalId: 'support-agent'
+        }
+      }
+    });
+
+    const malformedEmail = validDashboardConfiguration();
+    malformedEmail.dashboard.googleBootstrap = {
+      email: 'not-an-email',
+      principalId: 'support-agent'
+    };
+    const unknownPrincipal = validDashboardConfiguration();
+    unknownPrincipal.dashboard.googleBootstrap = {
+      email: 'support@example.test',
+      principalId: 'not-configured'
+    };
+    const inexactBootstrap = validDashboardConfiguration();
+    inexactBootstrap.dashboard.googleBootstrap = {
+      email: 'support@example.test',
+      principalId: 'support-agent',
+      unexpected: true
+    } as unknown as MutableRuntimeDashboardGoogleBootstrap;
+
+    for (const invalid of [malformedEmail, unknownPrincipal, inexactBootstrap]) {
+      readFileMock.mockResolvedValueOnce(JSON.stringify(invalid));
+      await expectGenericFailure(loadRuntimeConnectionConfiguration(CONFIGURATION_PATH));
+    }
+  });
+
   it('loads a canonical dashboard reply-intent allow-list while omitted scopes stay read-only', async () => {
     const configuration = validDashboardConfiguration();
     configuration.dashboard.principals[0]!.replyIntentInboxIds = ['support-inbox', 'sales-inbox'];
@@ -1009,10 +1049,16 @@ interface MutableRuntimeDashboardConfiguration extends MutableRuntimeInboxConfig
 }
 
 interface MutableRuntimeDashboard {
+  googleBootstrap?: MutableRuntimeDashboardGoogleBootstrap;
   principals: MutableRuntimeDashboardPrincipal[];
   publicOrigin: string;
   sessionCookieSigningKeys: string[];
   sessionIdPepper: string;
+}
+
+interface MutableRuntimeDashboardGoogleBootstrap {
+  email: string;
+  principalId: string;
 }
 
 interface MutableRuntimeDashboardPrincipal {

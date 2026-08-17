@@ -26,7 +26,7 @@ it does not mean a feature is complete.
 | [0018](0018-telegram-private-reply-eligibility.md)                  | accepted | Telegram private-chat and Bot-identity evidence before dispatch     |
 | [0019](0019-telegram-delivery-authorization-evidence.md)            | accepted | Immutable Telegram delivery authorization before dispatch           |
 | [0020](0020-experimental-zalo-user-group-bridge.md)                 | accepted | Isolated experimental Zalo User group bridge                        |
-| [0021](0021-linked-google-dashboard-sign-in.md)                     | accepted | Linked Google sign-in for configured dashboard principals           |
+| [0021](0021-linked-google-dashboard-sign-in.md)                     | accepted | Configured Google sign-in for dashboard principals                  |
 
 Template for a new ADR:
 

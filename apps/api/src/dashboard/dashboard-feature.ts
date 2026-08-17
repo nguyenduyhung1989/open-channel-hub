@@ -23,6 +23,15 @@ export interface DashboardPrincipal {
 }
 
 /**
+ * The only value returned for a configured first Google sign-in allow-list
+ * match. It deliberately excludes the email, password hash, inbox scope,
+ * bearer credentials, and every provider capability.
+ */
+export interface DashboardGoogleBootstrapPrincipal {
+  readonly id: string;
+}
+
+/**
  * A dashboard-safe view of an inbox. It deliberately omits the inbox bearer
  * token so neither the renderer nor a browser route can expose it.
  */
@@ -104,6 +113,7 @@ export interface DashboardFeature {
     principalId: string,
     inboxId: string
   ) => DashboardTelegramDeliveryAuthorizationInbox | undefined;
+  findGoogleBootstrapPrincipal: (email: string) => DashboardGoogleBootstrapPrincipal | undefined;
   findPrincipal: (principalId: string) => DashboardPrincipal | undefined;
   listInboxes: (principalId: string) => readonly DashboardInbox[];
 }

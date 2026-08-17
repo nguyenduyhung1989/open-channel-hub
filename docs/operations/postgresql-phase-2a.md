@@ -189,7 +189,7 @@ The optional linked dashboard Google sign-in adds forward migration
 domain-separated HMAC of a verified Google subject for one configured dashboard
 principal and its binding time. It does not store a raw subject, email, Google
 token, browser session, inbox bearer, or provider credential. See the
-[linked Google sign-in guide](dashboard-google-sign-in.md).
+[Google dashboard sign-in guide](dashboard-google-sign-in.md).
 
 ## Configure without exposing passwords
 

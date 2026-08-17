@@ -80,15 +80,16 @@ that fact. It exposes no bearer, Bot credential, target, fingerprint, provider
 request, worker, retry, delivery result, or live Telegram claim. It is a
 self-hosted one-operator alpha boundary, not a dual-control system.
 
-An optional linked Google sign-in candidate builds on the same configured
+An optional Google sign-in candidate builds on the same configured
 dashboard-principal boundary. It uses a server-side authorization-code flow
-with PKCE, state, nonce, and verified ID-token subject; PostgreSQL retains only
-an immutable domain-separated HMAC of that subject mapped one-to-one to a
-pre-existing configured principal. A Google account cannot create or claim a
-principal, inbox permission, or provider connection. The feature uses only
-file-backed client ID/secret values and does not retain a Google access, ID, or
-refresh token. Its exact callback registration and first-link procedure are in
-the [linked Google dashboard sign-in guide](docs/operations/dashboard-google-sign-in.md).
+with PKCE, state, nonce, verified ID-token subject, and verified email. One
+optional `dashboard.googleBootstrap` entry may let one exact configured Google
+email bind itself once to one pre-existing configured principal; PostgreSQL
+still retains only an immutable domain-separated HMAC of the subject. Google
+cannot create a principal, inbox permission, or provider connection. The
+feature uses only file-backed client ID/secret values and does not retain a
+Google access, ID, or refresh token. Its exact callback registration and
+first-sign-in procedure are in the [Google dashboard sign-in guide](docs/operations/dashboard-google-sign-in.md).
 
 The official Telegram Bot HTTP transport is wired for a deliberately narrow
 legacy text send/receive slice. Legacy mode uses <code>OPERATOR_API_TOKEN</code>;

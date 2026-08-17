@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { isIP } from 'node:net';
 
 import { isTelegramBotToken } from '../telegram-bot/telegram-bot-provider-identity.js';
+import { normalizeDashboardGoogleEmail } from '../dashboard/dashboard-google-email.js';
 
 export interface RuntimeTelegramBotConnection {
   readonly id: string;
@@ -113,11 +114,22 @@ export interface RuntimeDashboardPrincipal {
 }
 
 /**
+ * One deployment-local, first-sign-in allow-list entry. It maps a verified
+ * Google email to an already configured principal; it never creates a role or
+ * derives inbox permissions from Google.
+ */
+export interface RuntimeDashboardGoogleBootstrap {
+  readonly email: string;
+  readonly principalId: string;
+}
+
+/**
  * The optional server-rendered dashboard boundary. The loader only validates
  * and freezes its secret material; password hashes are verified later by the
  * dashboard authentication feature and are never logged from this boundary.
  */
 export interface RuntimeDashboard {
+  readonly googleBootstrap?: RuntimeDashboardGoogleBootstrap;
   readonly principals: readonly RuntimeDashboardPrincipal[];
   readonly publicOrigin: string;
   readonly sessionCookieSigningKeys: readonly string[];
@@ -201,6 +213,8 @@ const DASHBOARD_REQUIRED_KEYS = Object.freeze([
   'sessionIdPepper',
   'principals'
 ]);
+const DASHBOARD_OPTIONAL_KEYS = Object.freeze(['googleBootstrap']);
+const DASHBOARD_GOOGLE_BOOTSTRAP_REQUIRED_KEYS = Object.freeze(['email', 'principalId']);
 const DASHBOARD_PRINCIPAL_REQUIRED_KEYS = Object.freeze(['id', 'passwordHash', 'inboxIds']);
 const DASHBOARD_PRINCIPAL_OPTIONAL_KEYS = Object.freeze([
   'replyIntentInboxIds',
@@ -562,7 +576,7 @@ const parseDashboard = ({
 
   if (
     inboxes === undefined ||
-    !hasExactKeys(candidate, DASHBOARD_REQUIRED_KEYS, []) ||
+    !hasExactKeys(candidate, DASHBOARD_REQUIRED_KEYS, DASHBOARD_OPTIONAL_KEYS) ||
     !Array.isArray(candidate.sessionCookieSigningKeys) ||
     candidate.sessionCookieSigningKeys.length < 1 ||
     candidate.sessionCookieSigningKeys.length > 2
@@ -580,8 +594,10 @@ const parseDashboard = ({
     candidate.principals,
     new Set(inboxes.map(({ id }) => id))
   );
+  const googleBootstrap = parseDashboardGoogleBootstrap(candidate.googleBootstrap, principals);
 
   return Object.freeze({
+    ...(googleBootstrap === undefined ? {} : { googleBootstrap }),
     principals,
     publicOrigin,
     sessionCookieSigningKeys: dashboardSecrets.sessionCookieSigningKeys,
@@ -735,7 +751,6 @@ const parseDashboardPrincipal = (
     configuredInboxIds,
     readableInboxIds: inboxIds
   });
-
   return Object.freeze({
     id: value.id,
     inboxIds: Object.freeze([...inboxIds].sort()),
@@ -743,6 +758,30 @@ const parseDashboardPrincipal = (
     replyIntentInboxIds,
     telegramDeliveryAuthorizationInboxIds
   });
+};
+
+const parseDashboardGoogleBootstrap = (
+  value: unknown,
+  principals: readonly RuntimeDashboardPrincipal[]
+): RuntimeDashboardGoogleBootstrap | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (
+    !hasExactKeys(value, DASHBOARD_GOOGLE_BOOTSTRAP_REQUIRED_KEYS, []) ||
+    !isDashboardPrincipalId(value.principalId)
+  ) {
+    throw new RuntimeConnectionConfigurationError();
+  }
+
+  const email = normalizeDashboardGoogleEmail(value.email);
+
+  if (email === undefined || !principals.some((principal) => principal.id === value.principalId)) {
+    throw new RuntimeConnectionConfigurationError();
+  }
+
+  return Object.freeze({ email, principalId: value.principalId });
 };
 
 interface ParseReplyIntentInboxIdsInput {

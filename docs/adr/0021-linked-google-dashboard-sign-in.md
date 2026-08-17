@@ -1,4 +1,4 @@
-# ADR-0021: Linked Google sign-in for configured dashboard principals
+# ADR-0021: Configured Google sign-in for dashboard principals
 
 **Date:** 2026-08-17
 
@@ -35,7 +35,22 @@ must exactly equal:
 <dashboard.publicOrigin>/operator/auth/google/callback
 ```
 
-### Link first; sign in later
+### Permit one explicitly configured first Google sign-in
+
+The optional runtime `dashboard.googleBootstrap` object contains exactly one
+canonical Google email and the ID of one already configured dashboard
+principal. It is a deployment-local allow-list, not an invitation or role
+definition. On a first Google login only, after verifying the ID-token
+signature/audience/nonce and `email_verified: true`, the server compares that
+email with the configured value. A match writes the existing immutable
+subject-HMAC link and issues that principal's session. A mismatch, unverified
+email, stale principal, or link conflict returns the same generic invalid-login
+result.
+
+The raw email remains only in the runtime configuration long enough for this
+comparison. PostgreSQL receives only the subject HMAC and principal ID.
+
+### Keep manual link available for an authenticated principal
 
 A Google identity is not an account-creation mechanism. An already
 authenticated configured dashboard principal uses the native
@@ -55,14 +70,15 @@ its file-backed secret and a fixed domain separator. It is deliberately
 independent from `sessionIdPepper`: forced dashboard-session invalidation must
 not orphan an otherwise valid Google link.
 
-The ordinary `GET /operator/auth/google/login` callback can issue a dashboard
-session only after the verified HMAC lookup resolves to a currently configured
-principal. An unknown Google account receives the same generic invalid-login
-result as another failed sign-in and cannot create or claim a principal.
+The ordinary `GET /operator/auth/google/login` callback first resolves an
+existing verified HMAC link to a currently configured principal. Only if no
+link exists may it evaluate the one configured bootstrap allow-list entry.
+An unknown Google account receives the same generic invalid-login result as
+another failed sign-in and cannot create or claim a principal.
 
 ### Use the server-side authorization-code flow with PKCE
 
-The server uses the Google authorization-code flow with `openid`, PKCE S256,
+The server uses the Google authorization-code flow with `openid email`, PKCE S256,
 state, and nonce. A ten-minute in-memory transaction retains the code verifier,
 state, nonce, and optional linking principal. The browser receives only a
 signed opaque transaction-ID cookie. Every callback consumes the transaction
@@ -82,8 +98,8 @@ checks.
 ### Automatically create a principal from a Google email
 
 Rejected. An email address is personal data, changes over time, and does not
-define dashboard inbox scope. Auto-provisioning would turn one consent screen
-into an invitation and authorization system.
+define dashboard inbox scope. The chosen bootstrap is narrower: it names one
+pre-existing principal and cannot create a role, scope, or account.
 
 ### Persist a Google access or refresh token
 
@@ -106,9 +122,10 @@ client after a separate operational review.
 
 ## Consequences
 
-- A configured principal can link one Google account and then use Google for
-  dashboard sign-in without exposing an inbox bearer or provider credential to
-  the browser.
+- One exact configured owner email can bind one existing principal at its first
+  verified Google sign-in; an authenticated principal may still use the manual
+  link flow. Neither path exposes an inbox bearer or provider credential to the
+  browser.
 - A service restart safely cancels an in-progress Google flow because the PKCE
   transaction is intentionally in memory only; a user simply starts it again.
 - The current identity HMAC is derived inside the approved OAuth-client

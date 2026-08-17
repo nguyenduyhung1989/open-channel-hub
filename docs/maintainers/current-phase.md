@@ -30,7 +30,7 @@ that one server-owned scope. The final step is visibly paused: this does not add
 provider sending, a worker, retry, delivery/read status, or browser credential.
 
 **Candidate dashboard authentication extension:** the current working tree adds
-optional linked Google sign-in for an existing configured dashboard principal.
+optional configured Google sign-in for an existing dashboard principal.
 It uses a server-side authorization-code PKCE flow, exact redirect URI,
 state/nonce, a short-lived opaque transaction cookie, and one immutable
 HMAC-only identity link per principal. It does not auto-provision an account,

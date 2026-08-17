@@ -53,7 +53,7 @@ describe('dashboard routes', () => {
 
   it('uses a one-time signed PKCE transaction before issuing a dashboard session for a linked Google identity', async () => {
     const googleExchange = vi.fn(async () =>
-      Object.freeze({ subject: 'synthetic-google-subject-101' })
+      Object.freeze({ email: 'linked@example.test', subject: 'synthetic-google-subject-101' })
     );
     const subjectHmac = vi.fn(() => 'a'.repeat(64));
     const findPrincipalId = vi.fn(async () => 'support-agent');
@@ -135,7 +135,7 @@ describe('dashboard routes', () => {
         createAuthorizationUrl: ({ state }: Readonly<{ state: string }>) =>
           `https://accounts.example.test/authorize?state=${encodeURIComponent(state)}`,
         exchangeAuthorizationCode: async () =>
-          Object.freeze({ subject: 'unlinked-google-subject' }),
+          Object.freeze({ email: 'unlinked@example.test', subject: 'unlinked-google-subject' }),
         subjectHmac: () => 'b'.repeat(64)
       }),
       identityStore: Object.freeze({
@@ -165,7 +165,7 @@ describe('dashboard routes', () => {
 
   it('links Google only from an active same-principal dashboard session with origin and CSRF checks', async () => {
     const googleExchange = vi.fn(async () =>
-      Object.freeze({ subject: 'synthetic-google-subject-link' })
+      Object.freeze({ email: 'linked@example.test', subject: 'synthetic-google-subject-link' })
     );
     const bind = vi.fn(async () => Object.freeze({ kind: 'created' as const }));
     const googleAuthentication: DashboardGoogleAuthentication = Object.freeze({
@@ -232,6 +232,146 @@ describe('dashboard routes', () => {
       subjectHmac: expect.stringMatching(/^[a-f0-9]{64}$/)
     });
     expect(googleExchange).toHaveBeenCalledOnce();
+  });
+
+  it('binds the one configured verified Google email on first sign-in without a password bridge', async () => {
+    const bind = vi.fn(async () => Object.freeze({ kind: 'created' as const }));
+    const googleAuthentication: DashboardGoogleAuthentication = Object.freeze({
+      client: Object.freeze({
+        createAuthorizationUrl: ({ state }: Readonly<{ state: string }>) =>
+          `https://accounts.example.test/authorize?state=${encodeURIComponent(state)}`,
+        exchangeAuthorizationCode: async () =>
+          Object.freeze({
+            email: 'owner@example.test',
+            subject: 'synthetic-google-subject-bootstrap'
+          }),
+        subjectHmac: () => 'd'.repeat(64)
+      }),
+      identityStore: Object.freeze({ bind, findPrincipalId: vi.fn(async () => undefined) })
+    });
+    const harness = await createHarness({
+      googleAuthentication,
+      googleBootstrapEmail: 'owner@example.test'
+    });
+    applications.push(harness.app);
+
+    const start = await harness.app.inject({ method: 'GET', url: '/operator/auth/google/login' });
+    const transactionCookie = cookieFrom(start, '__Host-och_dashboard_google_oauth');
+    const state = new URL(
+      start.headers.location ?? 'https://invalid.example.test'
+    ).searchParams.get('state');
+    const callback = await harness.app.inject({
+      headers: { cookie: cookiePair(transactionCookie) },
+      method: 'GET',
+      url: `/operator/auth/google/callback?code=synthetic-google-code&state=${state}`
+    });
+
+    expect(callback.statusCode).toBe(303);
+    expect(callback.headers.location).toBe('/operator');
+    expect(cookieHeaderValues(callback).join('\n')).toContain('__Host-och_dashboard_session=');
+    expect(bind).toHaveBeenCalledWith({
+      principalId: 'support-agent',
+      subjectHmac: 'd'.repeat(64)
+    });
+    expect(JSON.stringify(bind.mock.calls)).not.toContain('owner@example.test');
+  });
+
+  it('does not bind a first Google sign-in whose verified email is not configured', async () => {
+    const bind = vi.fn(async () => Object.freeze({ kind: 'created' as const }));
+    const googleAuthentication: DashboardGoogleAuthentication = Object.freeze({
+      client: Object.freeze({
+        createAuthorizationUrl: ({ state }: Readonly<{ state: string }>) =>
+          `https://accounts.example.test/authorize?state=${encodeURIComponent(state)}`,
+        exchangeAuthorizationCode: async () =>
+          Object.freeze({ email: 'other@example.test', subject: 'synthetic-google-subject-other' }),
+        subjectHmac: () => 'e'.repeat(64)
+      }),
+      identityStore: Object.freeze({ bind, findPrincipalId: vi.fn(async () => undefined) })
+    });
+    const harness = await createHarness({
+      googleAuthentication,
+      googleBootstrapEmail: 'owner@example.test'
+    });
+    applications.push(harness.app);
+
+    const start = await harness.app.inject({ method: 'GET', url: '/operator/auth/google/login' });
+    const transactionCookie = cookieFrom(start, '__Host-och_dashboard_google_oauth');
+    const state = new URL(
+      start.headers.location ?? 'https://invalid.example.test'
+    ).searchParams.get('state');
+    const callback = await harness.app.inject({
+      headers: { cookie: cookiePair(transactionCookie) },
+      method: 'GET',
+      url: `/operator/auth/google/callback?code=synthetic-google-code&state=${state}`
+    });
+
+    expect(callback.statusCode).toBe(303);
+    expect(callback.headers.location).toBe('/operator/login?error=invalid');
+    expect(cookieHeaderValues(callback).join('\n')).not.toContain('__Host-och_dashboard_session=');
+    expect(bind).not.toHaveBeenCalled();
+  });
+
+  it('keeps bootstrap conflicts and stale stored principals indistinguishable from an invalid Google login', async () => {
+    const bootstrapBind = vi.fn(async () => Object.freeze({ kind: 'conflict' as const }));
+    const conflictingAuthentication: DashboardGoogleAuthentication = Object.freeze({
+      client: Object.freeze({
+        createAuthorizationUrl: ({ state }: Readonly<{ state: string }>) =>
+          `https://accounts.example.test/authorize?state=${encodeURIComponent(state)}`,
+        exchangeAuthorizationCode: async () =>
+          Object.freeze({ email: 'owner@example.test', subject: 'synthetic-google-conflict' }),
+        subjectHmac: () => 'f'.repeat(64)
+      }),
+      identityStore: Object.freeze({
+        bind: bootstrapBind,
+        findPrincipalId: vi.fn(async () => undefined)
+      })
+    });
+    const staleBind = vi.fn(async () => Object.freeze({ kind: 'created' as const }));
+    const staleAuthentication: DashboardGoogleAuthentication = Object.freeze({
+      client: Object.freeze({
+        createAuthorizationUrl: ({ state }: Readonly<{ state: string }>) =>
+          `https://accounts.example.test/authorize?state=${encodeURIComponent(state)}`,
+        exchangeAuthorizationCode: async () =>
+          Object.freeze({ email: 'owner@example.test', subject: 'synthetic-google-stale' }),
+        subjectHmac: () => '0'.repeat(64)
+      }),
+      identityStore: Object.freeze({
+        bind: staleBind,
+        findPrincipalId: vi.fn(async () => 'retired-principal')
+      })
+    });
+
+    const conflictHarness = await createHarness({
+      googleAuthentication: conflictingAuthentication,
+      googleBootstrapEmail: 'owner@example.test'
+    });
+    const staleHarness = await createHarness({
+      googleAuthentication: staleAuthentication,
+      googleBootstrapEmail: 'owner@example.test'
+    });
+    applications.push(conflictHarness.app, staleHarness.app);
+
+    for (const harness of [conflictHarness, staleHarness]) {
+      const start = await harness.app.inject({ method: 'GET', url: '/operator/auth/google/login' });
+      const transactionCookie = cookieFrom(start, '__Host-och_dashboard_google_oauth');
+      const state = new URL(
+        start.headers.location ?? 'https://invalid.example.test'
+      ).searchParams.get('state');
+      const callback = await harness.app.inject({
+        headers: { cookie: cookiePair(transactionCookie) },
+        method: 'GET',
+        url: `/operator/auth/google/callback?code=synthetic-google-code&state=${state}`
+      });
+
+      expect(callback.statusCode).toBe(303);
+      expect(callback.headers.location).toBe('/operator/login?error=invalid');
+      expect(cookieHeaderValues(callback).join('\n')).not.toContain(
+        '__Host-och_dashboard_session='
+      );
+    }
+
+    expect(bootstrapBind).toHaveBeenCalledOnce();
+    expect(staleBind).not.toHaveBeenCalled();
   });
 
   it('renders only escaped safe queued-command history through the signed dashboard session', async () => {
@@ -1328,6 +1468,7 @@ describe('dashboard routes', () => {
 const createHarness = async (
   options: Readonly<{
     googleAuthentication?: DashboardGoogleAuthentication;
+    googleBootstrapEmail?: string;
     historyRead?: ReturnType<typeof vi.fn>;
     replyIntentInboxIds?: readonly string[];
     replyIntentRecord?: ReplyIntentRecord;
@@ -1424,6 +1565,11 @@ const createHarness = async (
       principal.telegramDeliveryAuthorizationInboxIds.includes(inboxId) &&
       inboxId === telegramDeliveryAuthorizationInbox.id
         ? telegramDeliveryAuthorizationInbox
+        : undefined,
+    findGoogleBootstrapPrincipal: (email: string) =>
+      options.googleBootstrapEmail !== undefined &&
+      email.toLowerCase() === options.googleBootstrapEmail.toLowerCase()
+        ? Object.freeze({ id: principal.id })
         : undefined,
     findPrincipal: (principalId: string): DashboardPrincipal | undefined =>
       principalId === principal.id ? principal : undefined,

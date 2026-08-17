@@ -350,11 +350,27 @@ export const registerDashboardRoutes = async (
 
       if (transaction.mode === 'login') {
         try {
-          const principalId = await googleAuthentication.identityStore.findPrincipalId({
+          const linkedPrincipalId = await googleAuthentication.identityStore.findPrincipalId({
             subjectHmac
           });
+          const linkedPrincipal =
+            linkedPrincipalId === undefined ? undefined : feature.findPrincipal(linkedPrincipalId);
 
-          if (principalId === undefined || feature.findPrincipal(principalId) === undefined) {
+          if (linkedPrincipalId !== undefined && linkedPrincipal === undefined) {
+            return redirectDashboard(reply, '/operator/login?error=invalid');
+          }
+
+          const principalId =
+            linkedPrincipal === undefined
+              ? await bindGoogleBootstrapIdentity({
+                  email: identity.email,
+                  feature,
+                  googleAuthentication,
+                  subjectHmac
+                })
+              : linkedPrincipal.id;
+
+          if (principalId === undefined) {
             return redirectDashboard(reply, '/operator/login?error=invalid');
           }
 
@@ -647,6 +663,36 @@ export const registerDashboardRoutes = async (
       return sendDashboardFailure(reply.code(500));
     }
   });
+};
+
+/**
+ * A configured bootstrap maps exactly one verified Google email to one
+ * existing principal. The identity store still makes the durable subject link
+ * immutable and race-safe; a conflict is deliberately indistinguishable from
+ * an unknown login.
+ */
+const bindGoogleBootstrapIdentity = async (
+  input: Readonly<{
+    email: string;
+    feature: DashboardFeature;
+    googleAuthentication: NonNullable<DashboardFeature['googleAuthentication']>;
+    subjectHmac: string;
+  }>
+): Promise<string | undefined> => {
+  const principal = input.feature.findGoogleBootstrapPrincipal(input.email);
+
+  if (principal === undefined || input.feature.findPrincipal(principal.id) === undefined) {
+    return undefined;
+  }
+
+  const result = await input.googleAuthentication.identityStore.bind({
+    principalId: principal.id,
+    subjectHmac: input.subjectHmac
+  });
+
+  return result.kind === 'created' || result.kind === 'idempotent_replay'
+    ? principal.id
+    : undefined;
 };
 
 const resolveDashboardPageRequest = async (

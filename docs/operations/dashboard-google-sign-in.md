@@ -1,9 +1,10 @@
-# Linked Google sign-in for the operator dashboard
+# Google sign-in for the operator dashboard
 
 This optional feature lets an already configured dashboard principal sign in
-with one pre-linked Google account. It is not public Google registration and
-does not create a dashboard principal, inbox permission, provider connection,
-or provider credential.
+with Google. A deployment may name one exact verified Google email as a
+one-time first-sign-in bootstrap for one existing principal. It is not public
+Google registration and does not create a dashboard principal, inbox
+permission, provider connection, or provider credential.
 
 ## Prerequisites
 
@@ -52,7 +53,38 @@ Compose mounts the values as `/run/secrets/google_oauth_client_id` and
 The API validates that both are present and distinct. Supplying only one makes
 startup fail safely rather than leaving a half-enabled login path.
 
-## Link the first Google account
+## Let the owner sign in directly for the first time
+
+Add one optional object beside `dashboard.principals` in the same runtime
+connection JSON. The email is deployment-local configuration only; use the
+owner's actual address locally and never commit it:
+
+```json
+{
+  "dashboard": {
+    "googleBootstrap": {
+      "email": "owner@example.test",
+      "principalId": "support-agent"
+    }
+  }
+}
+```
+
+`principalId` must already exist in `dashboard.principals`. On the first
+**Đăng nhập bằng Google**, the server verifies the signed ID token, its
+audience, nonce, and `email_verified: true`; only then does it compare the
+canonical email to `googleBootstrap.email`. A match writes the same immutable
+Google-subject HMAC link as a manual link and immediately starts that
+principal's dashboard session. An email mismatch, missing/unverified email,
+stale principal, or identity conflict has the same generic invalid-login
+result.
+
+The bootstrap object is singular: it is deliberately an owner convenience, not
+a multi-user invitation system. Remove it after the first successful sign-in
+if the deployment does not need it again; the durable HMAC link continues to
+work.
+
+## Optional manual Google link
 
 1. Open `/operator/login` and sign in with the already configured principal
    ID and password.
@@ -61,10 +93,10 @@ startup fail safely rather than leaving a half-enabled login path.
 4. The callback returns to `/operator`. A generic failure means no identity
    link was written; do not infer whether an account exists or is linked to
    someone else.
-5. Sign out. The login page now lets that pre-linked Google account use
+5. Sign out. The login page now lets that Google account use
    **Đăng nhập bằng Google**.
 
-The initial link has three independent checks: the current signed dashboard
+The optional manual link has three independent checks: the current signed dashboard
 session, the exact configured Origin, and the dashboard anti-forgery token.
 The callback additionally consumes one short-lived state/PKCE/nonce transaction
 and must return to the same linking principal.
@@ -77,9 +109,11 @@ binding time. It intentionally excludes raw Google account data, email, name,
 access tokens, refresh tokens, ID tokens, browser session values, inbox bearer
 tokens, provider credentials, and provider data.
 
-An unknown Google account cannot sign in. The server does not provision an
-account or derive an inbox scope from Google. One Google identity and one
-configured principal have a one-to-one immutable relationship.
+An unknown Google account cannot sign in. The one optional bootstrap email is
+read only during the verified callback comparison and is not retained in the
+identity table. The server never provisions an account or derives inbox scope
+from Google. One Google identity and one configured principal have a one-to-one
+immutable relationship.
 
 ## Session and failure behavior
 

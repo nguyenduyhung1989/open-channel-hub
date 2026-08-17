@@ -4,7 +4,8 @@ import {
   createDashboardGoogleOAuthClient,
   createDashboardGoogleOAuthTransactionManager,
   dashboardGoogleSubjectHmac,
-  DashboardGoogleOAuthError
+  DashboardGoogleOAuthError,
+  toVerifiedDashboardGoogleIdentity
 } from './dashboard-google-oauth.js';
 
 const FIXED_RANDOM = (size: number): Buffer => Buffer.alloc(size, 7);
@@ -69,7 +70,7 @@ describe('dashboard Google OAuth boundary', () => {
     expect(url.searchParams.get('redirect_uri')).toBe(
       'https://dashboard.example.test/operator/auth/google/callback'
     );
-    expect(url.searchParams.get('scope')).toBe('openid');
+    expect(url.searchParams.get('scope')?.split(' ').sort()).toEqual(['email', 'openid']);
     expect(url.searchParams.get('access_type')).toBe('online');
     expect(url.searchParams.get('code_challenge_method')).toBe('S256');
     expect(url.searchParams.get('code_challenge')).toBe('c'.repeat(43));
@@ -114,6 +115,32 @@ describe('dashboard Google OAuth boundary', () => {
     expect(() => dashboardGoogleSubjectHmac(IDENTITY_KEY, 'subject\nwith-control')).toThrow(
       DashboardGoogleOAuthError
     );
+  });
+
+  it('accepts a provider-verified email only long enough to bind the configured first sign-in', () => {
+    const accepted = toVerifiedDashboardGoogleIdentity(
+      {
+        email: 'OWNER@EXAMPLE.TEST',
+        email_verified: true,
+        nonce: 'n'.repeat(43),
+        sub: 'synthetic-google-subject-101'
+      },
+      'n'.repeat(43)
+    );
+
+    expect(accepted).toEqual({
+      email: 'owner@example.test',
+      subject: 'synthetic-google-subject-101'
+    });
+
+    for (const rejected of [
+      { email: 'owner@example.test', email_verified: false, nonce: 'n'.repeat(43), sub: '1' },
+      { email: 'not-an-email', email_verified: true, nonce: 'n'.repeat(43), sub: '1' },
+      { email_verified: true, nonce: 'n'.repeat(43), sub: '1' },
+      { email: 'owner@example.test', email_verified: true, nonce: 'x'.repeat(43), sub: '1' }
+    ]) {
+      expect(toVerifiedDashboardGoogleIdentity(rejected, 'n'.repeat(43))).toBeUndefined();
+    }
   });
 
   it('derives the identity HMAC inside the OAuth-client boundary instead of from session state', () => {

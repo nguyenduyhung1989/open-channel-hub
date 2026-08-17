@@ -6,6 +6,7 @@ import type {
 } from '../connections/runtime-connection-configuration.js';
 import type { InboxFeature } from '../inbox/inbox-feature.js';
 import type {
+  DashboardGoogleBootstrapPrincipal,
   DashboardGoogleAuthentication,
   DashboardFeature,
   DashboardInbox,
@@ -15,6 +16,7 @@ import type {
   DashboardTelegramDeliveryAuthorizationInbox,
   DashboardTelegramDeliveryAuthorizationInput
 } from './dashboard-feature.js';
+import { normalizeDashboardGoogleEmail } from './dashboard-google-email.js';
 import type { DashboardGoogleOAuthClient } from './dashboard-google-oauth.js';
 
 /** A non-diagnostic composition failure for an invalid server-only dashboard graph. */
@@ -38,6 +40,10 @@ export const createRuntimeDashboardFeature = (
 ): DashboardFeature => {
   const inboxById = toInboxSnapshot(inboxes);
   const principalById = toPrincipalSnapshot(configuration.principals, inboxById);
+  const googleBootstrapPrincipalByEmail = toGoogleBootstrapPrincipalSnapshot(
+    configuration,
+    principalById
+  );
   const replyIntentInboxesByPrincipal = toReplyIntentInboxesByPrincipal(principalById, inboxes);
   const telegramDeliveryAuthorizationInboxesByPrincipal =
     toTelegramDeliveryAuthorizationInboxesByPrincipal(principalById, inboxes);
@@ -75,6 +81,13 @@ export const createRuntimeDashboardFeature = (
       inboxId: string
     ): DashboardTelegramDeliveryAuthorizationInbox | undefined =>
       telegramDeliveryAuthorizationInboxesByPrincipal.get(principalId)?.get(inboxId),
+    findGoogleBootstrapPrincipal: (
+      email: string
+    ): DashboardGoogleBootstrapPrincipal | undefined => {
+      const normalized = normalizeDashboardGoogleEmail(email);
+
+      return normalized === undefined ? undefined : googleBootstrapPrincipalByEmail.get(normalized);
+    },
     findPrincipal: (principalId: string): DashboardPrincipal | undefined =>
       principalById.get(principalId),
     listInboxes: (principalId: string): readonly DashboardInbox[] =>
@@ -87,6 +100,34 @@ export const createRuntimeDashboardFeature = (
     sessionIdPepper: configuration.sessionIdPepper,
     sessionStore
   });
+};
+
+/**
+ * Configured email is an invitation to bind a Google subject once, not a
+ * browser-visible identity attribute. The durable store still records only the
+ * Google-subject HMAC after the provider verifies account ownership.
+ */
+const toGoogleBootstrapPrincipalSnapshot = (
+  configuration: RuntimeDashboard,
+  principals: ReadonlyMap<string, DashboardPrincipal>
+): ReadonlyMap<string, DashboardGoogleBootstrapPrincipal> => {
+  const bootstrapPrincipals = new Map<string, DashboardGoogleBootstrapPrincipal>();
+  const bootstrap = configuration.googleBootstrap;
+
+  if (bootstrap === undefined) {
+    return bootstrapPrincipals;
+  }
+
+  const email = normalizeDashboardGoogleEmail(bootstrap.email);
+  const principal = principals.get(bootstrap.principalId);
+
+  if (email === undefined || principal === undefined) {
+    throw new RuntimeDashboardFeatureError();
+  }
+
+  bootstrapPrincipals.set(email, Object.freeze({ id: principal.id }));
+
+  return bootstrapPrincipals;
 };
 
 const toGoogleAuthenticationSnapshot = (

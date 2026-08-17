@@ -3,6 +3,8 @@ import { readFile } from 'node:fs/promises';
 
 import { CodeChallengeMethod, OAuth2Client } from 'google-auth-library';
 
+import { normalizeDashboardGoogleEmail } from './dashboard-google-email.js';
+
 const OPAQUE_TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const GOOGLE_CODE_PATTERN = /^[!-~]{1,2048}$/;
 const GOOGLE_SUBJECT_MAXIMUM_BYTES = 255;
@@ -34,8 +36,13 @@ export interface DashboardGoogleAuthorizationCodeInput {
   readonly nonce: string;
 }
 
-/** The only Google claim the dashboard retains long enough to HMAC it. */
+/**
+ * Claims retained only through the verified callback: `subject` is HMACed and
+ * `email` is compared only with the deployment-local first-sign-in entry.
+ */
 export interface DashboardGoogleIdentity {
+  /** Verified only long enough to select a configured first-sign-in allow-list entry. */
+  readonly email: string;
   readonly subject: string;
 }
 
@@ -149,7 +156,7 @@ export const createDashboardGoogleOAuthClient = (
         code_challenge_method: CodeChallengeMethod.S256,
         nonce: input.nonce,
         prompt: 'select_account',
-        scope: ['openid'],
+        scope: ['openid', 'email'],
         state: input.state
       });
     },
@@ -176,18 +183,7 @@ export const createDashboardGoogleOAuthClient = (
           audience: configuration.clientId,
           idToken
         });
-        const payload = ticket.getPayload();
-        const subject = payload?.sub;
-
-        if (
-          !isGoogleSubject(subject) ||
-          !isOpaqueToken(payload?.nonce) ||
-          !matchesOpaqueToken(input.nonce, payload.nonce)
-        ) {
-          return undefined;
-        }
-
-        return Object.freeze({ subject });
+        return toVerifiedDashboardGoogleIdentity(ticket.getPayload(), input.nonce);
       } catch {
         return undefined;
       }
@@ -197,6 +193,36 @@ export const createDashboardGoogleOAuthClient = (
     subjectHmac: (subject: string): string =>
       dashboardGoogleSubjectHmac(configuration.clientSecret, subject)
   });
+};
+
+/**
+ * Narrows claims only after `verifyIdToken` has checked the Google signature,
+ * issuer, audience, and expiry. Google Auth Library does not itself require
+ * `email_verified`, so the dashboard enforces it before an allow-list match.
+ */
+export const toVerifiedDashboardGoogleIdentity = (
+  payload: unknown,
+  expectedNonce: string
+): DashboardGoogleIdentity | undefined => {
+  if (!isRecord(payload)) {
+    return undefined;
+  }
+
+  const subject = payload.sub;
+  const nonce = payload.nonce;
+  const email = normalizeDashboardGoogleEmail(payload.email);
+
+  if (
+    !isGoogleSubject(subject) ||
+    !isOpaqueToken(nonce) ||
+    !matchesOpaqueToken(expectedNonce, nonce) ||
+    payload.email_verified !== true ||
+    email === undefined
+  ) {
+    return undefined;
+  }
+
+  return Object.freeze({ email, subject });
 };
 
 /**

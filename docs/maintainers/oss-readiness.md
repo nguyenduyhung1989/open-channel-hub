@@ -51,7 +51,7 @@ organization has accepted the project.
   <code>7672be9</code>. The local smoke intentionally remains dashboard-free
   because it is HTTP on loopback and cannot prove the required external HTTPS
   browser boundary.
-- The current Phase 4k candidate adds optional linked Google sign-in only for
+- The current Phase 4k candidate adds optional configured Google sign-in only for
   an already configured dashboard principal. It uses a file-backed shared OAuth
   client, server-side authorization-code PKCE, and an immutable HMAC-only
   identity link. It has not yet received final frozen-source, GitHub, or

@@ -18,7 +18,7 @@ production configuration.
 Before enabling it, all of the following must already be true:
 
 - PostgreSQL is configured and migration `0008_dashboard_sessions` has run.
-  If linked Google sign-in is enabled, migration
+  If Google dashboard sign-in is enabled, migration
   `0015_dashboard_google_identities` must also have run.
 - The version-1 runtime secret document contains configured `connections` and
   at least one configured `inboxes` entry. Dashboard principals may select only
@@ -143,7 +143,7 @@ When both file-backed Google OAuth values are configured, the same page also
 shows **Đăng nhập bằng Google**. Google does not create a principal: an
 already authenticated local principal must first select **Liên kết Google**.
 The callback, identity retention, exact redirect URI, and recovery procedure
-are documented in the [linked Google sign-in guide](dashboard-google-sign-in.md).
+are documented in the [Google dashboard sign-in guide](dashboard-google-sign-in.md).
 `SameSite=Lax` is limited to the top-level Google callback; every state-changing
 dashboard form still requires the exact configured Origin and a matching
 anti-forgery token.
